@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <RootNamespace>AxonIQ.AxonServer.Connector</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.18.1" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.40.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.41.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="..\..\axon-server-api\src\main\proto\common.proto" GrpcServices="None" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+    <Protobuf Include="..\..\axon-server-api\src\main\proto\admin.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+    <Protobuf Include="..\..\axon-server-api\src\main\proto\command.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+    <Protobuf Include="..\..\axon-server-api\src\main\proto\control.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+    <Protobuf Include="..\..\axon-server-api\src\main\proto\event.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+    <Protobuf Include="..\..\axon-server-api\src\main\proto\query.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+  </ItemGroup>
+</Project>

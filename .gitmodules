@@ -1,0 +1,3 @@
+[submodule "axon-server-api"]
+	path = axon-server-api
+	url = git@github.com:AxonIQ/axon-server-api.git

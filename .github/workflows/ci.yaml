@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      # composed axonserver
+      axonserver:
+        image: axoniq/axonserver:latest
+        ports:
+          - 8024:8024
+          - 8124:8124
+        env:
+          AXONIQ_AXONSERVER_NAME: axonserver
+          AXONIQ_AXONSERVER_HOSTNAME: localhost
+          AXONIQ_AXONSERVER_DEVMODE_ENABLED: true
+        options: --name axonserver-connector-dotnet-tests
+    steps:
+      # checkout the code
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      # setup dotnet based on global.json
+      - uses: actions/setup-dotnet@v1
+      # run the CI build
+      - name: make ci
+        run: make ci
+        env:
+          CI: true # I'd assume this is present by default (need to verify)
+          AXONIQ_AXONSERVER_ADDRESS: "axonserver:8024"
+          AXONIQ_AXONSERVER_GRPC_ADDRESS: "axonserver:8124"
+
