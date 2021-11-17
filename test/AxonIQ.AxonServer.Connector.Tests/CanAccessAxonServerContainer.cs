@@ -13,8 +13,9 @@ public class CanAccessAxonServerContainer
     }
 
     [Fact]
-    public void Proof()
+    public async Task Proof()
     {
         // This is where we should be able to talk to the axon server using our client
+        await _container.PurgeEvents();
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Diagnostics;
+using System.Net.Http.Headers;
 using Ductus.FluentDocker.Builders;
 using Ductus.FluentDocker.Services;
 using Ductus.FluentDocker.Services.Extensions;
@@ -79,6 +80,23 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
 
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container became available"));
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is initialized"));
+    }
+    
+    public HttpClient CreateClient()
+    {
+        return new HttpClient
+        {
+            BaseAddress = new UriBuilder
+            {
+                Host = "localhost",
+                Port = _container.ToHostExposedEndpoint("8024/tcp").Port
+            }.Uri
+        };
+    }
+
+    public Task PurgeEvents()
+    {
+        throw new NotImplementedException();
     }
 
     public Task DisposeAsync()

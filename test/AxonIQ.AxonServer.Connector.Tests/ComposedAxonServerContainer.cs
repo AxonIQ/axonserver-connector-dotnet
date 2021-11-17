@@ -13,11 +13,6 @@ public class ComposedAxonServerContainer : IAxonServerContainer
 
     public ComposedAxonServerContainer(IMessageSink logger)
     {
-        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_HOST") == null)
-        {
-            throw new InvalidOperationException("The AXONIQ_AXONSERVER_HOST environment variable is missing.");
-        }
-
         if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT") == null)
         {
             throw new InvalidOperationException("The AXONIQ_AXONSERVER_PORT environment variable is missing.");
@@ -75,6 +70,23 @@ public class ComposedAxonServerContainer : IAxonServerContainer
 
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container became available"));
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is initialized"));
+    }
+
+    public HttpClient CreateClient()
+    {
+        return new HttpClient
+        {
+            BaseAddress = new UriBuilder
+            {
+                Host = "localhost",
+                Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!)
+            }.Uri
+        };
+    }
+
+    public Task PurgeEvents()
+    {
+        throw new NotImplementedException();
     }
 
     public Task DisposeAsync()

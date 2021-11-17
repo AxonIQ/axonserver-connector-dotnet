@@ -1,3 +1,4 @@
+using Ductus.FluentDocker.Commands;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -24,6 +25,17 @@ public class AxonServerContainer : IAxonServerContainer
     public Task InitializeAsync()
     {
         return _container.InitializeAsync();
+    }
+
+    public HttpClient CreateClient()
+    {
+        return _container.CreateClient();
+    }
+
+    public async Task PurgeEvents()
+    {
+        using var client = _container.CreateClient();
+        (await client.DeleteAsync("v1/devmode/purge-events")).EnsureSuccessStatusCode();
     }
 
     public Task DisposeAsync()
