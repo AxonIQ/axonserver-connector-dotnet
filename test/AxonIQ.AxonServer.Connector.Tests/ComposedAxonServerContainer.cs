@@ -17,14 +17,17 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         {
             throw new InvalidOperationException("The AXONIQ_AXONSERVER_HOST environment variable is missing.");
         }
+
         if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT") == null)
         {
             throw new InvalidOperationException("The AXONIQ_AXONSERVER_PORT environment variable is missing.");
         }
+
         if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT") == null)
         {
             throw new InvalidOperationException("The AXONIQ_AXONSERVER_GRPC_PORT environment variable is missing.");
         }
+
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -41,18 +44,35 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         }.Uri;
 
         var available = false;
-        while (!available)
+        const int maximumAttempts = 60;
+        var attempt = 0;
+        while (!available && attempt < maximumAttempts)
         {
+            _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is being health checked at {0}",
+                requestUri.AbsoluteUri));
             try
             {
                 (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
                 available = true;
             }
-            catch(HttpRequestException)
+            catch (HttpRequestException exception)
             {
+                _logger.OnMessage(new DiagnosticMessage(
+                    "Composed Axon Server Container could not be reached at {0} because {1}",
+                    requestUri.AbsoluteUri,
+                    exception));
                 await Task.Delay(TimeSpan.FromSeconds(1));
             }
+
+            attempt++;
         }
+
+        if (!available)
+        {
+            throw new InvalidOperationException(
+                $"Composed Axon Server Container could not be initialized. Failed to reach it at {requestUri.AbsoluteUri} after {maximumAttempts} attempts");
+        }
+
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container became available"));
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is initialized"));
     }

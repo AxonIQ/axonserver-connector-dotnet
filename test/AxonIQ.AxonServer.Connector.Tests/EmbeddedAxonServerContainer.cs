@@ -19,7 +19,7 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-    
+
     public async Task InitializeAsync()
     {
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is being initialized"));
@@ -47,18 +47,36 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
         }.Uri;
 
         var available = false;
-        while (!available)
+        const int maximumAttempts = 60;
+        var attempt = 0;
+        while (!available && attempt < maximumAttempts)
         {
+            _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is being health checked at {0}",
+                requestUri.AbsoluteUri));
+
             try
             {
                 (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
                 available = true;
             }
-            catch(HttpRequestException)
+            catch (HttpRequestException exception)
             {
+                _logger.OnMessage(new DiagnosticMessage(
+                    "Embedded Axon Server Container could not be reached at {0} because {1}",
+                    requestUri.AbsoluteUri,
+                    exception));
                 await Task.Delay(TimeSpan.FromSeconds(1));
             }
+
+            attempt++;
         }
+
+        if (!available)
+        {
+            throw new InvalidOperationException(
+                $"Embedded Axon Server Container could not be initialized. Failed to reach it at {requestUri.AbsoluteUri} after {maximumAttempts} attempts");
+        }
+
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container became available"));
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is initialized"));
     }
@@ -71,6 +89,7 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
             _container.Remove(true);
             _container.Dispose();
         }
+
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container got disposed"));
         return Task.CompletedTask;
     }
