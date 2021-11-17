@@ -38,7 +38,7 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         var requestUri = new UriBuilder
         {
-            Host = Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_HOST"),
+            Host = "localhost",
             Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!),
             Path = "actuator/health"
         }.Uri;
