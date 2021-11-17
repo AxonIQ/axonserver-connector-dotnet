@@ -94,11 +94,6 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
         };
     }
 
-    public Task PurgeEvents()
-    {
-        throw new NotImplementedException();
-    }
-
     public Task DisposeAsync()
     {
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is being disposed"));

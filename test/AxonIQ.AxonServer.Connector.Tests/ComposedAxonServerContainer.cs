@@ -84,11 +84,6 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         };
     }
 
-    public Task PurgeEvents()
-    {
-        throw new NotImplementedException();
-    }
-
     public Task DisposeAsync()
     {
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is being disposed"));
