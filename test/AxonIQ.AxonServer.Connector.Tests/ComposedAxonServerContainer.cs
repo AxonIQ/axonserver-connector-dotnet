@@ -1,3 +1,7 @@
+using System.Net.Http.Headers;
+using Xunit.Abstractions;
+using Xunit.Sdk;
+
 namespace AxonIQ.AxonServer.Connector.Tests;
 
 /// <summary>
@@ -5,25 +9,58 @@ namespace AxonIQ.AxonServer.Connector.Tests;
 /// </summary>
 public class ComposedAxonServerContainer : IAxonServerContainer
 {
-    public ComposedAxonServerContainer()
+    private readonly IMessageSink _logger;
+
+    public ComposedAxonServerContainer(IMessageSink logger)
     {
-        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ADDRESS") == null)
+        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_HOST") == null)
         {
-            throw new InvalidOperationException("The AXONIQ_AXONSERVER_ADDRESS environment variable is missing.");
+            throw new InvalidOperationException("The AXONIQ_AXONSERVER_HOST environment variable is missing.");
         }
-        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_ADDRESS") == null)
+        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT") == null)
         {
-            throw new InvalidOperationException("The AXONIQ_AXONSERVER_GRPC_ADDRESS environment variable is missing.");
+            throw new InvalidOperationException("The AXONIQ_AXONSERVER_PORT environment variable is missing.");
         }
+        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT") == null)
+        {
+            throw new InvalidOperationException("The AXONIQ_AXONSERVER_GRPC_PORT environment variable is missing.");
+        }
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public Task InitializeAsync()
+    public async Task InitializeAsync()
     {
-        return Task.CompletedTask;
+        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is being initialized"));
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        var requestUri = new UriBuilder
+        {
+            Host = Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_HOST"),
+            Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!),
+            Path = "actuator/health"
+        }.Uri;
+
+        var available = false;
+        while (!available)
+        {
+            try
+            {
+                (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
+                available = true;
+            }
+            catch(HttpRequestException)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
+        }
+        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container became available"));
+        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is initialized"));
     }
 
     public Task DisposeAsync()
     {
+        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is being disposed"));
+        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container got disposed"));
         return Task.CompletedTask;
     }
 }

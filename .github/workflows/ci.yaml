@@ -34,6 +34,6 @@ jobs:
         run: make ci
         env:
           CI: true # I'd assume this is present by default (need to verify)
-          AXONIQ_AXONSERVER_ADDRESS: "axonserver:8024"
-          AXONIQ_AXONSERVER_GRPC_ADDRESS: "axonserver:8124"
-
+          AXONIQ_AXONSERVER_HOST: axonserver
+          AXONIQ_AXONSERVER_PORT: 8024
+          AXONIQ_AXONSERVER_GRPC_PORT: 8124
