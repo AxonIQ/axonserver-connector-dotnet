@@ -1,4 +1,5 @@
 using Ductus.FluentDocker.Commands;
+using Grpc.Net.Client;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -27,14 +28,19 @@ public class AxonServerContainer : IAxonServerContainer
         return _container.InitializeAsync();
     }
 
-    public HttpClient CreateClient()
+    public HttpClient CreateHttpClient()
     {
-        return _container.CreateClient();
+        return _container.CreateHttpClient();
+    }
+
+    public GrpcChannel CreateGrpcChannel()
+    {
+        return _container.CreateGrpcChannel();
     }
 
     public async Task PurgeEvents()
     {
-        using var client = _container.CreateClient();
+        using var client = _container.CreateHttpClient();
         (await client.DeleteAsync("v1/devmode/purge-events")).EnsureSuccessStatusCode();
     }
 

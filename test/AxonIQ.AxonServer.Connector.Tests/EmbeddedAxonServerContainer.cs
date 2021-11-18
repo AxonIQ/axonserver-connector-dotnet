@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using Ductus.FluentDocker.Builders;
 using Ductus.FluentDocker.Services;
 using Ductus.FluentDocker.Services.Extensions;
+using Grpc.Net.Client;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -82,7 +83,7 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is initialized"));
     }
     
-    public HttpClient CreateClient()
+    public HttpClient CreateHttpClient()
     {
         return new HttpClient
         {
@@ -92,6 +93,15 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
                 Port = _container.ToHostExposedEndpoint("8024/tcp").Port
             }.Uri
         };
+    }
+
+    public GrpcChannel CreateGrpcChannel()
+    {
+        return GrpcChannel.ForAddress(new UriBuilder
+        {
+            Host = "localhost",
+            Port = _container.ToHostExposedEndpoint("8124/tcp").Port
+        }.Uri);
     }
 
     public Task DisposeAsync()
