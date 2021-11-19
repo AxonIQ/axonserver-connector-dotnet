@@ -5,6 +5,7 @@ on:
     branches:
       - master
   pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   build:
@@ -36,3 +37,8 @@ jobs:
           CI: true # I'd assume this is present by default (need to verify)
           AXONIQ_AXONSERVER_PORT: 8024
           AXONIQ_AXONSERVER_GRPC_PORT: 8124
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
