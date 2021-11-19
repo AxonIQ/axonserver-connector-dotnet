@@ -39,6 +39,10 @@ jobs:
           AXONIQ_AXONSERVER_GRPC_PORT: 8124
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.organization=AxonIQ
+            -Dsonar.projectKey=axonserver-connector-dotnet
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
