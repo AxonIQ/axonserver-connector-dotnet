@@ -41,8 +41,8 @@ jobs:
         uses: sonarsource/sonarcloud-github-action@master
         with:
           args: >
-            -Dsonar.organization=AxonIQ
-            -Dsonar.projectKey=axonserver-connector-dotnet
+            -Dsonar.organization=axoniq
+            -Dsonar.projectKey=AxonIQ_axonserver-connector-dotnet
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
