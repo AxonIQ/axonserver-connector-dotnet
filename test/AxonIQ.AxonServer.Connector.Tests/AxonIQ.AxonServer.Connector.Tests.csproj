@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ductus.FluentDocker" Version="2.10.40" />
+    <PackageReference Include="Ductus.FluentDocker" Version="2.10.41" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
     <PackageReference Include="Xunit" Version="2.4.1" />
     <PackageReference Include="Xunit.Runner.Console" Version="2.4.1">
