@@ -1,3 +1,4 @@
+using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Grpc.Control;
 using Xunit;
 using Xunit.Abstractions;
@@ -31,5 +32,6 @@ public class CanAccessAxonServerContainer
             Version = "1.2.3.4"
         });
         _logger.WriteLine(response.ToString());
+        
     }
 }

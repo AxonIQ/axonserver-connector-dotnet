@@ -1,9 +1,8 @@
-using Ductus.FluentDocker.Commands;
 using Grpc.Net.Client;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
-namespace AxonIQ.AxonServer.Connector.Tests;
+namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public class AxonServerContainer : IAxonServerContainer
 {

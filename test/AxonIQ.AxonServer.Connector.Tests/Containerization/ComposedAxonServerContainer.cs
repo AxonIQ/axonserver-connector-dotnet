@@ -3,7 +3,7 @@ using Grpc.Net.Client;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
-namespace AxonIQ.AxonServer.Connector.Tests;
+namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 /// <summary>
 /// Manages the interaction with a container composed in the CI environment.
@@ -70,7 +70,7 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         }
 
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container became available"));
-        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is initialized"));
+        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container got initialized"));
     }
 
     public HttpClient CreateHttpClient()

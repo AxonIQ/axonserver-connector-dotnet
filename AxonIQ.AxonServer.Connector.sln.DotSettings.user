@@ -3,7 +3,5 @@
   &lt;Assembly Path="/home/yves/Code/axoniq/axonserver-connector-dotnet/AxonIQ.Connector/bin/Debug/net5.0/AxonIQ.Connector.dll" /&gt;
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=235a0940_002D86b8_002D4dda_002D80e2_002D05c3b05808ca/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Proof" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
-  &lt;TestAncestor&gt;
-    &lt;TestId&gt;xUnit::41591101-8B9F-471B-A736-4DD6C41DAB87::net6.0::AxonIQ.AxonServer.Connector.Tests.CanAccessAxonServerContainer.Proof&lt;/TestId&gt;
-  &lt;/TestAncestor&gt;
+  &lt;Project Location="/home/yves/Code/axoniq/axonserver-connector-dotnet/test/AxonIQ.AxonServer.Connector.Tests" Presentation="&amp;lt;test&amp;gt;\&amp;lt;AxonIQ.AxonServer.Connector.Tests&amp;gt;" /&gt;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
