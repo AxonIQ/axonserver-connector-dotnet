@@ -1,3 +1,4 @@
+using System.Net;
 using Grpc.Net.Client;
 using Xunit.Abstractions;
 using Xunit.Sdk;
@@ -27,9 +28,19 @@ public class AxonServerContainer : IAxonServerContainer
         return _container.InitializeAsync();
     }
 
+    public DnsEndPoint GetHttpEndpoint()
+    {
+        return _container.GetHttpEndpoint();
+    }
+
     public HttpClient CreateHttpClient()
     {
         return _container.CreateHttpClient();
+    }
+
+    public DnsEndPoint GetGrpcEndpoint()
+    {
+        return _container.GetGrpcEndpoint();
     }
 
     public GrpcChannel CreateGrpcChannel()

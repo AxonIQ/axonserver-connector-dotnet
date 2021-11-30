@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using Grpc.Net.Client;
 using Xunit.Abstractions;
@@ -73,6 +74,13 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container got initialized"));
     }
 
+    public DnsEndPoint GetHttpEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!));
+    }
+
     public HttpClient CreateHttpClient()
     {
         return new HttpClient
@@ -83,6 +91,13 @@ public class ComposedAxonServerContainer : IAxonServerContainer
                 Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!)
             }.Uri
         };
+    }
+
+    public DnsEndPoint GetGrpcEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT")!));
     }
 
     public GrpcChannel CreateGrpcChannel()

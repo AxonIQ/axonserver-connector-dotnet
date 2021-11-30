@@ -75,17 +75,17 @@ public class AxonServerConnectionFactoryOptionsTests
     [Fact]
     public void WithRoutingServersArrayHasExpectedResult()
     {
-        var routingServers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
+        var servers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
         
         var sut = 
             CreateSystemUnderTest()
-                .WithRoutingServers(routingServers);
+                .WithRoutingServers(servers);
         
         Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
         
         var result = sut.Build();
         
-        Assert.Equal(routingServers, result.RoutingServers);
+        Assert.Equal(servers, result.RoutingServers);
     }
     
     [Fact]
@@ -113,17 +113,17 @@ public class AxonServerConnectionFactoryOptionsTests
     [Fact]
     public void WithRoutingServersEnumerableHasExpectedResult()
     {
-        IEnumerable<DnsEndPoint> routingServers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
+        IEnumerable<DnsEndPoint> servers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
         
         var sut = 
             CreateSystemUnderTest()
-                .WithRoutingServers(routingServers);
+                .WithRoutingServers(servers);
         
         Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
         
         var result = sut.Build();
         
-        Assert.Equal(routingServers, result.RoutingServers);
+        Assert.Equal(servers, result.RoutingServers);
     }
     
     [Fact]

@@ -4,4 +4,4 @@ obj
 .ionide
 .attic
 .idea
-.user
+*.user

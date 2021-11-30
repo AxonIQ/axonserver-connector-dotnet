@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net;
+using System.Net.Http.Headers;
 using Ductus.FluentDocker.Builders;
 using Ductus.FluentDocker.Services;
 using Ductus.FluentDocker.Services.Extensions;
@@ -81,7 +82,14 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container became available"));
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container got initialized"));
     }
-    
+
+    public DnsEndPoint GetHttpEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            _container.ToHostExposedEndpoint("8024/tcp").Port);
+    }
+
     public HttpClient CreateHttpClient()
     {
         return new HttpClient
@@ -92,6 +100,13 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
                 Port = _container.ToHostExposedEndpoint("8024/tcp").Port
             }.Uri
         };
+    }
+
+    public DnsEndPoint GetGrpcEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            _container.ToHostExposedEndpoint("8124/tcp").Port);
     }
 
     public GrpcChannel CreateGrpcChannel()
