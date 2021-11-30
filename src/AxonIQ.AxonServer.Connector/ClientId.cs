@@ -14,6 +14,7 @@ public readonly struct ClientId
     private bool Equals(ClientId instance) => instance._value.Equals(_value);
     public override bool Equals(object? obj) => obj is ClientId instance && instance.Equals(this);
     public override int GetHashCode() => HashCode.Combine(_value);
+
     public override string ToString()
     {
         return _value;

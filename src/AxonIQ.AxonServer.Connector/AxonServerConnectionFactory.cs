@@ -6,10 +6,10 @@ namespace AxonIQ.AxonServer.Connector;
 public class AxonServerConnectionFactory
 {
     private readonly ConcurrentDictionary<string, AxonServerConnection> _connections;
-    
+
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
-        if (options == null) 
+        if (options == null)
             throw new ArgumentNullException(nameof(options));
 
         ComponentName = options.ComponentName;
@@ -24,7 +24,7 @@ public class AxonServerConnectionFactory
     public ComponentName ComponentName { get; }
     public ClientId ClientInstanceId { get; }
     public IReadOnlyCollection<DnsEndPoint> RoutingServers { get; }
-    public IReadOnlyDictionary<string,string> ClientTags { get; }
+    public IReadOnlyDictionary<string, string> ClientTags { get; }
     public IAxonServerAuthentication Authentication { get; }
 
     public Task<AxonServerConnection> Connect(string context)

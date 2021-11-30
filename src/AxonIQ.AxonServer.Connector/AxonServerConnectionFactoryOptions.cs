@@ -22,18 +22,20 @@ public class AxonServerConnectionFactoryOptions
         var rawComponentName = configuration[AxonServerConnectionFactoryConfiguration.ComponentName];
         if (rawComponentName == null)
         {
-            throw new InvalidOperationException($"The {AxonServerConnectionFactoryConfiguration.ComponentName} configuration value is missing.");
+            throw new InvalidOperationException(
+                $"The {AxonServerConnectionFactoryConfiguration.ComponentName} configuration value is missing.");
         }
+
         var componentName = new ComponentName(configuration[AxonServerConnectionFactoryConfiguration.ComponentName]);
         var clientInstanceId =
             configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId] == null
                 ? ClientId.GenerateFrom(componentName)
                 : new ClientId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
         var builder = new Builder(componentName, clientInstanceId);
-        
+
         return builder;
     }
-    
+
     private AxonServerConnectionFactoryOptions(
         ComponentName componentName,
         ClientId clientInstanceId,
@@ -53,7 +55,7 @@ public class AxonServerConnectionFactoryOptions
     public IReadOnlyCollection<DnsEndPoint> RoutingServers { get; }
     public IReadOnlyDictionary<string, string> ClientTags { get; }
     public IAxonServerAuthentication Authentication { get; }
-    
+
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
     private class Builder : IAxonServerConnectionFactoryOptionsBuilder

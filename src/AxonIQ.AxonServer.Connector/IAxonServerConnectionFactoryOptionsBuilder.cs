@@ -9,8 +9,8 @@ public interface IAxonServerConnectionFactoryOptionsBuilder
     IAxonServerConnectionFactoryOptionsBuilder WithoutAuthentication();
     IAxonServerConnectionFactoryOptionsBuilder WithAuthenticationToken(string token);
     IAxonServerConnectionFactoryOptionsBuilder WithClientTag(string key, string value);
-    IAxonServerConnectionFactoryOptionsBuilder WithClientTags(params KeyValuePair<string,string>[] tags);
-    IAxonServerConnectionFactoryOptionsBuilder WithClientTags(IEnumerable<KeyValuePair<string,string>> tags);
-    
+    IAxonServerConnectionFactoryOptionsBuilder WithClientTags(params KeyValuePair<string, string>[] tags);
+    IAxonServerConnectionFactoryOptionsBuilder WithClientTags(IEnumerable<KeyValuePair<string, string>> tags);
+
     AxonServerConnectionFactoryOptions Build();
 }

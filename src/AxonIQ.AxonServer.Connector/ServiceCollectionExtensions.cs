@@ -18,10 +18,11 @@ public static class ServiceCollectionExtensions
         });
         return services;
     }
-    
-    public static IServiceCollection AddAxonServerConnectionFactory(this IServiceCollection services, IConfiguration configuration)
+
+    public static IServiceCollection AddAxonServerConnectionFactory(this IServiceCollection services,
+        IConfiguration configuration)
     {
-        if (configuration == null) 
+        if (configuration == null)
             throw new ArgumentNullException(nameof(configuration));
         var options = AxonServerConnectionFactoryOptions
             .FromConfiguration(configuration)
@@ -29,26 +30,28 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new AxonServerConnectionFactory(options));
         return services;
     }
-    
-    public static IServiceCollection AddAxonServerConnectionFactory(this IServiceCollection services, AxonServerConnectionFactoryOptions options)
+
+    public static IServiceCollection AddAxonServerConnectionFactory(this IServiceCollection services,
+        AxonServerConnectionFactoryOptions options)
     {
         if (options == null) throw new ArgumentNullException(nameof(options));
         services.AddSingleton(new AxonServerConnectionFactory(options));
         return services;
     }
 
-    public static IServiceCollection AddAxonServerConnectionFactory(this IServiceCollection services, Action<IAxonServerConnectionFactoryOptionsBuilder> configure)
+    public static IServiceCollection AddAxonServerConnectionFactory(this IServiceCollection services,
+        Action<IAxonServerConnectionFactoryOptionsBuilder> configure)
     {
-        if (configure == null) 
+        if (configure == null)
             throw new ArgumentNullException(nameof(configure));
-        
+
         services.AddSingleton(sp =>
         {
             var configuration = sp.GetRequiredService<IConfiguration>();
             var section = configuration.GetRequiredSection(AxonServerConnectionFactoryConfiguration.DefaultSection);
             var builder = AxonServerConnectionFactoryOptions
                 .FromConfiguration(section);
-                configure(builder);
+            configure(builder);
             var options = builder.Build();
             return new AxonServerConnectionFactory(options);
         });

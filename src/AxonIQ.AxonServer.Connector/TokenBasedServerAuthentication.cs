@@ -8,9 +8,9 @@ internal class TokenBasedServerAuthentication : IAxonServerAuthentication
     {
         Token = token ?? throw new ArgumentNullException(nameof(token));
     }
-    
+
     public string Token { get; }
-        
+
     public void WriteTo(Metadata metadata)
     {
         metadata.Add(AxonServerConnectionHeaders.AccessToken, Token);
