@@ -6,12 +6,6 @@ public readonly struct ComponentName
 {
     private readonly string _value;
 
-    /// <summary>
-    /// Initializes a new instance of the <c>ComponentName</c>.
-    /// </summary>
-    /// <param name="value"></param>
-    /// <exception cref="ArgumentNullException"></exception>
-    /// <exception cref="ArgumentException"></exception>
     public ComponentName(string value)
     {
         if (value == null) throw new ArgumentNullException(nameof(value));
@@ -20,21 +14,13 @@ public readonly struct ComponentName
     }
 
     private bool Equals(ComponentName instance) => instance._value.Equals(_value);
-    /// <inheritdoc />
     public override bool Equals(object? obj) => obj is ComponentName instance && instance.Equals(this);
-    /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(_value);
-    /// <inheritdoc />
     public override string ToString()
     {
         return _value;
     }
 
-    /// <summary>
-    /// Suffixes 
-    /// </summary>
-    /// <param name="suffix"></param>
-    /// <returns></returns>
     [Pure]
     public ComponentName SuffixWith(string suffix)
     {
