@@ -28,7 +28,7 @@ public class ServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
 
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
-        Assert.StartsWith(AxonServerConnectionFactoryDefaults.ComponentName.ToString(),
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
             factory.ComponentName.ToString());
         Assert.StartsWith(factory.ComponentName.ToString(),
             factory.ClientInstanceId.ToString());
@@ -74,7 +74,7 @@ public class ServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
 
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
-        Assert.StartsWith(AxonServerConnectionFactoryDefaults.ComponentName.ToString(),
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
             factory.ComponentName.ToString());
         Assert.StartsWith(factory.ComponentName.ToString(),
             factory.ClientInstanceId.ToString());
@@ -130,7 +130,7 @@ public class ServiceCollectionExtensionsTests
 
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
         Assert.True(signal.Signaled);
-        Assert.StartsWith(AxonServerConnectionFactoryDefaults.ComponentName.ToString(),
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
             factory.ComponentName.ToString());
         Assert.StartsWith(factory.ComponentName.ToString(),
             factory.ClientInstanceId.ToString());

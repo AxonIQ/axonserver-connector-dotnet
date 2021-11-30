@@ -371,7 +371,7 @@ public class AxonServerConnectionFactoryOptionsTests
         var sut = AxonServerConnectionFactoryOptions.FromConfiguration(
             new ConfigurationRoot(new List<IConfigurationProvider>()));
         var result = sut.Build();
-        Assert.StartsWith(AxonServerConnectionFactoryDefaults.ComponentName.SuffixWith("_").ToString(),
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
             result.ComponentName.ToString());
         Assert.StartsWith(result.ComponentName.SuffixWith("_").ToString(), result.ClientInstanceId.ToString());
     }
