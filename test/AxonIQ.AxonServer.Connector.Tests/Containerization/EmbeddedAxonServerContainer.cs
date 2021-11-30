@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using Ductus.FluentDocker.Builders;
 using Ductus.FluentDocker.Services;
@@ -7,7 +7,7 @@ using Grpc.Net.Client;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
-namespace AxonIQ.AxonServer.Connector.Tests;
+namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 /// <summary>
 /// Manages the interaction with an embedded container.
@@ -80,9 +80,16 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
         }
 
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container became available"));
-        _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is initialized"));
+        _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container got initialized"));
     }
-    
+
+    public DnsEndPoint GetHttpEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            _container.ToHostExposedEndpoint("8024/tcp").Port);
+    }
+
     public HttpClient CreateHttpClient()
     {
         return new HttpClient
@@ -93,6 +100,13 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
                 Port = _container.ToHostExposedEndpoint("8024/tcp").Port
             }.Uri
         };
+    }
+
+    public DnsEndPoint GetGrpcEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            _container.ToHostExposedEndpoint("8124/tcp").Port);
     }
 
     public GrpcChannel CreateGrpcChannel()

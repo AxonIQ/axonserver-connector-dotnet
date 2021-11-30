@@ -1,9 +1,10 @@
+using System.Net;
 using System.Net.Http.Headers;
 using Grpc.Net.Client;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
-namespace AxonIQ.AxonServer.Connector.Tests;
+namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 /// <summary>
 /// Manages the interaction with a container composed in the CI environment.
@@ -70,7 +71,14 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         }
 
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container became available"));
-        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is initialized"));
+        _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container got initialized"));
+    }
+
+    public DnsEndPoint GetHttpEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!));
     }
 
     public HttpClient CreateHttpClient()
@@ -83,6 +91,13 @@ public class ComposedAxonServerContainer : IAxonServerContainer
                 Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!)
             }.Uri
         };
+    }
+
+    public DnsEndPoint GetGrpcEndpoint()
+    {
+        return new DnsEndPoint(
+            "localhost",
+            int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT")!));
     }
 
     public GrpcChannel CreateGrpcChannel()
