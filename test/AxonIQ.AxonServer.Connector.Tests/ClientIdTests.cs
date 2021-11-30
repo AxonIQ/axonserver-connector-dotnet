@@ -12,13 +12,13 @@ public class ClientIdTests
     {
         _fixture = new Fixture();
     }
-    
+
     [Fact]
     public void CanNotBeNull()
     {
         Assert.Throws<ArgumentNullException>(() => new ClientId(null!));
     }
-    
+
     [Fact]
     public void CanNotBeEmpty()
     {
@@ -30,9 +30,9 @@ public class ClientIdTests
     {
         var value = _fixture.Create<string>();
         var sut = new ClientId(value);
-        
+
         var result = sut.ToString();
-        
+
         Assert.Equal(value, result);
     }
 

@@ -32,6 +32,5 @@ public class CanAccessAxonServerContainer
             Version = "1.2.3.4"
         });
         _logger.WriteLine(response.ToString());
-        
     }
 }

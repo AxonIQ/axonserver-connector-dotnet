@@ -4,6 +4,8 @@ namespace AxonIQ.AxonServer.Connector;
 
 public static class AxonServerConnectionFactoryDefaults
 {
+    public static readonly ComponentName ComponentName = new("Unnamed");
+
     public static readonly IReadOnlyCollection<DnsEndPoint> RoutingServers = new[]
         { new DnsEndPoint("localhost", 8124) };
 

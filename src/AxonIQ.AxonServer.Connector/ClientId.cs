@@ -24,8 +24,8 @@ public readonly struct ClientId
     {
         return new ClientId(
             component
-                .SuffixWith(new ComponentName("_"))
-                .SuffixWith(ComponentName.GenerateRandom(8))
+                .SuffixWith("_")
+                .SuffixWith(ComponentName.GenerateRandomSuffix(8))
                 .ToString()
         );
     }

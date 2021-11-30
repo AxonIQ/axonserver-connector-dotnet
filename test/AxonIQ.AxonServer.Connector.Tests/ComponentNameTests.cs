@@ -12,13 +12,19 @@ public class ComponentNameTests
     {
         _fixture = new Fixture();
     }
-    
+
+    [Fact]
+    public void DefaultReturnsExpectedResult()
+    {
+        Assert.Equal(new ComponentName("Unnamed"), ComponentName.Default);
+    }
+
     [Fact]
     public void CanNotBeNull()
     {
         Assert.Throws<ArgumentNullException>(() => new ComponentName(null!));
     }
-    
+
     [Fact]
     public void CanNotBeEmpty()
     {
@@ -30,9 +36,9 @@ public class ComponentNameTests
     {
         var value = _fixture.Create<string>();
         var sut = new ComponentName(value);
-        
+
         var result = sut.ToString();
-        
+
         Assert.Equal(value, result);
     }
 
@@ -68,7 +74,7 @@ public class ComponentNameTests
 
         Assert.Throws<ArgumentNullException>(() => sut.SuffixWith(null!));
     }
-    
+
     [Fact]
     public void SuffixWithStringCanNotBeEmpty()
     {
@@ -89,7 +95,7 @@ public class ComponentNameTests
 
         Assert.Equal(new ComponentName(value + suffix), result);
     }
-    
+
     [Fact]
     public void PrefixWithComponentNameReturnsExpectedResult()
     {
@@ -110,7 +116,7 @@ public class ComponentNameTests
 
         Assert.Throws<ArgumentNullException>(() => sut.PrefixWith(null!));
     }
-    
+
     [Fact]
     public void PrefixWithStringCanNotBeEmpty()
     {
@@ -119,7 +125,7 @@ public class ComponentNameTests
 
         Assert.Throws<ArgumentException>(() => sut.PrefixWith(string.Empty));
     }
-    
+
     [Fact]
     public void PrefixWithStringReturnsExpectedResult()
     {
@@ -133,31 +139,47 @@ public class ComponentNameTests
     }
 
     [Fact]
-    public void GenerateRandomLengthCanNotBeNegative()
+    public void GenerateRandomSuffixLengthCanNotBeNegative()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ComponentName.GenerateRandom(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ComponentName.GenerateRandomSuffix(-1));
     }
-    
+
     [Fact]
-    public void GenerateRandomLengthCanNotBeZero()
+    public void GenerateRandomSuffixLengthCanNotBeZero()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ComponentName.GenerateRandom(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ComponentName.GenerateRandomSuffix(0));
     }
-    
+
     [Theory]
     [InlineData(1)]
     [InlineData(8)]
-    public void GenerateRandomReturnsExpectedResult(int length)
+    public void GenerateRandomSuffixReturnsExpectedResult(int length)
     {
         var hexCharacters = new[]
         {
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
             'a', 'b', 'c', 'd', 'e', 'f'
         };
-        var result = ComponentName.GenerateRandom(length);
-        
+        var result = ComponentName.GenerateRandomSuffix(length);
+
         Assert.Equal(length, result.ToString().Length);
         Assert.All(result.ToString(), character =>
             Assert.Contains(character, hexCharacters));
+    }
+
+    [Fact]
+    public void GenerateRandomNameReturnsExpectedResult()
+    {
+        var hexCharacters = new[]
+        {
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            'a', 'b', 'c', 'd', 'e', 'f'
+        };
+        var result = ComponentName.GenerateRandomName();
+
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(), result.ToString());
+        Assert.Equal(ComponentName.Default.SuffixWith("_").ToString().Length + 4, result.ToString().Length);
+        Assert.All(result.ToString().Substring(ComponentName.Default.SuffixWith("_").ToString().Length),
+            character => Assert.Contains(character, hexCharacters));
     }
 }

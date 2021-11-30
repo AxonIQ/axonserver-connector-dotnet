@@ -8,7 +8,7 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 public class AxonServerContainer : IAxonServerContainer
 {
     private readonly IAxonServerContainer _container;
-    
+
     public AxonServerContainer(IMessageSink logger)
     {
         if (logger == null) throw new ArgumentNullException(nameof(logger));
@@ -23,6 +23,7 @@ public class AxonServerContainer : IAxonServerContainer
             _container = new EmbeddedAxonServerContainer(logger);
         }
     }
+
     public Task InitializeAsync()
     {
         return _container.InitializeAsync();

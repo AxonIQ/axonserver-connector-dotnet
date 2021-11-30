@@ -12,12 +12,13 @@ public class AxonServerAuthenticationTests
     {
         _fixture = new Fixture();
     }
+
     [Fact]
     public void NoneReturnsExpectedResult()
     {
         Assert.IsType<NoServerAuthentication>(AxonServerAuthentication.None);
     }
-    
+
     [Fact]
     public void NoneActsAsSingleton()
     {
@@ -28,9 +29,9 @@ public class AxonServerAuthenticationTests
     public void UsingTokenReturnsExpectedResult()
     {
         var token = _fixture.Create<string>();
-        
+
         var authentication = Assert.IsType<TokenBasedServerAuthentication>(AxonServerAuthentication.UsingToken(token));
-        
+
         Assert.Equal(token, authentication.Token);
     }
 
@@ -41,7 +42,7 @@ public class AxonServerAuthenticationTests
 
         var metadata = new Metadata();
         sut.WriteTo(metadata);
-        
+
         Assert.Empty(metadata);
     }
 
@@ -49,7 +50,7 @@ public class AxonServerAuthenticationTests
     public void TokenBasedServerAuthenticationWriteToMetadataHasExpectedResult()
     {
         var token = _fixture.Create<string>();
-        
+
         var sut = new TokenBasedServerAuthentication(token);
 
         var metadata = new Metadata();
@@ -60,7 +61,7 @@ public class AxonServerAuthenticationTests
             { AxonServerConnectionHeaders.AccessToken, token }
         }, metadata, new MetadataEntryKeyValueComparer());
     }
-    
+
     private class MetadataEntryKeyValueComparer : IEqualityComparer<Metadata.Entry>
     {
         public bool Equals(Metadata.Entry? x, Metadata.Entry? y)

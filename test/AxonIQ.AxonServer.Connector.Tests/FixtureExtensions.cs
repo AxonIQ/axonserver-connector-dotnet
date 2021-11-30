@@ -8,10 +8,10 @@ public static class FixtureExtensions
     {
         fixture.Customize<ComponentName>(composer =>
             composer
-                .FromFactory(() => ComponentName.GenerateRandom(Random.Shared.Next(1,10)))
+                .FromFactory(ComponentName.GenerateRandomName)
                 .OmitAutoProperties());
     }
-    
+
     public static void CustomizeClientId(this IFixture fixture)
     {
         fixture.Customize<ClientId>(composer =>

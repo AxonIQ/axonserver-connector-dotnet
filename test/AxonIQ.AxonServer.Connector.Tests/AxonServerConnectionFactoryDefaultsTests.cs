@@ -15,7 +15,7 @@ public class AxonServerConnectionFactoryDefaultsTests
             new("localhost", 8124)
         }, result);
     }
-    
+
     [Fact]
     public void ClientTagsReturnsExpectedResult()
     {
@@ -23,7 +23,7 @@ public class AxonServerConnectionFactoryDefaultsTests
 
         Assert.Empty(result);
     }
-    
+
     [Fact]
     public void AuthenticationReturnsExpectedResult()
     {

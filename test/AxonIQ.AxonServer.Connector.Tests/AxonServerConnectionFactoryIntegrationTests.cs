@@ -17,7 +17,7 @@ public class AxonServerConnectionFactoryIntegrationTests
         _fixture.CustomizeClientId();
         _fixture.CustomizeComponentName();
     }
-    
+
     private AxonServerConnectionFactory CreateSystemUnderTest()
     {
         var component = _fixture.Create<ComponentName>();
@@ -28,24 +28,24 @@ public class AxonServerConnectionFactoryIntegrationTests
             .Build();
         return new AxonServerConnectionFactory(options);
     }
-    
+
     [Fact]
     public async Task ConnectContextReturnsExpectedResult()
     {
         var context = _fixture.Create<string>();
         var sut = CreateSystemUnderTest();
-        
+
         var result = await sut.Connect(context);
 
         Assert.NotNull(result);
     }
-    
+
     [Fact]
     public async Task SuccessiveConnectToSameContextReturnsSameInstance()
     {
         var context = _fixture.Create<string>();
         var sut = CreateSystemUnderTest();
-        
+
         var first = await sut.Connect(context);
         var second = await sut.Connect(context);
 
