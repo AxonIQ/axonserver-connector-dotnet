@@ -31,7 +31,7 @@ public class AxonServerGrpcChannelFactoryTests
             var routingServers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
 
             var sut = new AxonServerGrpcChannelFactory(clientIdentity, context, AxonServerAuthentication.None,
-                routingServers, _loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>());
+                routingServers, _loggerFactory);
 
             var result = await sut.Create();
 
@@ -64,7 +64,7 @@ public class AxonServerGrpcChannelFactoryTests
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
             var sut = new AxonServerGrpcChannelFactory(clientIdentity, context, AxonServerAuthentication.None,
-                routingServers, _loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>());
+                routingServers, _loggerFactory);
 
             var result = await sut.Create();
 
@@ -98,7 +98,7 @@ public class AxonServerGrpcChannelFactoryTests
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
             var sut = new AxonServerGrpcChannelFactory(clientIdentity, context, AxonServerAuthentication.None,
-                routingServers, _loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>());
+                routingServers, _loggerFactory);
 
             var result = await sut.Create();
 
@@ -113,7 +113,7 @@ public class AxonServerGrpcChannelFactoryTests
             var routingServers = new[] { _server.GetGrpcEndpoint() };
             var sut = new AxonServerGrpcChannelFactory(clientIdentity, context,
                 AxonServerAuthentication.UsingToken(_server.Token), routingServers,
-                _loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>());
+                _loggerFactory);
 
             var result = await sut.Create();
 

@@ -13,6 +13,7 @@ public class AxonServerGrpcChannelFactory
     private readonly Context _context;
     private readonly IAxonServerAuthentication _authentication;
     private readonly IReadOnlyList<DnsEndPoint> _routingServers;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<AxonServerGrpcChannelFactory> _logger;
 
     public AxonServerGrpcChannelFactory(
@@ -20,13 +21,14 @@ public class AxonServerGrpcChannelFactory
         Context context,
         IAxonServerAuthentication authentication,
         IReadOnlyList<DnsEndPoint> routingServers,
-        ILogger<AxonServerGrpcChannelFactory> logger)
+        ILoggerFactory loggerFactory)
     {
         _clientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
         _context = context;
         _authentication = authentication ?? throw new ArgumentNullException(nameof(authentication));
         _routingServers = routingServers ?? throw new ArgumentNullException(nameof(routingServers));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        _logger = loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>();
     }
 
     public async Task<GrpcChannel?> Create()
@@ -37,7 +39,10 @@ public class AxonServerGrpcChannelFactory
         {
             var server = _routingServers[index];
             _logger.LogInformation("Requesting connection details from {Host}:{Port}", server.Host, server.Port);
-            var candidate = GrpcChannel.ForAddress(server.ToUri());
+            var candidate = GrpcChannel.ForAddress(server.ToUri(), new GrpcChannelOptions
+            {
+                LoggerFactory = _loggerFactory
+            });
             var callInvoker = candidate.Intercept(metadata =>
             {
                 _authentication.WriteTo(metadata);
@@ -47,7 +52,10 @@ public class AxonServerGrpcChannelFactory
             try
             {
                 var service = new PlatformService.PlatformServiceClient(callInvoker);
-                var info = await service.GetPlatformServerAsync(_clientIdentity.ToClientIdentification());
+                var info = await service.GetPlatformServerAsync(
+                    _clientIdentity.ToClientIdentification()
+                    //, new CallOptions(deadline: DateTime.Now)
+                );
                 _logger.LogDebug("Received PlatformInfo suggesting [{NodeName}] ({Host}:{Port}), {SameConnection}",
                     info.Primary.NodeName,
                     info.Primary.HostName,

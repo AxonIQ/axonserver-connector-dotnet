@@ -7,7 +7,7 @@ public readonly struct ClientInstanceId
     public ClientInstanceId(string value)
     {
         if (value == null) throw new ArgumentNullException(nameof(value));
-        if (value == string.Empty) throw new ArgumentException("The client id can not be empty", nameof(value));
+        if (value == string.Empty) throw new ArgumentException("The client instance id can not be empty", nameof(value));
         _value = value;
     }
 

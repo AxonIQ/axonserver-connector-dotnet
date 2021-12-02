@@ -29,7 +29,7 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
         var requestUri = new UriBuilder
         {
             Host = "localhost",
-            Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!),
+            Port = HttpPort,
             Path = "actuator/health"
         }.Uri;
 
@@ -81,7 +81,7 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
             BaseAddress = new UriBuilder
             {
                 Host = "localhost",
-                Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT")!)
+                Port = HttpPort
             }.Uri
         };
     }
@@ -90,7 +90,8 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
     {
         return new DnsEndPoint(
             "localhost",
-            int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT")!));
+            GrpcPort
+        );
     }
 
     public GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options)
@@ -98,7 +99,7 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
         var address = new UriBuilder
         {
             Host = "localhost",
-            Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT")!)
+            Port = GrpcPort
         }.Uri;
         return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
     }
