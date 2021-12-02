@@ -1,6 +1,5 @@
 using System.Net;
 using AxonIQ.AxonServer.Grpc.Control;
-using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
@@ -10,7 +9,6 @@ namespace AxonIQ.AxonServer.Connector;
 public class AxonServerGrpcChannelFactory
 {
     private readonly ClientIdentity _clientIdentity;
-    private readonly Context _context;
     private readonly IAxonServerAuthentication _authentication;
     private readonly IReadOnlyList<DnsEndPoint> _routingServers;
     private readonly ILoggerFactory _loggerFactory;
@@ -18,20 +16,18 @@ public class AxonServerGrpcChannelFactory
 
     public AxonServerGrpcChannelFactory(
         ClientIdentity clientIdentity,
-        Context context,
         IAxonServerAuthentication authentication,
         IReadOnlyList<DnsEndPoint> routingServers,
         ILoggerFactory loggerFactory)
     {
         _clientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
-        _context = context;
         _authentication = authentication ?? throw new ArgumentNullException(nameof(authentication));
         _routingServers = routingServers ?? throw new ArgumentNullException(nameof(routingServers));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>();
     }
 
-    public async Task<GrpcChannel?> Create()
+    public async Task<GrpcChannel?> Create(Context context)
     {
         GrpcChannel? channel = null;
         var index = 0;
@@ -46,7 +42,7 @@ public class AxonServerGrpcChannelFactory
             var callInvoker = candidate.Intercept(metadata =>
             {
                 _authentication.WriteTo(metadata);
-                _context.WriteTo(metadata);
+                context.WriteTo(metadata);
                 return metadata;
             });
             try

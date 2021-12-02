@@ -30,10 +30,10 @@ public class AxonServerGrpcChannelFactoryTests
             var context = _fixture.Create<Context>();
             var routingServers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
 
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, context, AxonServerAuthentication.None,
+            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
                 routingServers, _loggerFactory);
 
-            var result = await sut.Create();
+            var result = await sut.Create(context);
 
             Assert.Null(result);
         }
@@ -63,10 +63,10 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, context, AxonServerAuthentication.None,
+            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
                 routingServers, _loggerFactory);
 
-            var result = await sut.Create();
+            var result = await sut.Create(context);
 
             Assert.NotNull(result);
             Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
@@ -97,10 +97,10 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, context, AxonServerAuthentication.None,
+            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
                 routingServers, _loggerFactory);
 
-            var result = await sut.Create();
+            var result = await sut.Create(context);
 
             Assert.Null(result);
         }
@@ -111,11 +111,11 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, context,
+            var sut = new AxonServerGrpcChannelFactory(clientIdentity,
                 AxonServerAuthentication.UsingToken(_server.Token), routingServers,
                 _loggerFactory);
 
-            var result = await sut.Create();
+            var result = await sut.Create(context);
 
             Assert.NotNull(result);
             Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);

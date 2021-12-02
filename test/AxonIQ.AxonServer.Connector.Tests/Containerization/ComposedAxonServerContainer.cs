@@ -170,9 +170,9 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
                     "The AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN environment variable is missing.");
             }
 
-            HttpPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT")!);
+            HttpPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_PORT")!);
             GrpcPort = int.Parse(
-                Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT")!);
+                Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_GRPC_PORT")!);
             Token = Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN")!;
         }
 
