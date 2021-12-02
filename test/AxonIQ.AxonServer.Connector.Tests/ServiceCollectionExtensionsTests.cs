@@ -29,9 +29,9 @@ public class ServiceCollectionExtensionsTests
 
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
         Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
-            factory.ComponentName.ToString());
-        Assert.StartsWith(factory.ComponentName.ToString(),
-            factory.ClientInstanceId.ToString());
+            factory.ClientIdentity.ComponentName.ToString());
+        Assert.StartsWith(factory.ClientIdentity.ComponentName.ToString(),
+            factory.ClientIdentity.ClientInstanceId.ToString());
     }
 
     [Fact]
@@ -56,9 +56,9 @@ public class ServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
 
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
-        Assert.Equal(component, factory.ComponentName);
-        Assert.StartsWith(factory.ComponentName.ToString(),
-            factory.ClientInstanceId.ToString());
+        Assert.Equal(component, factory.ClientIdentity.ComponentName);
+        Assert.StartsWith(factory.ClientIdentity.ComponentName.ToString(),
+            factory.ClientIdentity.ClientInstanceId.ToString());
     }
 
     [Fact]
@@ -75,9 +75,9 @@ public class ServiceCollectionExtensionsTests
 
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
         Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
-            factory.ComponentName.ToString());
-        Assert.StartsWith(factory.ComponentName.ToString(),
-            factory.ClientInstanceId.ToString());
+            factory.ClientIdentity.ComponentName.ToString());
+        Assert.StartsWith(factory.ClientIdentity.ComponentName.ToString(),
+            factory.ClientIdentity.ClientInstanceId.ToString());
     }
 
     [Fact]
@@ -103,9 +103,9 @@ public class ServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
 
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
-        Assert.Equal(component, factory.ComponentName);
-        Assert.StartsWith(factory.ComponentName.ToString(),
-            factory.ClientInstanceId.ToString());
+        Assert.Equal(component, factory.ClientIdentity.ComponentName);
+        Assert.StartsWith(factory.ClientIdentity.ComponentName.ToString(),
+            factory.ClientIdentity.ClientInstanceId.ToString());
     }
 
     [Fact]
@@ -131,9 +131,9 @@ public class ServiceCollectionExtensionsTests
         var factory = provider.GetRequiredService<AxonServerConnectionFactory>();
         Assert.True(signal.Signaled);
         Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
-            factory.ComponentName.ToString());
-        Assert.StartsWith(factory.ComponentName.ToString(),
-            factory.ClientInstanceId.ToString());
+            factory.ClientIdentity.ComponentName.ToString());
+        Assert.StartsWith(factory.ClientIdentity.ComponentName.ToString(),
+            factory.ClientIdentity.ClientInstanceId.ToString());
     }
 
     private class Signal

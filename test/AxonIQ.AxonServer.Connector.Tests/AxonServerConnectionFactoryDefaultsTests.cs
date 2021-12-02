@@ -31,4 +31,12 @@ public class AxonServerConnectionFactoryDefaultsTests
 
         Assert.Same(AxonServerAuthentication.None, result);
     }
+
+    [Fact]
+    public void ConnectTimeoutReturnsExpectedResult()
+    {
+        var result = AxonServerConnectionFactoryDefaults.ConnectTimeout;
+
+        Assert.Equal(TimeSpan.FromMilliseconds(10_000), result);
+    }
 }

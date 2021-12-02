@@ -1,18 +1,18 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct ClientId
+public readonly struct ClientInstanceId
 {
     private readonly string _value;
 
-    public ClientId(string value)
+    public ClientInstanceId(string value)
     {
         if (value == null) throw new ArgumentNullException(nameof(value));
         if (value == string.Empty) throw new ArgumentException("The client id can not be empty", nameof(value));
         _value = value;
     }
 
-    private bool Equals(ClientId instance) => instance._value.Equals(_value);
-    public override bool Equals(object? obj) => obj is ClientId instance && instance.Equals(this);
+    private bool Equals(ClientInstanceId instance) => instance._value.Equals(_value);
+    public override bool Equals(object? obj) => obj is ClientInstanceId instance && instance.Equals(this);
     public override int GetHashCode() => HashCode.Combine(_value);
 
     public override string ToString()
@@ -20,9 +20,9 @@ public readonly struct ClientId
         return _value;
     }
 
-    public static ClientId GenerateFrom(ComponentName component)
+    public static ClientInstanceId GenerateFrom(ComponentName component)
     {
-        return new ClientId(
+        return new ClientInstanceId(
             component
                 .SuffixWith("_")
                 .SuffixWith(ComponentName.GenerateRandomSuffix(8))

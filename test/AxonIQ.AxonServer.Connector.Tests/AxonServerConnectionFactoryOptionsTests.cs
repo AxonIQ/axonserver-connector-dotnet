@@ -14,7 +14,7 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         _fixture = new Fixture();
         _fixture.CustomizeComponentName();
-        _fixture.CustomizeClientId();
+        _fixture.CustomizeClientInstanceId();
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class AxonServerConnectionFactoryOptionsTests
     public void ForComponentNameAndClientInstanceIdReturnsExpectedResult()
     {
         var component = _fixture.Create<ComponentName>();
-        var clientInstance = _fixture.Create<ClientId>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
 
         var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
 
@@ -59,19 +59,19 @@ public class AxonServerConnectionFactoryOptionsTests
     private IAxonServerConnectionFactoryOptionsBuilder CreateSystemUnderTest()
     {
         var component = _fixture.Create<ComponentName>();
-        var clientInstance = _fixture.Create<ClientId>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
 
         return AxonServerConnectionFactoryOptions.For(component, clientInstance);
     }
 
     [Fact]
-    public void WithComponentNameHasExpectedResult()
+    public void AsComponentNameHasExpectedResult()
     {
         var component = _fixture.Create<ComponentName>();
 
         var sut =
             CreateSystemUnderTest()
-                .WithComponentName(component);
+                .AsComponentName(component);
 
         Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
 
@@ -81,19 +81,33 @@ public class AxonServerConnectionFactoryOptionsTests
     }
 
     [Fact]
-    public void WithClientInstanceIdHasExpectedResult()
+    public void AsClientInstanceIdHasExpectedResult()
     {
-        var clientInstanceId = _fixture.Create<ClientId>();
+        var clientInstanceId = _fixture.Create<ClientInstanceId>();
 
         var sut =
             CreateSystemUnderTest()
-                .WithClientInstanceId(clientInstanceId);
+                .AsClientInstanceId(clientInstanceId);
 
         Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
 
         var result = sut.Build();
 
         Assert.Equal(clientInstanceId, result.ClientInstanceId);
+    }
+
+    [Fact]
+    public void WithDefaultRoutingServersHasExpectedResult()
+    {
+        var sut =
+            CreateSystemUnderTest()
+                .WithDefaultRoutingServers();
+
+        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+
+        var result = sut.Build();
+
+        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
     }
 
     [Fact]
@@ -407,7 +421,7 @@ public class AxonServerConnectionFactoryOptionsTests
     public void FromConfigurationWithClientInstanceIdReturnsExpectedResult()
     {
         var component = _fixture.Create<ComponentName>();
-        var clientInstance = _fixture.Create<ClientId>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
         var source = new MemoryConfigurationSource
         {
             InitialData = new KeyValuePair<string, string>[]

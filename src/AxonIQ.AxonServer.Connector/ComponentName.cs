@@ -5,7 +5,7 @@ namespace AxonIQ.AxonServer.Connector;
 public readonly struct ComponentName
 {
     public static readonly ComponentName Default = new("Unnamed");
-    
+
     private readonly string _value;
 
     public ComponentName(string value)
@@ -58,7 +58,7 @@ public readonly struct ComponentName
     {
         return Default.SuffixWith("_").SuffixWith(GenerateRandomSuffix(4));
     }
-    
+
     internal static ComponentName GenerateRandomSuffix(int length)
     {
         if (length <= 0)

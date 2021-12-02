@@ -1,62 +1,45 @@
 using System.Net;
 using Grpc.Net.Client;
-using Xunit.Abstractions;
-using Xunit.Sdk;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
-public class AxonServerContainer : IAxonServerContainer
+public abstract class AxonServerContainer : IAxonServerContainer
 {
-    private readonly IAxonServerContainer _container;
-
-    public AxonServerContainer(IMessageSink logger)
-    {
-        if (logger == null) throw new ArgumentNullException(nameof(logger));
-        if (Environment.GetEnvironmentVariable("CI") != null)
-        {
-            logger.OnMessage(new DiagnosticMessage("Using Composed Axon Server Container inside of CI"));
-            _container = new ComposedAxonServerContainer(logger);
-        }
-        else
-        {
-            logger.OnMessage(new DiagnosticMessage("Using Embedded Axon Server Container outside of CI"));
-            _container = new EmbeddedAxonServerContainer(logger);
-        }
-    }
+    protected abstract IAxonServerContainer Container { get; }
 
     public Task InitializeAsync()
     {
-        return _container.InitializeAsync();
+        return Container.InitializeAsync();
     }
 
     public DnsEndPoint GetHttpEndpoint()
     {
-        return _container.GetHttpEndpoint();
+        return Container.GetHttpEndpoint();
     }
 
     public HttpClient CreateHttpClient()
     {
-        return _container.CreateHttpClient();
+        return Container.CreateHttpClient();
     }
 
     public DnsEndPoint GetGrpcEndpoint()
     {
-        return _container.GetGrpcEndpoint();
+        return Container.GetGrpcEndpoint();
     }
 
-    public GrpcChannel CreateGrpcChannel()
+    public GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options = default)
     {
-        return _container.CreateGrpcChannel();
+        return Container.CreateGrpcChannel(options);
     }
 
     public async Task PurgeEvents()
     {
-        using var client = _container.CreateHttpClient();
+        using var client = Container.CreateHttpClient();
         (await client.DeleteAsync("v1/devmode/purge-events")).EnsureSuccessStatusCode();
     }
 
     public Task DisposeAsync()
     {
-        return _container.DisposeAsync();
+        return Container.DisposeAsync();
     }
 }

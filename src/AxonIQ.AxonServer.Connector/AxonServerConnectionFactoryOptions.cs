@@ -7,11 +7,11 @@ public class AxonServerConnectionFactoryOptions
 {
     public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName)
     {
-        return new Builder(componentName, ClientId.GenerateFrom(componentName));
+        return new Builder(componentName, Connector.ClientInstanceId.GenerateFrom(componentName));
     }
 
     public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName,
-        ClientId clientInstanceId)
+        ClientInstanceId clientInstanceId)
     {
         return new Builder(componentName, clientInstanceId);
     }
@@ -25,8 +25,8 @@ public class AxonServerConnectionFactoryOptions
                 : new ComponentName(configuration[AxonServerConnectionFactoryConfiguration.ComponentName]);
         var clientInstanceId =
             configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId] == null
-                ? ClientId.GenerateFrom(componentName)
-                : new ClientId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
+                ? Connector.ClientInstanceId.GenerateFrom(componentName)
+                : new ClientInstanceId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
         var builder = new Builder(componentName, clientInstanceId);
 
         return builder;
@@ -34,7 +34,7 @@ public class AxonServerConnectionFactoryOptions
 
     private AxonServerConnectionFactoryOptions(
         ComponentName componentName,
-        ClientId clientInstanceId,
+        ClientInstanceId clientInstanceId,
         IReadOnlyCollection<DnsEndPoint> routingServers,
         IReadOnlyDictionary<string, string> clientTags,
         IAxonServerAuthentication authentication)
@@ -47,7 +47,7 @@ public class AxonServerConnectionFactoryOptions
     }
 
     public ComponentName ComponentName { get; }
-    public ClientId ClientInstanceId { get; }
+    public ClientInstanceId ClientInstanceId { get; }
     public IReadOnlyCollection<DnsEndPoint> RoutingServers { get; }
     public IReadOnlyDictionary<string, string> ClientTags { get; }
     public IAxonServerAuthentication Authentication { get; }
@@ -57,12 +57,12 @@ public class AxonServerConnectionFactoryOptions
     private class Builder : IAxonServerConnectionFactoryOptionsBuilder
     {
         private ComponentName _componentName;
-        private ClientId _clientInstanceId;
+        private ClientInstanceId _clientInstanceId;
         private readonly List<DnsEndPoint> _routingServers;
         private readonly Dictionary<string, string> _clientTags;
         private IAxonServerAuthentication _authentication;
 
-        internal Builder(ComponentName componentName, ClientId clientInstanceId)
+        internal Builder(ComponentName componentName, ClientInstanceId clientInstanceId)
         {
             _componentName = componentName;
             _clientInstanceId = clientInstanceId;
@@ -76,15 +76,21 @@ public class AxonServerConnectionFactoryOptions
             _authentication = AxonServerAuthentication.None;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithComponentName(ComponentName name)
+        public IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name)
         {
             _componentName = name;
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithClientInstanceId(ClientId id)
+        public IAxonServerConnectionFactoryOptionsBuilder AsClientInstanceId(ClientInstanceId id)
         {
             _clientInstanceId = id;
+            return this;
+        }
+
+        public IAxonServerConnectionFactoryOptionsBuilder WithDefaultRoutingServers()
+        {
+            _routingServers.Clear();
             return this;
         }
 

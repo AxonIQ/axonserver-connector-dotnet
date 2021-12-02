@@ -9,24 +9,17 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 /// <summary>
 /// Manages the interaction with a container composed in the CI environment.
 /// </summary>
-public class ComposedAxonServerContainer : IAxonServerContainer
+public abstract class ComposedAxonServerContainer : IAxonServerContainer
 {
     private readonly IMessageSink _logger;
 
-    public ComposedAxonServerContainer(IMessageSink logger)
+    protected ComposedAxonServerContainer(IMessageSink logger)
     {
-        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_PORT") == null)
-        {
-            throw new InvalidOperationException("The AXONIQ_AXONSERVER_PORT environment variable is missing.");
-        }
-
-        if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT") == null)
-        {
-            throw new InvalidOperationException("The AXONIQ_AXONSERVER_GRPC_PORT environment variable is missing.");
-        }
-
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
+    protected abstract int HttpPort { get; }
+    protected abstract int GrpcPort { get; }
 
     public async Task InitializeAsync()
     {
@@ -100,13 +93,14 @@ public class ComposedAxonServerContainer : IAxonServerContainer
             int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT")!));
     }
 
-    public GrpcChannel CreateGrpcChannel()
+    public GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options)
     {
-        return GrpcChannel.ForAddress(new UriBuilder
+        var address = new UriBuilder
         {
             Host = "localhost",
             Port = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_GRPC_PORT")!)
-        }.Uri);
+        }.Uri;
+        return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
     }
 
     public Task DisposeAsync()
@@ -114,5 +108,75 @@ public class ComposedAxonServerContainer : IAxonServerContainer
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container is being disposed"));
         _logger.OnMessage(new DiagnosticMessage("Composed Axon Server Container got disposed"));
         return Task.CompletedTask;
+    }
+
+    public static IAxonServerContainerWithAccessControlDisabled WithAccessControlDisabled(IMessageSink logger)
+    {
+        return new ComposedAxonServerContainerWithAccessControlDisabled(logger);
+    }
+
+    public static IAxonServerContainerWithAccessControlEnabled WithAccessControlEnabled(IMessageSink logger)
+    {
+        return new ComposedAxonServerContainerWithAccessControlEnabled(logger);
+    }
+
+    private class ComposedAxonServerContainerWithAccessControlDisabled : ComposedAxonServerContainer,
+        IAxonServerContainerWithAccessControlDisabled
+    {
+        public ComposedAxonServerContainerWithAccessControlDisabled(IMessageSink logger) : base(logger)
+        {
+            if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT") == null)
+            {
+                throw new InvalidOperationException(
+                    "The AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT environment variable is missing.");
+            }
+
+            if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT") == null)
+            {
+                throw new InvalidOperationException(
+                    "The AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT environment variable is missing.");
+            }
+
+            HttpPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT")!);
+            GrpcPort = int.Parse(
+                Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT")!);
+        }
+
+        protected override int HttpPort { get; }
+        protected override int GrpcPort { get; }
+    }
+
+    private class ComposedAxonServerContainerWithAccessControlEnabled : ComposedAxonServerContainer,
+        IAxonServerContainerWithAccessControlEnabled
+    {
+        public ComposedAxonServerContainerWithAccessControlEnabled(IMessageSink logger) : base(logger)
+        {
+            if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_PORT") == null)
+            {
+                throw new InvalidOperationException(
+                    "The AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_PORT environment variable is missing.");
+            }
+
+            if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_GRPC_PORT") == null)
+            {
+                throw new InvalidOperationException(
+                    "The AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_GRPC_PORT environment variable is missing.");
+            }
+
+            if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN") == null)
+            {
+                throw new InvalidOperationException(
+                    "The AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN environment variable is missing.");
+            }
+
+            HttpPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT")!);
+            GrpcPort = int.Parse(
+                Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT")!);
+            Token = Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN")!;
+        }
+
+        protected override int HttpPort { get; }
+        protected override int GrpcPort { get; }
+        public string Token { get; }
     }
 }

@@ -4,8 +4,9 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface IAxonServerConnectionFactoryOptionsBuilder
 {
-    IAxonServerConnectionFactoryOptionsBuilder WithComponentName(ComponentName name);
-    IAxonServerConnectionFactoryOptionsBuilder WithClientInstanceId(ClientId id);
+    IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name);
+    IAxonServerConnectionFactoryOptionsBuilder AsClientInstanceId(ClientInstanceId id);
+    IAxonServerConnectionFactoryOptionsBuilder WithDefaultRoutingServers();
     IAxonServerConnectionFactoryOptionsBuilder WithRoutingServers(params DnsEndPoint[] servers);
     IAxonServerConnectionFactoryOptionsBuilder WithRoutingServers(IEnumerable<DnsEndPoint> servers);
     IAxonServerConnectionFactoryOptionsBuilder WithoutAuthentication();

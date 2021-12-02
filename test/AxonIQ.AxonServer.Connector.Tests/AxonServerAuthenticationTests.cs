@@ -36,6 +36,13 @@ public class AxonServerAuthenticationTests
     }
 
     [Fact]
+    public void NoServerAuthenticationAuthenticationWriteToMetadataCanNotBeNull()
+    {
+        var sut = new NoServerAuthentication();
+        Assert.Throws<ArgumentNullException>(() => sut.WriteTo(null!));
+    }
+
+    [Fact]
     public void NoServerAuthenticationWriteToMetadataHasExpectedResult()
     {
         var sut = new NoServerAuthentication();
@@ -44,6 +51,14 @@ public class AxonServerAuthenticationTests
         sut.WriteTo(metadata);
 
         Assert.Empty(metadata);
+    }
+
+    [Fact]
+    public void TokenBasedServerAuthenticationWriteToMetadataCanNotBeNull()
+    {
+        var token = _fixture.Create<string>();
+        var sut = new TokenBasedServerAuthentication(token);
+        Assert.Throws<ArgumentNullException>(() => sut.WriteTo(null!));
     }
 
     [Fact]
@@ -60,22 +75,5 @@ public class AxonServerAuthenticationTests
         {
             { AxonServerConnectionHeaders.AccessToken, token }
         }, metadata, new MetadataEntryKeyValueComparer());
-    }
-
-    private class MetadataEntryKeyValueComparer : IEqualityComparer<Metadata.Entry>
-    {
-        public bool Equals(Metadata.Entry? x, Metadata.Entry? y)
-        {
-            if (ReferenceEquals(x, y)) return true;
-            if (ReferenceEquals(x, null)) return false;
-            if (ReferenceEquals(y, null)) return false;
-            if (x.GetType() != y.GetType()) return false;
-            return x.Key == y.Key && x.Value == y.Value;
-        }
-
-        public int GetHashCode(Metadata.Entry obj)
-        {
-            return HashCode.Combine(obj.Key, obj.Value);
-        }
     }
 }

@@ -12,11 +12,19 @@ public static class FixtureExtensions
                 .OmitAutoProperties());
     }
 
-    public static void CustomizeClientId(this IFixture fixture)
+    public static void CustomizeContext(this IFixture fixture)
     {
-        fixture.Customize<ClientId>(composer =>
+        fixture.Customize<Context>(composer =>
             composer
-                .FromFactory((ComponentName name) => ClientId.GenerateFrom(name))
+                .FromFactory((string value) => new Context(value))
+                .OmitAutoProperties());
+    }
+
+    public static void CustomizeClientInstanceId(this IFixture fixture)
+    {
+        fixture.Customize<ClientInstanceId>(composer =>
+            composer
+                .FromFactory((ComponentName name) => ClientInstanceId.GenerateFrom(name))
                 .OmitAutoProperties());
     }
 }

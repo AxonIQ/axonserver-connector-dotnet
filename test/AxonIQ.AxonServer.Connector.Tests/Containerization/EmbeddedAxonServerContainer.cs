@@ -9,10 +9,7 @@ using Xunit.Sdk;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
-/// <summary>
-/// Manages the interaction with an embedded container.
-/// </summary>
-public class EmbeddedAxonServerContainer : IAxonServerContainer
+public abstract class EmbeddedAxonServerContainer : IAxonServerContainer
 {
     private readonly IMessageSink _logger;
     private IContainerService? _container;
@@ -22,6 +19,8 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    protected abstract string[] ContainerEnvironmentVariables { get; }
+
     public async Task InitializeAsync()
     {
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container is being initialized"));
@@ -30,10 +29,7 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
             .UseImage("axoniq/axonserver")
             .ExposePort(8024)
             .ExposePort(8124)
-            .WithEnvironment(
-                "AXONIQ_AXONSERVER_NAME=axonserver",
-                "AXONIQ_AXONSERVER_HOSTNAME=localhost",
-                "AXONIQ_AXONSERVER_DEVMODE_ENABLED=true")
+            .WithEnvironment(ContainerEnvironmentVariables)
             .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0))
             .Build()
             .Start();
@@ -109,13 +105,14 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
             _container.ToHostExposedEndpoint("8124/tcp").Port);
     }
 
-    public GrpcChannel CreateGrpcChannel()
+    public GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options)
     {
-        return GrpcChannel.ForAddress(new UriBuilder
+        var address = new UriBuilder
         {
             Host = "localhost",
             Port = _container.ToHostExposedEndpoint("8124/tcp").Port
-        }.Uri);
+        }.Uri;
+        return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
     }
 
     public Task DisposeAsync()
@@ -129,5 +126,57 @@ public class EmbeddedAxonServerContainer : IAxonServerContainer
 
         _logger.OnMessage(new DiagnosticMessage("Embedded Axon Server Container got disposed"));
         return Task.CompletedTask;
+    }
+
+    public static IAxonServerContainerWithAccessControlDisabled WithAccessControlDisabled(IMessageSink logger)
+    {
+        return new EmbeddedAxonServerContainerWithAccessControlDisabled(logger);
+    }
+
+    public static IAxonServerContainerWithAccessControlEnabled WithAccessControlEnabled(IMessageSink logger)
+    {
+        return new EmbeddedAxonServerContainerWithAccessControlEnabled(logger);
+    }
+
+    private class EmbeddedAxonServerContainerWithAccessControlDisabled : EmbeddedAxonServerContainer,
+        IAxonServerContainerWithAccessControlDisabled
+    {
+        public EmbeddedAxonServerContainerWithAccessControlDisabled(IMessageSink logger) : base(logger)
+        {
+        }
+
+        protected override string[] ContainerEnvironmentVariables { get; } =
+        {
+            "AXONIQ_AXONSERVER_NAME=axonserver",
+            "AXONIQ_AXONSERVER_HOSTNAME=localhost",
+            "AXONIQ_AXONSERVER_DEVMODE_ENABLED=true",
+            "AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED=false"
+        };
+    }
+
+    private class EmbeddedAxonServerContainerWithAccessControlEnabled : EmbeddedAxonServerContainer,
+        IAxonServerContainerWithAccessControlEnabled
+    {
+        public EmbeddedAxonServerContainerWithAccessControlEnabled(IMessageSink logger) : base(logger)
+        {
+            Token = Guid.NewGuid().ToString("N");
+        }
+
+        public string Token { get; }
+
+        protected override string[] ContainerEnvironmentVariables
+        {
+            get
+            {
+                return new[]
+                {
+                    "AXONIQ_AXONSERVER_NAME=axonserver",
+                    "AXONIQ_AXONSERVER_HOSTNAME=localhost",
+                    "AXONIQ_AXONSERVER_DEVMODE_ENABLED=true",
+                    "AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED=true",
+                    "AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN=" + Token
+                };
+            }
+        }
     }
 }

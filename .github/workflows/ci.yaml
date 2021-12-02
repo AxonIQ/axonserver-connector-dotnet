@@ -11,8 +11,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     services:
-      # composed axonserver
-      axonserver:
+      # composed axonservers
+      axonserver-with-accesscontrol-disabled:
         image: axoniq/axonserver:latest
         ports:
           - 8024:8024
@@ -21,7 +21,20 @@ jobs:
           AXONIQ_AXONSERVER_NAME: axonserver
           AXONIQ_AXONSERVER_HOSTNAME: localhost
           AXONIQ_AXONSERVER_DEVMODE_ENABLED: true
-        options: --name axonserver-connector-dotnet-tests
+          AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED: false
+        options: --name axonserver-with-accesscontrol-disabled-connector-dotnet-tests
+      axonserver-with-accesscontrol-enabled:
+        image: axoniq/axonserver:latest
+        ports:
+          - 8224:8024
+          - 8324:8124
+        env:
+          AXONIQ_AXONSERVER_NAME: axonserver
+          AXONIQ_AXONSERVER_HOSTNAME: localhost
+          AXONIQ_AXONSERVER_DEVMODE_ENABLED: true
+          AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED: true
+          AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN: E@syP@ssw0rd
+        options: --name axonserver-with-accesscontrol-enabled-connector-dotnet-tests
     steps:
       # checkout the code
       - uses: actions/checkout@v2
@@ -35,8 +48,11 @@ jobs:
         run: make ci
         env:
           CI: true # I'd assume this is present by default (need to verify)
-          AXONIQ_AXONSERVER_PORT: 8024
-          AXONIQ_AXONSERVER_GRPC_PORT: 8124
+          AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT: 8024
+          AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT: 8124
+          AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_PORT: 8224
+          AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_GRPC_PORT: 8324
+          AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN: E@syP@ssw0rd
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:

@@ -4,11 +4,11 @@ using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
-public class ClientIdTests
+public class ClientInstanceIdTests
 {
     private readonly Fixture _fixture;
 
-    public ClientIdTests()
+    public ClientInstanceIdTests()
     {
         _fixture = new Fixture();
     }
@@ -16,20 +16,20 @@ public class ClientIdTests
     [Fact]
     public void CanNotBeNull()
     {
-        Assert.Throws<ArgumentNullException>(() => new ClientId(null!));
+        Assert.Throws<ArgumentNullException>(() => new ClientInstanceId(null!));
     }
 
     [Fact]
     public void CanNotBeEmpty()
     {
-        Assert.Throws<ArgumentException>(() => new ClientId(string.Empty));
+        Assert.Throws<ArgumentException>(() => new ClientInstanceId(string.Empty));
     }
 
     [Fact]
     public void ToStringReturnsExpectedResult()
     {
         var value = _fixture.Create<string>();
-        var sut = new ClientId(value);
+        var sut = new ClientInstanceId(value);
 
         var result = sut.ToString();
 
@@ -45,6 +45,6 @@ public class ClientIdTests
             new EqualsSuccessiveAssertion(_fixture),
             new EqualsNewObjectAssertion(_fixture),
             new GetHashCodeSuccessiveAssertion(_fixture)
-        ).Verify(typeof(ClientId));
+        ).Verify(typeof(ClientInstanceId));
     }
 }

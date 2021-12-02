@@ -10,5 +10,5 @@ public interface IAxonServerContainer : IAsyncLifetime
     HttpClient CreateHttpClient();
 
     DnsEndPoint GetGrpcEndpoint();
-    GrpcChannel CreateGrpcChannel();
+    GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options);
 }
