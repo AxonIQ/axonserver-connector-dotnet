@@ -26,6 +26,8 @@ public class AxonServerConnectionFactory
 
     public Task<AxonServerConnection> Connect(Context context)
     {
+        //Note: The valueFactory is not thread safe, but in the odd case of a race,
+        //the instances that lost the race will be garbage collected anyway (they don't hold any precious resources). 
         return Task.FromResult(_connections.GetOrAdd(context,
             _ => new AxonServerConnection(
                 ClientIdentity,

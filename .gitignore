@@ -5,3 +5,5 @@ obj
 .attic
 .idea
 *.user
+axoniq.license
+axonserver.properties

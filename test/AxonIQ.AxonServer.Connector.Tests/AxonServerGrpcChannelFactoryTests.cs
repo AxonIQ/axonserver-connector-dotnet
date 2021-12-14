@@ -9,17 +9,18 @@ namespace AxonIQ.AxonServer.Connector.Tests;
 
 public class AxonServerGrpcChannelFactoryTests
 {
-    public class WhenRoutingServersAreNotReachable
+    public class WhenServerIsNotReachable
     {
         private readonly Fixture _fixture;
         private readonly ILoggerFactory _loggerFactory;
 
-        public WhenRoutingServersAreNotReachable()
+        public WhenServerIsNotReachable()
         {
             _fixture = new Fixture();
             _fixture.CustomizeComponentName();
             _fixture.CustomizeClientInstanceId();
             _fixture.CustomizeContext();
+            _fixture.CustomizeLocalHostDnsEndPointInReservedPortRange();
             _loggerFactory = new NullLoggerFactory();
         }
 
@@ -39,21 +40,22 @@ public class AxonServerGrpcChannelFactoryTests
         }
     }
 
-    [Collection(nameof(AxonServerContainerWithAccessControlDisabledCollection))]
-    public class WhenRoutingServersWithAccessControlDisabledAreReachable
+    [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+    public class WhenServerHasAccessControlDisabled
     {
-        private readonly AxonServerContainerWithAccessControlDisabled _server;
+        private readonly IAxonServer _server;
         private readonly Fixture _fixture;
         private readonly ILoggerFactory _loggerFactory;
 
-        public WhenRoutingServersWithAccessControlDisabledAreReachable(
-            AxonServerContainerWithAccessControlDisabled server)
+        public WhenServerHasAccessControlDisabled(
+            AxonServerWithAccessControlDisabled server)
         {
             _server = server ?? throw new ArgumentNullException(nameof(server));
             _fixture = new Fixture();
             _fixture.CustomizeComponentName();
             _fixture.CustomizeClientInstanceId();
             _fixture.CustomizeContext();
+            _fixture.CustomizeLocalHostDnsEndPointInReservedPortRange();
             _loggerFactory = new NullLoggerFactory();
         }
 
@@ -71,23 +73,43 @@ public class AxonServerGrpcChannelFactoryTests
             Assert.NotNull(result);
             Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
         }
+        
+        [Fact]
+        public async Task CreateReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            var context = _fixture.Create<Context>();
+            var servers = new List<DnsEndPoint>(
+                _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
+            );
+            servers.Insert(Random.Shared.Next(0, servers.Count), _server.GetGrpcEndpoint());
+            var routingServers = servers.ToArray();
+            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
+                routingServers, _loggerFactory);
+
+            var result = await sut.Create(context);
+
+            Assert.NotNull(result);
+            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
+        }
     }
 
-    [Collection(nameof(AxonServerContainerWithAccessControlEnabledCollection))]
-    public class WhenRoutingServersWithAccessControlEnabledAreReachable
+    [Collection(nameof(AxonServerWithAccessControlEnabledCollection))]
+    public class WhenServerHasAccessControlEnabled
     {
-        private readonly AxonServerContainerWithAccessControlEnabled _server;
+        private readonly IAxonServer _server;
         private readonly Fixture _fixture;
         private readonly ILoggerFactory _loggerFactory;
 
-        public WhenRoutingServersWithAccessControlEnabledAreReachable(
-            AxonServerContainerWithAccessControlEnabled server)
+        public WhenServerHasAccessControlEnabled(
+            AxonServerWithAccessControlEnabled server)
         {
             _server = server ?? throw new ArgumentNullException(nameof(server));
             _fixture = new Fixture();
             _fixture.CustomizeComponentName();
             _fixture.CustomizeClientInstanceId();
             _fixture.CustomizeContext();
+            _fixture.CustomizeLocalHostDnsEndPointInReservedPortRange();
             _loggerFactory = new NullLoggerFactory();
         }
 
@@ -104,6 +126,25 @@ public class AxonServerGrpcChannelFactoryTests
 
             Assert.Null(result);
         }
+        
+        [Fact]
+        public async Task CreateWithoutAuthenticationReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            var context = _fixture.Create<Context>();
+            var servers = new List<DnsEndPoint>(
+                _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
+            );
+            servers.Insert(Random.Shared.Next(0, servers.Count), _server.GetGrpcEndpoint());
+            var routingServers = servers.ToArray();
+            var sut = new AxonServerGrpcChannelFactory(clientIdentity, 
+                AxonServerAuthentication.None,
+                routingServers, _loggerFactory);
+
+            var result = await sut.Create(context);
+
+            Assert.Null(result);
+        }
 
         [Fact]
         public async Task CreateWithAuthenticationTokenReturnsExpectedResult()
@@ -112,8 +153,28 @@ public class AxonServerGrpcChannelFactoryTests
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
             var sut = new AxonServerGrpcChannelFactory(clientIdentity,
-                AxonServerAuthentication.UsingToken(_server.Token), routingServers,
-                _loggerFactory);
+                AxonServerAuthentication.UsingToken(_server.Properties.AccessControl.AccessControlToken!),
+                routingServers, _loggerFactory);
+
+            var result = await sut.Create(context);
+
+            Assert.NotNull(result);
+            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
+        }
+        
+        [Fact]
+        public async Task CreateWithAuthenticationTokenReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            var context = _fixture.Create<Context>();
+            var servers = new List<DnsEndPoint>(
+                _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
+            );
+            servers.Insert(Random.Shared.Next(0, servers.Count), _server.GetGrpcEndpoint());
+            var routingServers = servers.ToArray();
+            var sut = new AxonServerGrpcChannelFactory(clientIdentity, 
+                AxonServerAuthentication.UsingToken(_server.Properties.AccessControl.AccessControlToken!),
+                routingServers, _loggerFactory);
 
             var result = await sut.Create(context);
 

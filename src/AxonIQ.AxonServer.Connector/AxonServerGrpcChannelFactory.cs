@@ -72,7 +72,10 @@ public class AxonServerGrpcChannelFactory
                         info.Primary.HostName,
                         info.Primary.GrpcPort);
                     var primaryServer = new DnsEndPoint(info.Primary.HostName, info.Primary.GrpcPort);
-                    channel = GrpcChannel.ForAddress(primaryServer.ToUri());
+                    channel = GrpcChannel.ForAddress(primaryServer.ToUri(), new GrpcChannelOptions
+                    {
+                        LoggerFactory = _loggerFactory
+                    });
                 }
             }
             catch (Exception exception)

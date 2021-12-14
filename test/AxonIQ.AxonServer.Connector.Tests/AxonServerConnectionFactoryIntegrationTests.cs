@@ -4,13 +4,13 @@ using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
-[Collection(nameof(AxonServerContainerWithAccessControlDisabledCollection))]
+[Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 public class AxonServerConnectionFactoryIntegrationTests
 {
-    private readonly AxonServerContainer _container;
+    private readonly IAxonServer _container;
     private readonly Fixture _fixture;
 
-    public AxonServerConnectionFactoryIntegrationTests(AxonServerContainerWithAccessControlDisabled container)
+    public AxonServerConnectionFactoryIntegrationTests(AxonServerWithAccessControlDisabled container)
     {
         _container = container ?? throw new ArgumentNullException(nameof(container));
         _fixture = new Fixture();
@@ -54,12 +54,4 @@ public class AxonServerConnectionFactoryIntegrationTests
 
         Assert.Same(first, second);
     }
-
-
-    // [Fact]
-    // public async Task ConnectReturnsExpectedResultWhenDefaultRoutingServersAreNotReachable()
-    // {
-    //     var context = _fixture.Create<string>();
-    //     var sut = CreateSystemUnderTest(builder => builder.WithDefaultRoutingServers());
-    // }
 }

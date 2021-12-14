@@ -5,13 +5,13 @@ using Xunit.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
-[Collection(nameof(AxonServerContainerWithAccessControlDisabledCollection))]
+[Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 public class CanAccessAxonServerContainer
 {
-    private readonly AxonServerContainer _container;
+    private readonly Containerization.AxonServer _container;
     private readonly ITestOutputHelper _logger;
 
-    public CanAccessAxonServerContainer(AxonServerContainerWithAccessControlDisabled container,
+    public CanAccessAxonServerContainer(AxonServerWithAccessControlDisabled container,
         ITestOutputHelper logger)
     {
         _container = container ?? throw new ArgumentNullException(nameof(container));

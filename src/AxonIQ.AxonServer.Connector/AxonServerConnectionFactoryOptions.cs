@@ -7,7 +7,7 @@ public class AxonServerConnectionFactoryOptions
 {
     public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName)
     {
-        return new Builder(componentName, Connector.ClientInstanceId.GenerateFrom(componentName));
+        return new Builder(componentName, ClientInstanceId.GenerateFrom(componentName));
     }
 
     public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName,
@@ -25,7 +25,7 @@ public class AxonServerConnectionFactoryOptions
                 : new ComponentName(configuration[AxonServerConnectionFactoryConfiguration.ComponentName]);
         var clientInstanceId =
             configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId] == null
-                ? Connector.ClientInstanceId.GenerateFrom(componentName)
+                ? ClientInstanceId.GenerateFrom(componentName)
                 : new ClientInstanceId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
         var builder = new Builder(componentName, clientInstanceId);
 

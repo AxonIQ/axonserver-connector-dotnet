@@ -9,17 +9,19 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 /// <summary>
 /// Manages the interaction with a container composed in the CI environment.
 /// </summary>
-public abstract class ComposedAxonServerContainer : IAxonServerContainer
+public abstract class ComposedAxonServer : IAxonServer
 {
     private readonly IMessageSink _logger;
 
-    protected ComposedAxonServerContainer(IMessageSink logger)
+    private ComposedAxonServer(IMessageSink logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     protected abstract int HttpPort { get; }
     protected abstract int GrpcPort { get; }
+
+    public SystemProperties Properties { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -111,20 +113,19 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
         return Task.CompletedTask;
     }
 
-    public static IAxonServerContainerWithAccessControlDisabled WithAccessControlDisabled(IMessageSink logger)
+    public static IAxonServer WithAccessControlDisabled(IMessageSink logger)
     {
-        return new ComposedAxonServerContainerWithAccessControlDisabled(logger);
+        return new ComposedAxonServerWithAccessControlDisabled(logger);
     }
 
-    public static IAxonServerContainerWithAccessControlEnabled WithAccessControlEnabled(IMessageSink logger)
+    public static IAxonServer WithAccessControlEnabled(IMessageSink logger)
     {
-        return new ComposedAxonServerContainerWithAccessControlEnabled(logger);
+        return new ComposedAxonServerWithAccessControlEnabled(logger);
     }
 
-    private class ComposedAxonServerContainerWithAccessControlDisabled : ComposedAxonServerContainer,
-        IAxonServerContainerWithAccessControlDisabled
+    private class ComposedAxonServerWithAccessControlDisabled : ComposedAxonServer
     {
-        public ComposedAxonServerContainerWithAccessControlDisabled(IMessageSink logger) : base(logger)
+        public ComposedAxonServerWithAccessControlDisabled(IMessageSink logger) : base(logger)
         {
             if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT") == null)
             {
@@ -139,18 +140,16 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
             }
 
             HttpPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_PORT")!);
-            GrpcPort = int.Parse(
-                Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT")!);
+            GrpcPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_DISABLED_GRPC_PORT")!);
         }
 
         protected override int HttpPort { get; }
         protected override int GrpcPort { get; }
     }
 
-    private class ComposedAxonServerContainerWithAccessControlEnabled : ComposedAxonServerContainer,
-        IAxonServerContainerWithAccessControlEnabled
+    private class ComposedAxonServerWithAccessControlEnabled : ComposedAxonServer
     {
-        public ComposedAxonServerContainerWithAccessControlEnabled(IMessageSink logger) : base(logger)
+        public ComposedAxonServerWithAccessControlEnabled(IMessageSink logger) : base(logger)
         {
             if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_PORT") == null)
             {
@@ -169,15 +168,20 @@ public abstract class ComposedAxonServerContainer : IAxonServerContainer
                 throw new InvalidOperationException(
                     "The AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN environment variable is missing.");
             }
+            
+            if (Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ADMINTOKEN") == null)
+            {
+                throw new InvalidOperationException(
+                    "The AXONIQ_AXONSERVER_ACCESSCONTROL_ADMINTOKEN environment variable is missing.");
+            }
 
             HttpPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_PORT")!);
-            GrpcPort = int.Parse(
-                Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_GRPC_PORT")!);
-            Token = Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN")!;
+            GrpcPort = int.Parse(Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ENABLED_GRPC_PORT")!);
+            Properties.AccessControl.AccessControlToken = Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_TOKEN")!;
+            Properties.AccessControl.AccessControlAdminToken = Environment.GetEnvironmentVariable("AXONIQ_AXONSERVER_ACCESSCONTROL_ADMINTOKEN")!;
         }
 
         protected override int HttpPort { get; }
         protected override int GrpcPort { get; }
-        public string Token { get; }
     }
 }

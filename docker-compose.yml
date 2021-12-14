@@ -1,0 +1,72 @@
+version: '3.3'
+services:
+  axonserver-1:
+    image: axoniq/axonserver-enterprise:4.5.11-dev
+    hostname: axonserver-1
+    volumes:
+      - axonserver-1-config:/axonserver/config
+    secrets:
+      - source: axoniq-license
+        target: /axonserver/config/axoniq.license
+      - source: axonserver-properties
+        target: /axonserver/config/axonserver.properties
+    environment:
+      - AXONIQ_LICENSE=/axonserver/config/axoniq.license
+    ports:
+      - '8024:8024'
+      - '8124:8124'
+      - '8224:8224'
+    networks:
+      - axon-demo
+
+  axonserver-2:
+    image: axoniq/axonserver-enterprise:4.5.11-dev
+    hostname: axonserver-2
+    volumes:
+      - axonserver-2-config:/axonserver/config
+    secrets:
+      - source: axoniq-license
+        target: /axonserver/config/axoniq.license
+      - source: axonserver-properties
+        target: /axonserver/config/axonserver.properties
+    environment:
+      - AXONIQ_LICENSE=/axonserver/config/axoniq.license
+    ports:
+      - '8025:8024'
+      - '8125:8124'
+      - '8225:8224'
+    networks:
+      - axon-demo
+
+  axonserver-3:
+    image: axoniq/axonserver-enterprise:4.5.11-dev
+    hostname: axonserver-3
+    volumes:
+      - axonserver-3-config:/axonserver/config
+    secrets:
+      - source: axoniq-license
+        target: /axonserver/config/axoniq.license
+      - source: axonserver-properties
+        target: /axonserver/config/axonserver.properties
+    environment:
+      - AXONIQ_LICENSE=/axonserver/config/axoniq.license
+    ports:
+      - '8026:8024'
+      - '8126:8124'
+      - '8226:8224'
+    networks:
+      - axon-demo
+
+networks:
+  axon-demo:
+
+secrets:
+  axonserver-properties:
+    file: ./axonserver.properties
+  axoniq-license:
+    file: ./axoniq.license
+    
+volumes:
+  axonserver-1-config:
+  axonserver-2-config:
+  axonserver-3-config:
