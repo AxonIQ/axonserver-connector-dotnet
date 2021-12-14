@@ -10,16 +10,8 @@ public class AxonServerWithAccessControlEnabled : AxonServer
     {
         if (logger == null) throw new ArgumentNullException(nameof(logger));
 
-        if (Environment.GetEnvironmentVariable("CI") != null)
-        {
-            logger.OnMessage(new DiagnosticMessage("Using Composed Axon Server Container inside of CI"));
-            Server = ComposedAxonServer.WithAccessControlEnabled(logger);
-        }
-        else
-        {
-            logger.OnMessage(new DiagnosticMessage("Using Embedded Axon Server Container outside of CI"));
-            Server = EmbeddedAxonServer.WithAccessControlEnabled(new MessageSinkLogger<EmbeddedAxonServer>(logger));
-        }
+        logger.OnMessage(new DiagnosticMessage("Using Embedded Axon Server Container outside of CI"));
+        Server = EmbeddedAxonServer.WithAccessControlEnabled(new MessageSinkLogger<EmbeddedAxonServer>(logger));
     }
 
     protected override IAxonServer Server { get; }
