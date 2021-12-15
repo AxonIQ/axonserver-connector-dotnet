@@ -10,8 +10,8 @@ public class AxonServerWithAccessControlEnabled : AxonServer
     {
         if (sink == null) throw new ArgumentNullException(nameof(sink));
         var logger = new MessageSinkLogger<EmbeddedAxonServer>(sink);
-        logger.LogDebug("Using Embedded Axon Server Container outside of CI");
-        Server = EmbeddedAxonServer.WithAccessControlEnabled(new MessageSinkLogger<EmbeddedAxonServer>(sink));
+        logger.LogDebug("Using Embedded Axon Server with access control enabled");
+        Server = EmbeddedAxonServer.WithAccessControlEnabled(logger);
     }
 
     protected override IAxonServer Server { get; }

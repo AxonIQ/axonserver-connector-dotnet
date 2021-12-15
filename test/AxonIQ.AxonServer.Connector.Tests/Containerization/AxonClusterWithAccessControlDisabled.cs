@@ -1,4 +1,5 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using Microsoft.Extensions.Logging;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -6,11 +7,12 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public class AxonClusterWithAccessControlDisabled : AxonCluster
 {
-    public AxonClusterWithAccessControlDisabled(IMessageSink logger)
+    public AxonClusterWithAccessControlDisabled(IMessageSink sink)
     {
-        if (logger == null) throw new ArgumentNullException(nameof(logger));
-        logger.OnMessage(new DiagnosticMessage("Using Embedded Axon Server Container outside of CI"));
-        Cluster = EmbeddedAxonCluster.WithAccessControlDisabled(new MessageSinkLogger<EmbeddedAxonCluster>(logger));
+        if (sink == null) throw new ArgumentNullException(nameof(sink));
+        var logger = new MessageSinkLogger<EmbeddedAxonCluster>(sink);
+        logger.LogDebug("Using Embedded Axon Cluster with access control disabled");
+        Cluster = EmbeddedAxonCluster.WithAccessControlDisabled(logger);
     }
 
     protected override IAxonCluster Cluster { get; }
