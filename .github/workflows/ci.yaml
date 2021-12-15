@@ -21,6 +21,8 @@ jobs:
       # run the CI build
       - name: make ci
         run: make ci
+        env:
+          AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:

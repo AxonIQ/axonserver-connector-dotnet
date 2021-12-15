@@ -21,19 +21,9 @@ public abstract class AxonCluster : IAxonCluster
         return Cluster.GetHttpEndpoints();
     }
 
-    public HttpClient CreateHttpClient(int node)
-    {
-        return Cluster.CreateHttpClient(node);
-    }
-
     public DnsEndPoint[] GetGrpcEndpoints()
     {
         return Cluster.GetGrpcEndpoints();
-    }
-
-    public GrpcChannel CreateGrpcChannel(int node, GrpcChannelOptions? options = default)
-    {
-        return Cluster.CreateGrpcChannel(node, options);
     }
 
     public Task DisposeAsync()

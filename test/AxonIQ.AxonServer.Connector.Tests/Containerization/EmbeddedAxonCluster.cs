@@ -1,14 +1,7 @@
 using System.Net;
-using System.Net.Http.Headers;
-using System.Text.Json;
 using Ductus.FluentDocker.Builders;
-using Ductus.FluentDocker.Model.Builders;
 using Ductus.FluentDocker.Services;
-using Ductus.FluentDocker.Services.Extensions;
-using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
-using shortid.Configuration;
-using YamlDotNet.Serialization;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
@@ -17,17 +10,14 @@ public class EmbeddedAxonCluster : IAxonCluster
     private readonly int _id = EmbeddedAxonClusterCounter.Next();
     
     private readonly EmbeddedAxonClusterNode[] _nodes;
-    private readonly ClusterTemplate _clusterTemplate;
     private readonly ILogger<EmbeddedAxonCluster> _logger;
 
     private Context[]? _contexts;
     private INetworkService? _network;
-    private IContainerService[]? _containers;
 
-    private EmbeddedAxonCluster(EmbeddedAxonClusterNode[] nodes, ClusterTemplate clusterTemplate, ILogger<EmbeddedAxonCluster> logger)
+    private EmbeddedAxonCluster(EmbeddedAxonClusterNode[] nodes, ILogger<EmbeddedAxonCluster> logger)
     {
         _nodes = nodes ?? throw new ArgumentNullException(nameof(nodes));
-        _clusterTemplate = clusterTemplate ?? throw new ArgumentNullException(nameof(clusterTemplate));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -43,17 +33,12 @@ public class EmbeddedAxonCluster : IAxonCluster
             {
                 var contexts = new HashSet<Context>();
 
-                foreach (var node in Nodes)
+                foreach (var node in _nodes)
                 {
-                    foreach (var context in node.Properties.ScanForContexts())
+                    foreach (var context in node.ScanForContexts())
                     {
                         contexts.Add(context);
                     }
-                }
-
-                foreach (var context in _clusterTemplate.ScanForContexts())
-                {
-                    contexts.Add(context);
                 }
 
                 _contexts = contexts.ToArray();
@@ -62,255 +47,49 @@ public class EmbeddedAxonCluster : IAxonCluster
             return _contexts;
         }
     }
-    
-    private string License
-    {
-        get
-        {
-            var licensePath = Environment.GetEnvironmentVariable("AXONIQ_LICENSE");
-            if (licensePath == null)
-            {
-                throw new InvalidOperationException(
-                    "The AXONIQ_LICENSE environment variable was not set. It is required if you want to interact with an embedded axon cluster.");
-            }
-
-            if (!File.Exists(licensePath))
-            {
-                throw new InvalidOperationException(
-                    $"The AXONIQ_LICENSE environment variable value refers to a file path that does not exist: {licensePath}");
-            }
-
-            return File.ReadAllText(licensePath);
-        }
-    }
 
     public async Task InitializeAsync()
     {
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being initialized", _id);
 
-        _network = ProvisionNetwork();
-        _containers = ProvisionClusterNodes();
+        _network = new Builder().UseNetwork($"axoniq-dotnet-{_id}").ReuseIfExist().Build();
+
+        foreach (var node in _nodes)
+        {
+            node.Start(_network);
+        }
 
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got started", _id);
         
-        using var client = new HttpClient();
-        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        
-        const int maximumAttempts = 60;
-        var attempt = 0;
-        foreach (var container in _containers)
+        foreach (var node in _nodes)
         {
-            var endpoint = _containers[0].ToHostExposedEndpoint("8024/tcp");
-            var requestUri = new UriBuilder
-            {
-                Host = "localhost",
-                Port = endpoint.Port,
-                Path = "actuator/health"
-            }.Uri;
-
-            var available = false;
-            while (!available && attempt < maximumAttempts)
-            {
-                _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being health checked on node {Node} at {Endpoint}",
-                    _id,
-                    container.Name,
-                    requestUri.AbsoluteUri);
-
-                try
-                {
-                    var response = (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
-                    var json = await response.Content.ReadAsStringAsync();
-                    var document = JsonDocument.Parse(json);
-                    if (document.RootElement.GetProperty("status").GetString() == "UP" &&
-                        document.RootElement.GetProperty("components").GetProperty("raft").GetProperty("status").GetString() == "UP" &&
-                        Contexts.All(context => 
-                            document.RootElement
-                                .GetProperty("components").GetProperty("raft").GetProperty("details")
-                                .GetProperty($"{context.ToString()}.leader").GetString() != null 
-                        ))
-                    {
-                        available = true;
-                    }
-                    else
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(1));
-                    }
-                }
-                catch (KeyNotFoundException exception)
-                {
-                    _logger.LogDebug(
-                        exception,
-                        "[{ClusterId}]Embedded Axon Cluster actuator health does not contain have a 'status' or a 'components.raft.status' property with the value 'UP'",
-                        _id);
-                    await Task.Delay(TimeSpan.FromSeconds(1));
-                }
-                catch (HttpRequestException exception)
-                {
-                    _logger.LogDebug(
-                        exception,
-                        "[{ClusterId}]Embedded Axon Cluster could not be reached on node {Node} at {Endpoint} because {Exception}",
-                        _id,
-                        container.Name,
-                        requestUri.AbsoluteUri,
-                        exception.Message);
-                    await Task.Delay(TimeSpan.FromSeconds(1));
-                }
-
-                attempt++;
-            }
-
-            if (attempt == maximumAttempts)
-            {
-                throw new InvalidOperationException(
-                    $"[{_id}]Embedded Axon Cluster could not be initialized. Failed to reach node {container.Name} at {requestUri.AbsoluteUri} after {maximumAttempts} attempts");
-            }
+            await node.WaitUntilAvailableAsync(_id);
         }
 
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster became available", _id);
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got initialized", _id);
     }
     
-    private INetworkService ProvisionNetwork()
-    {
-        return new Builder().UseNetwork($"axoniq-dotnet-{_id}").ReuseIfExist().Build();
-    }
-
-    private IContainerService[] ProvisionClusterNodes()
-    {
-        var containers = new IContainerService[_nodes.Length];
-        for (var index = 0; index < _nodes.Length; index++)
-        {
-            var node = _nodes[index];
-            node.Files.Create();
-
-            var template = new Serializer().Serialize(_clusterTemplate.Serialize());
-            File.WriteAllText(Path.Combine(node.Files.FullName, "cluster-template.yml"), template);
-            File.WriteAllText(Path.Combine(node.Files.FullName, "axoniq.license"), License);
-            File.WriteAllText(Path.Combine(node.Files.FullName, "axonserver.properties"),
-                string.Join(Environment.NewLine, node.Properties.Serialize()));
-
-            var builder = new Builder()
-                .UseContainer()
-                .UseImage("axoniq/axonserver-enterprise:latest-dev")
-                .UseNetwork(_network)
-                .ExposePort(8024)
-                .ExposePort(8124)
-                .Mount(node.Files.FullName, "/axonserver/config", MountType.ReadOnly)
-                .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0));
-            if (!string.IsNullOrEmpty(node.Properties.NodeSetup.Name))
-            {
-                builder.WithName(node.Properties.NodeSetup.Name);
-            }
-
-            if (!string.IsNullOrEmpty(node.Properties.NodeSetup.Hostname))
-            {
-                builder.WithHostName(node.Properties.NodeSetup.Hostname);
-            }
-
-            containers[index] = builder.Build().Start();
-        }
-
-        return containers;
-    }
-
     public DnsEndPoint[] GetHttpEndpoints()
     {
-        if (_containers == null)
-        {
-            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
-        }
-
-        return Array.ConvertAll(
-            _containers,
-            clusterNode => new DnsEndPoint(
-                "localhost",
-                clusterNode.ToHostExposedEndpoint("8024/tcp").Port
-            )
-        );
-    }
-
-    public HttpClient CreateHttpClient(int node)
-    {
-        if (_containers == null)
-        {
-            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
-        }
-        if (node < 0 || node >= _containers.Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(node), node,
-                $"[{_id}]The node index is out of the acceptable range: [0,{_containers.Length}]");
-        }
-
-        return new HttpClient
-        {
-            BaseAddress = new UriBuilder
-            {
-                Host = "localhost",
-                Port = _containers[node].ToHostExposedEndpoint("8024/tcp").Port
-            }.Uri
-        };
+        return Array.ConvertAll(_nodes, node => node.GetHttpEndpoint());
     }
 
     public DnsEndPoint[] GetGrpcEndpoints()
     {
-        if (_containers == null)
-        {
-            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
-        }
-
-        return Array.ConvertAll(
-            _containers,
-            clusterNode => new DnsEndPoint(
-                "localhost",
-                clusterNode.ToHostExposedEndpoint("8124/tcp").Port
-            )
-        );
-    }
-
-    public GrpcChannel CreateGrpcChannel(int node, GrpcChannelOptions? options)
-    {
-        if (_containers == null)
-        {
-            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
-        }
-        if (node < 0 || node >= _containers.Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(node), node,
-                $"[{_id}]The node index is out of the acceptable range: [0,{_containers.Length}]");
-        }
-        
-        var address = new UriBuilder
-        {
-            Host = "localhost",
-            Port = _containers[node].ToHostExposedEndpoint("8124/tcp").Port
-        }.Uri;
-        return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
+        return Array.ConvertAll(_nodes, node => node.GetGrpcEndpoint());
     }
 
     public Task DisposeAsync()
     {
         _logger.LogDebug("[{Cluster}]Embedded Axon Cluster is being disposed", _id);
-        
-        if (_containers != null)
+
+        foreach (var node in _nodes)
         {
-            if (_network != null)
-            {
-                Array.ForEach(_containers, container =>
-                {
-                    _network.Detach(container);
-                });
-            }
-            
-            Array.ForEach(_containers, container =>
-            {
-                container.Remove(true);
-                container.Dispose();
-            });
+            node.Stop(_network);
         }
 
         _network?.Dispose();
-
-        Array.ForEach(_nodes, node => node.Dispose());
 
         _logger.LogDebug("[{Cluster}]Embedded Axon Cluster got disposed", _id);
         return Task.CompletedTask;
@@ -343,7 +122,6 @@ public class EmbeddedAxonCluster : IAxonCluster
         node3.NodeSetup.Name = "axonserver-3";
         node3.NodeSetup.Hostname = "axonserver-3";
         node3.NodeSetup.InternalHostname = "axonserver-3";
-        var nodeProperties = new[] { new EmbeddedAxonClusterNode(node1), new EmbeddedAxonClusterNode(node2), new EmbeddedAxonClusterNode(node3) };
         var template = new ClusterTemplate
         {
             First = "axonserver-1",
@@ -430,7 +208,13 @@ public class EmbeddedAxonCluster : IAxonCluster
                 }
             }
         };
-        return new EmbeddedAxonCluster(nodeProperties, template, logger);
+        var nodes = new[]
+        {
+            new EmbeddedAxonClusterNode(node1, template, logger), 
+            new EmbeddedAxonClusterNode(node2, template, logger), 
+            new EmbeddedAxonClusterNode(node3, template, logger)
+        };
+        return new EmbeddedAxonCluster(nodes, logger);
     }
 
     public static IAxonCluster WithAccessControlEnabled(ILogger<EmbeddedAxonCluster> logger)
@@ -461,7 +245,6 @@ public class EmbeddedAxonCluster : IAxonCluster
         node3.NodeSetup.Name = "axonserver-3";
         node3.NodeSetup.Hostname = "axonserver-3";
         node3.NodeSetup.InternalHostname = "axonserver-3";
-        var nodeProperties = new[] { new EmbeddedAxonClusterNode(node1), new EmbeddedAxonClusterNode(node2), new EmbeddedAxonClusterNode(node3) };
         var template = new ClusterTemplate
         {
             First = "axonserver-1",
@@ -548,6 +331,12 @@ public class EmbeddedAxonCluster : IAxonCluster
                 }
             }
         };
-        return new EmbeddedAxonCluster(nodeProperties, template, logger);
+        var nodes = new[]
+        {
+            new EmbeddedAxonClusterNode(node1, template, logger), 
+            new EmbeddedAxonClusterNode(node2, template, logger), 
+            new EmbeddedAxonClusterNode(node3, template, logger)
+        };
+        return new EmbeddedAxonCluster(nodes, logger);
     }
 }
