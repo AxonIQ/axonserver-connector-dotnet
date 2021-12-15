@@ -15,6 +15,18 @@ public class ContextTests
     }
 
     [Fact]
+    public void AdminReturnsExpectedResult()
+    {
+        Assert.Equal(new Context("_admin"), Context.Admin);
+    }
+    
+    [Fact]
+    public void DefaultReturnsExpectedResult()
+    {
+        Assert.Equal(new Context("default"), Context.Default);
+    }
+
+    [Fact]
     public void CanNotBeNull()
     {
         Assert.Throws<ArgumentNullException>(() => new Context(null!));

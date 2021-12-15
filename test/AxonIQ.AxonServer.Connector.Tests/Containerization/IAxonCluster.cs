@@ -6,7 +6,8 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public interface IAxonCluster : IAsyncLifetime
 {
-    SystemProperties[] NodeProperties { get; }
+    IAxonClusterNode[] Nodes { get; }
+    Context[] Contexts { get; }
 
     DnsEndPoint[] GetHttpEndpoints();
     HttpClient CreateHttpClient(int node);

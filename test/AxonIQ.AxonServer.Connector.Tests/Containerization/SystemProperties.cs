@@ -53,4 +53,18 @@ public class SystemProperties
         properties.AddRange(KeepAlive.Serialize());
         return properties.ToArray();
     }
+
+    public Context[] ScanForContexts()
+    {
+        var contexts = new HashSet<Context>();
+        if (ClusterSetup.AutoclusterContexts != null)
+        {
+            foreach (var name in ClusterSetup.AutoclusterContexts)
+            {
+                contexts.Add(new Context(name));
+            }
+        }
+
+        return contexts.ToArray();
+    }
 }

@@ -1,16 +1,17 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using Microsoft.Extensions.Logging;
 using Xunit.Abstractions;
-using Xunit.Sdk;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public class AxonServerWithAccessControlDisabled : AxonServer
 {
-    public AxonServerWithAccessControlDisabled(IMessageSink logger)
+    public AxonServerWithAccessControlDisabled(IMessageSink sink)
     {
-        if (logger == null) throw new ArgumentNullException(nameof(logger));
-        logger.OnMessage(new DiagnosticMessage("Using Embedded Axon Server Container outside of CI"));
-        Server = EmbeddedAxonServer.WithAccessControlDisabled(new MessageSinkLogger<EmbeddedAxonServer>(logger));
+        if (sink == null) throw new ArgumentNullException(nameof(sink));
+        var logger = new MessageSinkLogger<EmbeddedAxonServer>(sink);
+        logger.LogDebug("Using Embedded Axon Server Container outside of CI");
+        Server = EmbeddedAxonServer.WithAccessControlDisabled(logger);
     }
 
     protected override IAxonServer Server { get; }

@@ -72,7 +72,7 @@ public class EmbeddedAxonServer : IAxonServer
                 var json = await response.Content.ReadAsStringAsync();
                 var document = JsonDocument.Parse(json);
                 var property = document.RootElement.GetProperty("status");
-                if (property.GetString()?.ToLowerInvariant() == "up")
+                if (property.GetString() == "UP")
                 {
                     available = true;
                 }
@@ -85,7 +85,7 @@ public class EmbeddedAxonServer : IAxonServer
             {
                 _logger.LogDebug(
                     exception,
-                    "Embedded Axon Server actuator health does not contain a 'status' property with the value 'up'");
+                    "Embedded Axon Server actuator health does not contain a 'status' property with the value 'UP'");
                 await Task.Delay(TimeSpan.FromSeconds(1));
             }
             catch (HttpRequestException exception)

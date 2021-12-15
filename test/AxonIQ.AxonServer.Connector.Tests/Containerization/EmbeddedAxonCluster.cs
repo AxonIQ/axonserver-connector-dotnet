@@ -14,130 +14,214 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public class EmbeddedAxonCluster : IAxonCluster
 {
+    private readonly int _id = EmbeddedAxonClusterCounter.Next();
+    
+    private readonly EmbeddedAxonClusterNode[] _nodes;
+    private readonly ClusterTemplate _clusterTemplate;
     private readonly ILogger<EmbeddedAxonCluster> _logger;
-    private IContainerService[]? _nodes;
-    private DirectoryInfo[]? _nodeFiles;
 
-    private EmbeddedAxonCluster(SystemProperties[] nodeProperties, string license, ClusterTemplate? clusterTemplate, ILogger<EmbeddedAxonCluster> logger)
+    private Context[]? _contexts;
+    private INetworkService? _network;
+    private IContainerService[]? _containers;
+
+    private EmbeddedAxonCluster(EmbeddedAxonClusterNode[] nodes, ClusterTemplate clusterTemplate, ILogger<EmbeddedAxonCluster> logger)
     {
-        NodeProperties = nodeProperties ?? throw new ArgumentNullException(nameof(nodeProperties));
-        License = license ?? throw new ArgumentNullException(nameof(license));
-        ClusterTemplate = clusterTemplate;
+        _nodes = nodes ?? throw new ArgumentNullException(nameof(nodes));
+        _clusterTemplate = clusterTemplate ?? throw new ArgumentNullException(nameof(clusterTemplate));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public SystemProperties[] NodeProperties { get; }
-    public string License { get; }
-    public ClusterTemplate? ClusterTemplate { get; }
+    public IAxonClusterNode[] Nodes => _nodes
+        .Select<EmbeddedAxonClusterNode, IAxonClusterNode>(node => node)
+        .ToArray();
+
+    public Context[] Contexts
+    {
+        get
+        {
+            if (_contexts == null)
+            {
+                var contexts = new HashSet<Context>();
+
+                foreach (var node in Nodes)
+                {
+                    foreach (var context in node.Properties.ScanForContexts())
+                    {
+                        contexts.Add(context);
+                    }
+                }
+
+                foreach (var context in _clusterTemplate.ScanForContexts())
+                {
+                    contexts.Add(context);
+                }
+
+                _contexts = contexts.ToArray();
+            }
+
+            return _contexts;
+        }
+    }
+    
+    private string License
+    {
+        get
+        {
+            var licensePath = Environment.GetEnvironmentVariable("AXONIQ_LICENSE");
+            if (licensePath == null)
+            {
+                throw new InvalidOperationException(
+                    "The AXONIQ_LICENSE environment variable was not set. It is required if you want to interact with an embedded axon cluster.");
+            }
+
+            if (!File.Exists(licensePath))
+            {
+                throw new InvalidOperationException(
+                    $"The AXONIQ_LICENSE environment variable value refers to a file path that does not exist: {licensePath}");
+            }
+
+            return File.ReadAllText(licensePath);
+        }
+    }
 
     public async Task InitializeAsync()
     {
-        _logger.LogDebug("Embedded Axon Cluster is being initialized");
+        _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being initialized", _id);
 
-        _nodeFiles = new DirectoryInfo[NodeProperties.Length];
-        _nodes = new IContainerService[NodeProperties.Length];
-        for (var index = 0; index < NodeProperties.Length; index++)
-        {
-            _nodeFiles[index] = new DirectoryInfo(
-                Path.Combine(Path.GetTempPath(), shortid.ShortId.Generate(new GenerationOptions
-                {
-                    UseSpecialCharacters = false
-                })));
-            _nodeFiles[index].Create();
-            
-            if (ClusterTemplate != null)
-            {
-                var template = new Serializer().Serialize(ClusterTemplate.Serialize());
-                await File.WriteAllTextAsync(Path.Combine(_nodeFiles[index].FullName, "cluster-template.yml"), template);    
-            }
-            await File.WriteAllTextAsync(Path.Combine(_nodeFiles[index].FullName, "axoniq.license"), License);
-            await File.WriteAllTextAsync(Path.Combine(_nodeFiles[index].FullName, "axonserver.properties"), string.Join(Environment.NewLine, NodeProperties[index].Serialize()));
-            
-            _nodes[index] = new Builder()
-                .UseContainer()
-                .UseImage("axoniq/axonserver-enterprise")
-                .ExposePort(8024)
-                .ExposePort(8124)
-                .Mount(_nodeFiles[index].FullName, "/axonserver/config", MountType.ReadOnly)
-                .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0))
-                .Build()
-                .Start();
-        }
+        _network = ProvisionNetwork();
+        _containers = ProvisionClusterNodes();
 
-        _logger.LogDebug("Embedded Axon Cluster got started");
+        _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got started", _id);
         
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        var endpoint = _nodes[0].ToHostExposedEndpoint("8024/tcp");
-        var requestUri = new UriBuilder
-        {
-            Host = "localhost",
-            Port = endpoint.Port,
-            Path = "actuator/health"
-        }.Uri;
-
-        var available = false;
+        
         const int maximumAttempts = 60;
         var attempt = 0;
-        while (!available && attempt < maximumAttempts)
+        foreach (var container in _containers)
         {
-            _logger.LogDebug("Embedded Axon Cluster is being health checked at {Endpoint}",
-                requestUri.AbsoluteUri);
-
-            try
+            var endpoint = _containers[0].ToHostExposedEndpoint("8024/tcp");
+            var requestUri = new UriBuilder
             {
-                var response = (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
-                var json = await response.Content.ReadAsStringAsync();
-                var document = JsonDocument.Parse(json);
-                var property = document.RootElement.GetProperty("status");
-                if (property.GetString()?.ToLowerInvariant() == "up")
+                Host = "localhost",
+                Port = endpoint.Port,
+                Path = "actuator/health"
+            }.Uri;
+
+            var available = false;
+            while (!available && attempt < maximumAttempts)
+            {
+                _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being health checked on node {Node} at {Endpoint}",
+                    _id,
+                    container.Name,
+                    requestUri.AbsoluteUri);
+
+                try
                 {
-                    available = true;
+                    var response = (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
+                    var json = await response.Content.ReadAsStringAsync();
+                    var document = JsonDocument.Parse(json);
+                    if (document.RootElement.GetProperty("status").GetString() == "UP" &&
+                        document.RootElement.GetProperty("components").GetProperty("raft").GetProperty("status").GetString() == "UP" &&
+                        Contexts.All(context => 
+                            document.RootElement
+                                .GetProperty("components").GetProperty("raft").GetProperty("details")
+                                .GetProperty($"{context.ToString()}.leader").GetString() != null 
+                        ))
+                    {
+                        available = true;
+                    }
+                    else
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(1));
+                    }
                 }
-                else
+                catch (KeyNotFoundException exception)
                 {
+                    _logger.LogDebug(
+                        exception,
+                        "[{ClusterId}]Embedded Axon Cluster actuator health does not contain have a 'status' or a 'components.raft.status' property with the value 'UP'",
+                        _id);
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
-            }
-            catch (KeyNotFoundException exception)
-            {
-                _logger.LogDebug(
-                    exception,
-                    "Embedded Axon Cluster actuator health does not contain a 'status' property with the value 'up'");
-                await Task.Delay(TimeSpan.FromSeconds(1));
-            }
-            catch (HttpRequestException exception)
-            {
-                _logger.LogDebug(
-                    exception,
-                    "Embedded Axon Cluster could not be reached at {Endpoint} because {Exception}",
-                    requestUri.AbsoluteUri,
-                    exception.Message);
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                catch (HttpRequestException exception)
+                {
+                    _logger.LogDebug(
+                        exception,
+                        "[{ClusterId}]Embedded Axon Cluster could not be reached on node {Node} at {Endpoint} because {Exception}",
+                        _id,
+                        container.Name,
+                        requestUri.AbsoluteUri,
+                        exception.Message);
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
+
+                attempt++;
             }
 
-            attempt++;
+            if (attempt == maximumAttempts)
+            {
+                throw new InvalidOperationException(
+                    $"[{_id}]Embedded Axon Cluster could not be initialized. Failed to reach node {container.Name} at {requestUri.AbsoluteUri} after {maximumAttempts} attempts");
+            }
         }
 
-        if (!available)
+        _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster became available", _id);
+        _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got initialized", _id);
+    }
+    
+    private INetworkService ProvisionNetwork()
+    {
+        return new Builder().UseNetwork($"axoniq-dotnet-{_id}").ReuseIfExist().Build();
+    }
+
+    private IContainerService[] ProvisionClusterNodes()
+    {
+        var containers = new IContainerService[_nodes.Length];
+        for (var index = 0; index < _nodes.Length; index++)
         {
-            throw new InvalidOperationException(
-                $"Embedded Axon Cluster could not be initialized. Failed to reach it at {requestUri.AbsoluteUri} after {maximumAttempts} attempts");
+            var node = _nodes[index];
+            node.Files.Create();
+
+            var template = new Serializer().Serialize(_clusterTemplate.Serialize());
+            File.WriteAllText(Path.Combine(node.Files.FullName, "cluster-template.yml"), template);
+            File.WriteAllText(Path.Combine(node.Files.FullName, "axoniq.license"), License);
+            File.WriteAllText(Path.Combine(node.Files.FullName, "axonserver.properties"),
+                string.Join(Environment.NewLine, node.Properties.Serialize()));
+
+            var builder = new Builder()
+                .UseContainer()
+                .UseImage("axoniq/axonserver-enterprise:latest-dev")
+                .UseNetwork(_network)
+                .ExposePort(8024)
+                .ExposePort(8124)
+                .Mount(node.Files.FullName, "/axonserver/config", MountType.ReadOnly)
+                .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0));
+            if (!string.IsNullOrEmpty(node.Properties.NodeSetup.Name))
+            {
+                builder.WithName(node.Properties.NodeSetup.Name);
+            }
+
+            if (!string.IsNullOrEmpty(node.Properties.NodeSetup.Hostname))
+            {
+                builder.WithHostName(node.Properties.NodeSetup.Hostname);
+            }
+
+            containers[index] = builder.Build().Start();
         }
 
-        _logger.LogDebug("Embedded Axon Cluster became available");
-        _logger.LogDebug("Embedded Axon Cluster got initialized");
+        return containers;
     }
 
     public DnsEndPoint[] GetHttpEndpoints()
     {
-        if (_nodes == null)
+        if (_containers == null)
         {
-            throw new InvalidOperationException("The cluster nodes have not been initialized");
+            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
         }
 
         return Array.ConvertAll(
-            _nodes,
+            _containers,
             clusterNode => new DnsEndPoint(
                 "localhost",
                 clusterNode.ToHostExposedEndpoint("8024/tcp").Port
@@ -147,14 +231,14 @@ public class EmbeddedAxonCluster : IAxonCluster
 
     public HttpClient CreateHttpClient(int node)
     {
-        if (_nodes == null)
+        if (_containers == null)
         {
-            throw new InvalidOperationException("The cluster nodes have not been initialized");
+            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
         }
-        if (node < 0 || node >= _nodes.Length)
+        if (node < 0 || node >= _containers.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(node), node,
-                $"The node index is out of the acceptable range: [0,{_nodes.Length}]");
+                $"[{_id}]The node index is out of the acceptable range: [0,{_containers.Length}]");
         }
 
         return new HttpClient
@@ -162,20 +246,20 @@ public class EmbeddedAxonCluster : IAxonCluster
             BaseAddress = new UriBuilder
             {
                 Host = "localhost",
-                Port = _nodes[node].ToHostExposedEndpoint("8024/tcp").Port
+                Port = _containers[node].ToHostExposedEndpoint("8024/tcp").Port
             }.Uri
         };
     }
 
     public DnsEndPoint[] GetGrpcEndpoints()
     {
-        if (_nodes == null)
+        if (_containers == null)
         {
-            throw new InvalidOperationException("The cluster nodes have not been initialized");
+            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
         }
 
         return Array.ConvertAll(
-            _nodes,
+            _containers,
             clusterNode => new DnsEndPoint(
                 "localhost",
                 clusterNode.ToHostExposedEndpoint("8124/tcp").Port
@@ -185,38 +269,50 @@ public class EmbeddedAxonCluster : IAxonCluster
 
     public GrpcChannel CreateGrpcChannel(int node, GrpcChannelOptions? options)
     {
-        if (_nodes == null)
+        if (_containers == null)
         {
-            throw new InvalidOperationException("The cluster nodes have not been initialized");
+            throw new InvalidOperationException($"[{_id}]The cluster nodes have not been initialized");
+        }
+        if (node < 0 || node >= _containers.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(node), node,
+                $"[{_id}]The node index is out of the acceptable range: [0,{_containers.Length}]");
         }
         
         var address = new UriBuilder
         {
             Host = "localhost",
-            Port = _nodes[node].ToHostExposedEndpoint("8124/tcp").Port
+            Port = _containers[node].ToHostExposedEndpoint("8124/tcp").Port
         }.Uri;
         return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
     }
 
     public Task DisposeAsync()
     {
-        _logger.LogDebug("Embedded Axon Cluster is being disposed");
+        _logger.LogDebug("[{Cluster}]Embedded Axon Cluster is being disposed", _id);
         
-        if (_nodes != null)
+        if (_containers != null)
         {
-            Array.ForEach(_nodes, node =>
+            if (_network != null)
             {
-                node.Remove(true);
-                node.Dispose();
+                Array.ForEach(_containers, container =>
+                {
+                    _network.Detach(container);
+                });
+            }
+            
+            Array.ForEach(_containers, container =>
+            {
+                container.Remove(true);
+                container.Dispose();
             });
         }
 
-        if (_nodeFiles != null)
-        {
-            Array.ForEach(_nodeFiles, files => files.Delete(true));
-        }
+        _network?.Dispose();
 
-        _logger.LogDebug("Embedded Axon Cluster got disposed");
+        Array.ForEach(_nodes, node => node.Dispose());
+
+        _logger.LogDebug("[{Cluster}]Embedded Axon Cluster got disposed", _id);
         return Task.CompletedTask;
     }
 
@@ -247,8 +343,94 @@ public class EmbeddedAxonCluster : IAxonCluster
         node3.NodeSetup.Name = "axonserver-3";
         node3.NodeSetup.Hostname = "axonserver-3";
         node3.NodeSetup.InternalHostname = "axonserver-3";
-        var nodeProperties = new[] { node1, node2, node3 };
-        return new EmbeddedAxonCluster(nodeProperties, "", null, logger);
+        var nodeProperties = new[] { new EmbeddedAxonClusterNode(node1), new EmbeddedAxonClusterNode(node2), new EmbeddedAxonClusterNode(node3) };
+        var template = new ClusterTemplate
+        {
+            First = "axonserver-1",
+            Applications = new ClusterTemplateApplication[]
+            {
+                new()
+                {
+                    Name = "axonserver-dotnet-connector-tests",
+                    Roles = new ClusterTemplateApplicationRole[]
+                    {
+                        new()
+                        {
+                            Context = Context.Default.ToString(),
+                            Roles = new[] { "USE_CONTEXT" }
+                        },
+                        new()
+                        {
+                            Context = Context.Admin.ToString(),
+                            Roles = new[] { "USE_CONTEXT" }
+                        }
+                    },
+                    Token = Guid.NewGuid().ToString("N")
+                }
+            },
+            ReplicationGroups = new ClusterTemplateReplicationGroup[]
+            {
+                new()
+                {
+                    Name = Context.Default.ToString(),
+                    Contexts = new ClusterTemplateReplicationGroupContext[]
+                    {
+                        new()
+                        {
+                            Name = Context.Default.ToString()
+                        }
+                    },
+                    Roles = new ClusterTemplateReplicationGroupRole[]
+                    {
+                        new()
+                        {
+                            Node = "axonserver-1",
+                            Role = "PRIMARY"
+                        },
+                        new()
+                        {
+                            Node = "axonserver-2",
+                            Role = "PRIMARY"
+                        },
+                        new()
+                        {
+                            Node = "axonserver-3",
+                            Role = "PRIMARY"
+                        }
+                    }
+                },
+                new()
+                {
+                    Name = Context.Admin.ToString(),
+                    Contexts = new ClusterTemplateReplicationGroupContext[]
+                    {
+                        new()
+                        {
+                            Name = Context.Admin.ToString()
+                        }
+                    },
+                    Roles = new ClusterTemplateReplicationGroupRole[]
+                    {
+                        new()
+                        {
+                            Node = "axonserver-1",
+                            Role = "PRIMARY"
+                        },
+                        new()
+                        {
+                            Node = "axonserver-2",
+                            Role = "PRIMARY"
+                        },
+                        new()
+                        {
+                            Node = "axonserver-3",
+                            Role = "PRIMARY"
+                        }
+                    }
+                }
+            }
+        };
+        return new EmbeddedAxonCluster(nodeProperties, template, logger);
     }
 
     public static IAxonCluster WithAccessControlEnabled(ILogger<EmbeddedAxonCluster> logger)
@@ -258,7 +440,7 @@ public class EmbeddedAxonCluster : IAxonCluster
             ClusterSetup =
             {
                 AutoclusterFirst = "axonserver-1",
-                AutoclusterContexts = new[] { "_admin", "default" }
+                AutoclusterContexts = new[] { Context.Admin.ToString(), Context.Default.ToString() }
             },
             AccessControl =
             {
@@ -279,7 +461,7 @@ public class EmbeddedAxonCluster : IAxonCluster
         node3.NodeSetup.Name = "axonserver-3";
         node3.NodeSetup.Hostname = "axonserver-3";
         node3.NodeSetup.InternalHostname = "axonserver-3";
-        var nodeProperties = new[] { node1, node2, node3 };
+        var nodeProperties = new[] { new EmbeddedAxonClusterNode(node1), new EmbeddedAxonClusterNode(node2), new EmbeddedAxonClusterNode(node3) };
         var template = new ClusterTemplate
         {
             First = "axonserver-1",
@@ -292,7 +474,12 @@ public class EmbeddedAxonCluster : IAxonCluster
                     {
                         new()
                         {
-                            Context = "default",
+                            Context = Context.Default.ToString(),
+                            Roles = new[] { "USE_CONTEXT" }
+                        },
+                        new()
+                        {
+                            Context = Context.Admin.ToString(),
                             Roles = new[] { "USE_CONTEXT" }
                         }
                     },
@@ -303,16 +490,21 @@ public class EmbeddedAxonCluster : IAxonCluster
             {
                 new()
                 {
-                    Name = "default",
+                    Name = Context.Default.ToString(),
                     Contexts = new ClusterTemplateReplicationGroupContext[]
                     {
                         new()
                         {
-                            Name = "default"
+                            Name = Context.Default.ToString()
                         }
                     },
                     Roles = new ClusterTemplateReplicationGroupRole[]
                     {
+                        new()
+                        {
+                            Node = "axonserver-1",
+                            Role = "PRIMARY"
+                        },
                         new()
                         {
                             Node = "axonserver-2",
@@ -327,12 +519,12 @@ public class EmbeddedAxonCluster : IAxonCluster
                 },
                 new()
                 {
-                    Name = "_admin",
+                    Name = Context.Admin.ToString(),
                     Contexts = new ClusterTemplateReplicationGroupContext[]
                     {
                         new()
                         {
-                            Name = "_admin"
+                            Name = Context.Admin.ToString()
                         }
                     },
                     Roles = new ClusterTemplateReplicationGroupRole[]
@@ -341,11 +533,21 @@ public class EmbeddedAxonCluster : IAxonCluster
                         {
                             Node = "axonserver-1",
                             Role = "PRIMARY"
+                        },
+                        new()
+                        {
+                            Node = "axonserver-2",
+                            Role = "PRIMARY"
+                        },
+                        new()
+                        {
+                            Node = "axonserver-3",
+                            Role = "PRIMARY"
                         }
                     }
                 }
             }
         };
-        return new EmbeddedAxonCluster(nodeProperties, "", template, logger);
+        return new EmbeddedAxonCluster(nodeProperties, template, logger);
     }
 }

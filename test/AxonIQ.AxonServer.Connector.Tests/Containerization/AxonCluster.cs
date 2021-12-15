@@ -12,7 +12,9 @@ public abstract class AxonCluster : IAxonCluster
         return Cluster.InitializeAsync();
     }
 
-    public SystemProperties[] NodeProperties => Cluster.NodeProperties;
+    public IAxonClusterNode[] Nodes => Cluster.Nodes;
+
+    public Context[] Contexts => Cluster.Contexts;
 
     public DnsEndPoint[] GetHttpEndpoints()
     {

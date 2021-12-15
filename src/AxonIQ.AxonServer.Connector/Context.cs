@@ -4,6 +4,9 @@ namespace AxonIQ.AxonServer.Connector;
 
 public readonly struct Context
 {
+    public static readonly Context Admin = new ("_admin");
+    public static readonly Context Default = new ("default");
+    
     private readonly string _value;
 
     public Context(string value)

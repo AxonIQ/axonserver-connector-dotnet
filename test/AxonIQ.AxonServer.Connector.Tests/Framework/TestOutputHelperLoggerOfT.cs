@@ -1,22 +1,20 @@
 using Microsoft.Extensions.Logging;
 using Xunit.Abstractions;
-using Xunit.Sdk;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Framework;
 
-public class MessageSinkLogger : ILogger
+public class TestOutputHelperLogger<T> : ILogger<T>
 {
-    private readonly IMessageSink _sink;
+    private readonly ITestOutputHelper _output;
 
-    public MessageSinkLogger(IMessageSink sink)
+    public TestOutputHelperLogger(ITestOutputHelper output)
     {
-        _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+        _output = output ?? throw new ArgumentNullException(nameof(output));
     }
     
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
     {
-        _sink.OnMessage(
-            new DiagnosticMessage($"[{logLevel.ToString()}]-{eventId.ToString()}:{formatter(state, exception)}"));
+        _output.WriteLine($"[{logLevel.ToString()}]-{eventId.ToString()}:{formatter(state, exception)}");
     }
 
     public bool IsEnabled(LogLevel logLevel)
