@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -153,8 +154,9 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        const int maximumAttempts = 120;
+        var maximumWaitTime = TimeSpan.FromMinutes(2);
         var attempt = 0;
+        var available = false;
         var endpoint = _container.ToHostExposedEndpoint("8024/tcp");
         var requestUri = new UriBuilder
         {
@@ -163,8 +165,8 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
             Path = "actuator/health"
         }.Uri;
 
-        var available = false;
-        while (!available && attempt < maximumAttempts)
+        var watch = Stopwatch.StartNew();
+        while (!available && watch.Elapsed < maximumWaitTime)
         {
             _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being health checked on node {Node} at {Endpoint}",
                 cluster,
@@ -217,7 +219,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         if (!available)
         {
             throw new InvalidOperationException(
-                $"[{cluster}]Embedded Axon Cluster could not be initialized. Failed to reach node {_container.Name} at {requestUri.AbsoluteUri} after {maximumAttempts} attempts");
+                $"[{cluster}]Embedded Axon Cluster could not be initialized. Failed to reach node {_container.Name} at {requestUri.AbsoluteUri} within {Convert.ToInt32(maximumWaitTime.TotalSeconds)} seconds and after {attempt} attempts");
         }
     }
 

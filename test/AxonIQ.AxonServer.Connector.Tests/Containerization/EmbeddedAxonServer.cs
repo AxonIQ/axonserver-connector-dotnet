@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Ductus.FluentDocker.Builders;
@@ -48,6 +49,10 @@ public class EmbeddedAxonServer : IAxonServer
             .Build()
             .Start();
         _logger.LogDebug("Embedded Axon Server got started");
+        
+        var maximumWaitTime = TimeSpan.FromMinutes(2);
+        var attempt = 0;
+        var available = false;
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         var endpoint = _container.ToHostExposedEndpoint("8024/tcp");
@@ -58,10 +63,8 @@ public class EmbeddedAxonServer : IAxonServer
             Path = "actuator/health"
         }.Uri;
 
-        var available = false;
-        const int maximumAttempts = 60;
-        var attempt = 0;
-        while (!available && attempt < maximumAttempts)
+        var watch = Stopwatch.StartNew();
+        while (!available && watch.Elapsed < maximumWaitTime)
         {
             _logger.LogDebug("Embedded Axon Server is being health checked at {Endpoint}",
                 requestUri.AbsoluteUri);
@@ -104,7 +107,7 @@ public class EmbeddedAxonServer : IAxonServer
         if (!available)
         {
             throw new InvalidOperationException(
-                $"Embedded Axon Server could not be initialized. Failed to reach it at {requestUri.AbsoluteUri} after {maximumAttempts} attempts");
+                $"Embedded Axon Server could not be initialized. Failed to reach it at {requestUri.AbsoluteUri} within {Convert.ToInt32(maximumWaitTime.TotalSeconds)} seconds and after {attempt} attempts");
         }
 
         _logger.LogDebug("Embedded Axon Server became available");
