@@ -63,7 +63,7 @@ public class EmbeddedAxonCluster : IAxonCluster
         
         foreach (var node in _nodes)
         {
-            await node.WaitUntilAvailableAsync(_id);
+            await node.WaitUntilAvailableAsync(_id, Contexts);
         }
 
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster became available", _id);

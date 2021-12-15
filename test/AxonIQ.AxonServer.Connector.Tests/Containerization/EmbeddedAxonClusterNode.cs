@@ -143,16 +143,17 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         _container = builder.Build().Start();
     }
 
-    internal async Task WaitUntilAvailableAsync(int cluster)
+    internal async Task WaitUntilAvailableAsync(int cluster, Context[] contexts)
     {
+        if (contexts == null) 
+            throw new ArgumentNullException(nameof(contexts));
+        
         if (_container == null)
-        {
-            throw new InvalidOperationException("The cluster node have not been initialized");
-        }
+            throw new InvalidOperationException("The cluster node has not been initialized");
         
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        const int maximumAttempts = 60;
+        const int maximumAttempts = 120;
         var attempt = 0;
         var endpoint = _container.ToHostExposedEndpoint("8024/tcp");
         var requestUri = new UriBuilder
@@ -177,7 +178,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
                 var document = JsonDocument.Parse(json);
                 if (document.RootElement.GetProperty("status").GetString() == "UP" &&
                     document.RootElement.GetProperty("components").GetProperty("raft").GetProperty("status").GetString() == "UP" &&
-                    ScanForContexts().All(context => 
+                    contexts.All(context => 
                         document.RootElement
                             .GetProperty("components").GetProperty("raft").GetProperty("details")
                             .GetProperty($"{context.ToString()}.leader").GetString() != null 
