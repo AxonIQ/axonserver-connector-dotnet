@@ -2,19 +2,28 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public static class AxonClusterLicense
 {
+    private const string LicenseVariableName = "AXONIQ_LICENSE";
+    private const string LicensePathVariableName = "AXONIQ_LICENSEPATH";
+
     public static string FromEnvironment()
     {
-        var licensePath = Environment.GetEnvironmentVariable("AXONIQ_LICENSE");
-        if (licensePath == null)
+        var license = Environment.GetEnvironmentVariable(LicenseVariableName);
+        var licensePath = Environment.GetEnvironmentVariable(LicensePathVariableName);
+        if (license == null && licensePath == null)
         {
             throw new InvalidOperationException(
-                "The AXONIQ_LICENSE environment variable was not set. It is required if you want to interact with an embedded axon cluster.");
+                $"Neither the {LicenseVariableName} nor the {LicensePathVariableName} environment variable was set. It is required that you set at least one if you want to interact with an embedded axon cluster.");
+        }
+
+        if (license != null)
+        {
+            return license;
         }
 
         if (!File.Exists(licensePath))
         {
             throw new InvalidOperationException(
-                $"The AXONIQ_LICENSE environment variable value refers to a file path that does not exist: {licensePath}");
+                $"The {LicensePathVariableName} environment variable value refers to a file path that does not exist: {licensePath}");
         }
 
         return File.ReadAllText(licensePath);
