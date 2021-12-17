@@ -15,7 +15,7 @@ public class AxonServerConnectionFactoryDefaultsTests
             new("localhost", 8124)
         }, result);
     }
-    
+
     [Fact]
     public void ClientTagsReturnsExpectedResult()
     {
@@ -23,12 +23,20 @@ public class AxonServerConnectionFactoryDefaultsTests
 
         Assert.Empty(result);
     }
-    
+
     [Fact]
     public void AuthenticationReturnsExpectedResult()
     {
         var result = AxonServerConnectionFactoryDefaults.Authentication;
 
         Assert.Same(AxonServerAuthentication.None, result);
+    }
+
+    [Fact]
+    public void ConnectTimeoutReturnsExpectedResult()
+    {
+        var result = AxonServerConnectionFactoryDefaults.ConnectTimeout;
+
+        Assert.Equal(TimeSpan.FromMilliseconds(10_000), result);
     }
 }

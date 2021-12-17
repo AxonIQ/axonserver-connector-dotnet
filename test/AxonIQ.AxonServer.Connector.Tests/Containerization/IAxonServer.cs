@@ -4,11 +4,13 @@ using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
-public interface IAxonServerContainer : IAsyncLifetime
+public interface IAxonServer : IAsyncLifetime
 {
+    SystemProperties Properties { get; }
+    
     DnsEndPoint GetHttpEndpoint();
     HttpClient CreateHttpClient();
 
     DnsEndPoint GetGrpcEndpoint();
-    GrpcChannel CreateGrpcChannel();
+    GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options);
 }

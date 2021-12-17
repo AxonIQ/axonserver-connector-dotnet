@@ -11,7 +11,7 @@ public class AxonServerConnectionFactoryConfigurationTests
 
         Assert.Equal("AxonIQ", result);
     }
-    
+
     [Fact]
     public void ComponentNameReturnsExpectedResult()
     {
@@ -19,7 +19,7 @@ public class AxonServerConnectionFactoryConfigurationTests
 
         Assert.Equal("ComponentName", result);
     }
-    
+
     [Fact]
     public void ClientInstanceIdReturnsExpectedResult()
     {
@@ -27,7 +27,7 @@ public class AxonServerConnectionFactoryConfigurationTests
 
         Assert.Equal("ClientInstanceId", result);
     }
-    
+
     [Fact]
     public void RoutingServersReturnsExpectedResult()
     {

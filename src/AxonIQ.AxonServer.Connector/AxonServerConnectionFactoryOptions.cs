@@ -7,11 +7,11 @@ public class AxonServerConnectionFactoryOptions
 {
     public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName)
     {
-        return new Builder(componentName, ClientId.GenerateFrom(componentName));
+        return new Builder(componentName, ClientInstanceId.GenerateFrom(componentName));
     }
 
     public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName,
-        ClientId clientInstanceId)
+        ClientInstanceId clientInstanceId)
     {
         return new Builder(componentName, clientInstanceId);
     }
@@ -19,24 +19,22 @@ public class AxonServerConnectionFactoryOptions
     public static IAxonServerConnectionFactoryOptionsBuilder FromConfiguration(IConfiguration configuration)
     {
         if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-        var rawComponentName = configuration[AxonServerConnectionFactoryConfiguration.ComponentName];
-        if (rawComponentName == null)
-        {
-            throw new InvalidOperationException($"The {AxonServerConnectionFactoryConfiguration.ComponentName} configuration value is missing.");
-        }
-        var componentName = new ComponentName(configuration[AxonServerConnectionFactoryConfiguration.ComponentName]);
+        var componentName =
+            configuration[AxonServerConnectionFactoryConfiguration.ComponentName] == null
+                ? ComponentName.GenerateRandomName()
+                : new ComponentName(configuration[AxonServerConnectionFactoryConfiguration.ComponentName]);
         var clientInstanceId =
             configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId] == null
-                ? ClientId.GenerateFrom(componentName)
-                : new ClientId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
+                ? ClientInstanceId.GenerateFrom(componentName)
+                : new ClientInstanceId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
         var builder = new Builder(componentName, clientInstanceId);
-        
+
         return builder;
     }
-    
+
     private AxonServerConnectionFactoryOptions(
         ComponentName componentName,
-        ClientId clientInstanceId,
+        ClientInstanceId clientInstanceId,
         IReadOnlyCollection<DnsEndPoint> routingServers,
         IReadOnlyDictionary<string, string> clientTags,
         IAxonServerAuthentication authentication)
@@ -49,22 +47,22 @@ public class AxonServerConnectionFactoryOptions
     }
 
     public ComponentName ComponentName { get; }
-    public ClientId ClientInstanceId { get; }
+    public ClientInstanceId ClientInstanceId { get; }
     public IReadOnlyCollection<DnsEndPoint> RoutingServers { get; }
     public IReadOnlyDictionary<string, string> ClientTags { get; }
     public IAxonServerAuthentication Authentication { get; }
-    
+
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
     private class Builder : IAxonServerConnectionFactoryOptionsBuilder
     {
-        private readonly ComponentName _componentName;
-        private readonly ClientId _clientInstanceId;
+        private ComponentName _componentName;
+        private ClientInstanceId _clientInstanceId;
         private readonly List<DnsEndPoint> _routingServers;
         private readonly Dictionary<string, string> _clientTags;
         private IAxonServerAuthentication _authentication;
 
-        internal Builder(ComponentName componentName, ClientId clientInstanceId)
+        internal Builder(ComponentName componentName, ClientInstanceId clientInstanceId)
         {
             _componentName = componentName;
             _clientInstanceId = clientInstanceId;
@@ -76,6 +74,24 @@ public class AxonServerConnectionFactoryOptions
             }
 
             _authentication = AxonServerAuthentication.None;
+        }
+
+        public IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name)
+        {
+            _componentName = name;
+            return this;
+        }
+
+        public IAxonServerConnectionFactoryOptionsBuilder AsClientInstanceId(ClientInstanceId id)
+        {
+            _clientInstanceId = id;
+            return this;
+        }
+
+        public IAxonServerConnectionFactoryOptionsBuilder WithDefaultRoutingServers()
+        {
+            _routingServers.Clear();
+            return this;
         }
 
         public IAxonServerConnectionFactoryOptionsBuilder WithRoutingServers(params DnsEndPoint[] servers)

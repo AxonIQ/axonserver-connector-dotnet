@@ -1,7 +1,11 @@
 bin
 obj
+.env
 .fake
 .ionide
 .attic
 .idea
 *.user
+axoniq.license
+axonserver.properties
+cluster-template.yml

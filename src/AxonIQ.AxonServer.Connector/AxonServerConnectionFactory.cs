@@ -5,32 +5,33 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class AxonServerConnectionFactory
 {
-    private readonly ConcurrentDictionary<string, AxonServerConnection> _connections;
-    
+    private readonly ConcurrentDictionary<Context, AxonServerConnection> _connections;
+
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
-        if (options == null) 
+        if (options == null)
             throw new ArgumentNullException(nameof(options));
 
-        ComponentName = options.ComponentName;
-        ClientInstanceId = options.ClientInstanceId;
+        ClientIdentity = new ClientIdentity(
+            options.ComponentName, options.ClientInstanceId, options.ClientTags, new Version(1, 0));
         RoutingServers = options.RoutingServers;
-        ClientTags = options.ClientTags;
         Authentication = options.Authentication;
 
-        _connections = new ConcurrentDictionary<string, AxonServerConnection>();
+        _connections = new ConcurrentDictionary<Context, AxonServerConnection>();
     }
 
-    public ComponentName ComponentName { get; }
-    public ClientId ClientInstanceId { get; }
+    public ClientIdentity ClientIdentity { get; }
     public IReadOnlyCollection<DnsEndPoint> RoutingServers { get; }
-    public IReadOnlyDictionary<string,string> ClientTags { get; }
     public IAxonServerAuthentication Authentication { get; }
 
-    public Task<AxonServerConnection> Connect(string context)
+    public Task<AxonServerConnection> Connect(Context context)
     {
-        if (context == null) throw new ArgumentNullException(nameof(context));
-
-        return Task.FromResult(_connections.GetOrAdd(context, _ => new AxonServerConnection()));
+        //Note: The valueFactory is not thread safe, but in the odd case of a race,
+        //the instances that lost the race will be garbage collected anyway (they don't hold any precious resources). 
+        return Task.FromResult(_connections.GetOrAdd(context,
+            _ => new AxonServerConnection(
+                ClientIdentity,
+                RoutingServers,
+                context)));
     }
 }

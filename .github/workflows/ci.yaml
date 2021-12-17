@@ -10,18 +10,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    services:
-      # composed axonserver
-      axonserver:
-        image: axoniq/axonserver:latest
-        ports:
-          - 8024:8024
-          - 8124:8124
-        env:
-          AXONIQ_AXONSERVER_NAME: axonserver
-          AXONIQ_AXONSERVER_HOSTNAME: localhost
-          AXONIQ_AXONSERVER_DEVMODE_ENABLED: true
-        options: --name axonserver-connector-dotnet-tests
     steps:
       # checkout the code
       - uses: actions/checkout@v2
@@ -34,9 +22,7 @@ jobs:
       - name: make ci
         run: make ci
         env:
-          CI: true # I'd assume this is present by default (need to verify)
-          AXONIQ_AXONSERVER_PORT: 8024
-          AXONIQ_AXONSERVER_GRPC_PORT: 8124
+          AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:

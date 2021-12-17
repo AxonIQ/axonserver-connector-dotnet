@@ -8,11 +8,12 @@ internal class TokenBasedServerAuthentication : IAxonServerAuthentication
     {
         Token = token ?? throw new ArgumentNullException(nameof(token));
     }
-    
+
     public string Token { get; }
-        
+
     public void WriteTo(Metadata metadata)
     {
+        if (metadata == null) throw new ArgumentNullException(nameof(metadata));
         metadata.Add(AxonServerConnectionHeaders.AccessToken, Token);
     }
 }
