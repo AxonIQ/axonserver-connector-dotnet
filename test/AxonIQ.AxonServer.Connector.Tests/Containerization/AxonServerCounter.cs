@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
-public static class EmbeddedAxonClusterCounter
+public static class AxonServerCounter
 {
     private static int _current = -1;
 

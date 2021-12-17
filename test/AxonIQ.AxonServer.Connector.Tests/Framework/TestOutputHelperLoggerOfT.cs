@@ -14,7 +14,7 @@ public class TestOutputHelperLogger<T> : ILogger<T>
     
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
     {
-        _output.WriteLine($"[{logLevel.ToString()}]-{eventId.ToString()}:{formatter(state, exception)}");
+        _output.WriteLine($"[{logLevel.ToString()}]:{formatter(state, exception)}");
     }
 
     public bool IsEnabled(LogLevel logLevel)

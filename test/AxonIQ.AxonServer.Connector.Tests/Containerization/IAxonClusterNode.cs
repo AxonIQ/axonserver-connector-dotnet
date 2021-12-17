@@ -6,6 +6,7 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 public interface IAxonClusterNode
 {
     SystemProperties Properties { get; }
+    ClusterTemplate Template { get; }
 
     DnsEndPoint GetHttpEndpoint();
     HttpClient CreateHttpClient();

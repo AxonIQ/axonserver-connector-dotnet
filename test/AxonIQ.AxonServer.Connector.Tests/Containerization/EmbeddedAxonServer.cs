@@ -18,7 +18,7 @@ public class EmbeddedAxonServer : IAxonServer
     private IContainerService? _container;
     private DirectoryInfo? _serverFiles;
 
-    private EmbeddedAxonServer(SystemProperties properties, ILogger<EmbeddedAxonServer> logger)
+    public EmbeddedAxonServer(SystemProperties properties, ILogger<EmbeddedAxonServer> logger)
     {
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -38,16 +38,26 @@ public class EmbeddedAxonServer : IAxonServer
         _serverFiles.Create();
         
         await File.WriteAllTextAsync(Path.Combine(_serverFiles.FullName, "axonserver.properties"), string.Join(Environment.NewLine, Properties.Serialize()));
-        
-        _container = new Builder()
+
+        var builder = new Builder()
             .UseContainer()
             .UseImage("axoniq/axonserver")
             .ExposePort(8024)
             .ExposePort(8124)
             .Mount(_serverFiles.FullName, "/config", MountType.ReadOnly)
-            .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0))
-            .Build()
-            .Start();
+            .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0));
+        if (!string.IsNullOrEmpty(Properties.NodeSetup.Name))
+        {
+            builder.WithName(Properties.NodeSetup.Name);
+        }
+
+        if (!string.IsNullOrEmpty(Properties.NodeSetup.Hostname))
+        {
+            builder.WithHostName(Properties.NodeSetup.Hostname);
+        }
+
+        _container = builder.Build().Start();
+        
         _logger.LogDebug("Embedded Axon Server got started");
         
         var maximumWaitTime = TimeSpan.FromMinutes(2);
@@ -117,7 +127,7 @@ public class EmbeddedAxonServer : IAxonServer
     public DnsEndPoint GetHttpEndpoint()
     {
         return new DnsEndPoint(
-            "localhost",
+            Properties.NodeSetup.Hostname ?? "localhost",
             _container.ToHostExposedEndpoint("8024/tcp").Port);
     }
 
@@ -127,7 +137,7 @@ public class EmbeddedAxonServer : IAxonServer
         {
             BaseAddress = new UriBuilder
             {
-                Host = "localhost",
+                Host = Properties.NodeSetup.Hostname ?? "localhost",
                 Port = _container.ToHostExposedEndpoint("8024/tcp").Port
             }.Uri
         };
@@ -136,7 +146,7 @@ public class EmbeddedAxonServer : IAxonServer
     public DnsEndPoint GetGrpcEndpoint()
     {
         return new DnsEndPoint(
-            "localhost",
+            Properties.NodeSetup.Hostname ?? "localhost",
             _container.ToHostExposedEndpoint("8124/tcp").Port);
     }
 
@@ -144,7 +154,7 @@ public class EmbeddedAxonServer : IAxonServer
     {
         var address = new UriBuilder
         {
-            Host = "localhost",
+            Host = Properties.NodeSetup.Hostname ?? "localhost",
             Port = _container.ToHostExposedEndpoint("8124/tcp").Port
         }.Uri;
         return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
@@ -165,17 +175,22 @@ public class EmbeddedAxonServer : IAxonServer
 
     public static IAxonServer WithAccessControlDisabled(ILogger<EmbeddedAxonServer> logger)
     {
+        var suffix = AxonServerCounter.Next();
         var properties = new SystemProperties
         {
             NodeSetup =
             {
-                Name = "axonserver",
+                Name = $"axonserver-{suffix}",
                 Hostname = "localhost",
                 DevModeEnabled = true
             },
             AccessControl =
             {
                 AccessControlEnabled = false
+            },
+            KeepAlive =
+            {
+                HeartbeatEnabled = true
             }
         };
         return new EmbeddedAxonServer(properties, logger);
@@ -183,11 +198,12 @@ public class EmbeddedAxonServer : IAxonServer
 
     public static IAxonServer WithAccessControlEnabled(ILogger<EmbeddedAxonServer> logger)
     {
+        var suffix = AxonServerCounter.Next();
         var properties = new SystemProperties
         {
             NodeSetup =
             {
-                Name = "axonserver",
+                Name = $"axonserver-{suffix}",
                 Hostname = "localhost",
                 DevModeEnabled = true
             },
@@ -196,6 +212,10 @@ public class EmbeddedAxonServer : IAxonServer
                 AccessControlEnabled = true,
                 AccessControlToken = Guid.NewGuid().ToString("N"),
                 AccessControlAdminToken = Guid.NewGuid().ToString("N")
+            },
+            KeepAlive =
+            {
+                HeartbeatEnabled = true
             }
         };
         return new EmbeddedAxonServer(properties, logger);

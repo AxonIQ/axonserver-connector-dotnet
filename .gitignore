@@ -8,3 +8,4 @@ obj
 *.user
 axoniq.license
 axonserver.properties
+cluster-template.yml

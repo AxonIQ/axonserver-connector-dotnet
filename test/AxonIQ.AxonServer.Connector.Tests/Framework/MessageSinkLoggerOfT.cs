@@ -16,7 +16,7 @@ public class MessageSinkLogger<T> : ILogger<T>
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
     {
         _sink.OnMessage(
-            new DiagnosticMessage($"[{logLevel.ToString()}]-{eventId.ToString()}:{formatter(state, exception)}"));
+            new DiagnosticMessage($"[{logLevel.ToString()}]:{formatter(state, exception)}"));
     }
 
     public bool IsEnabled(LogLevel logLevel)

@@ -28,11 +28,8 @@ public class ClusterTemplateApplication
             node.Add("name", Name);
         }
 
-        if (!string.IsNullOrEmpty(Description))
-        {
-            node.Add("description", Description);
-        }
-        
+        node.Add("description", !string.IsNullOrEmpty(Description) ? Description : "");
+
         if (Metadata != null && Metadata.Length != 0)
         {
             node.Add("metaData",
@@ -41,6 +38,10 @@ public class ClusterTemplateApplication
                         new YamlScalarNode(metadatum.Key),
                         new YamlScalarNode(metadatum.Value))))
             );
+        }
+        else
+        {
+            node.Add("metaData", new YamlMappingNode());
         }
         
         return node;

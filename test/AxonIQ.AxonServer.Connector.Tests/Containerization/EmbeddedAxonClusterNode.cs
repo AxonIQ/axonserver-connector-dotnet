@@ -9,7 +9,7 @@ using Ductus.FluentDocker.Services.Extensions;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using shortid.Configuration;
-using YamlDotNet.Serialization;
+using YamlDotNet.RepresentationModel;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
@@ -40,9 +40,16 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         {
             throw new InvalidOperationException("The cluster node have not been initialized");
         }
-        
+
+        if (Properties.NodeSetup.ServerPort.HasValue)
+        {
+            return new DnsEndPoint(
+                 Properties.NodeSetup.Hostname ?? "localhost",
+                _container.ToHostExposedEndpoint($"{Properties.NodeSetup.ServerPort.Value}/tcp").Port
+            );    
+        }
         return new DnsEndPoint(
-            "localhost",
+            Properties.NodeSetup.Hostname ?? "localhost",
             _container.ToHostExposedEndpoint("8024/tcp").Port
         );
     }
@@ -53,13 +60,14 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         {
             throw new InvalidOperationException("The cluster node have not been initialized");
         }
-        
+
+        var endpoint = GetHttpEndpoint();
         return new HttpClient
         {
             BaseAddress = new UriBuilder
             {
-                Host = "localhost",
-                Port = _container.ToHostExposedEndpoint("8024/tcp").Port
+                Host = endpoint.Host,
+                Port = endpoint.Port
             }.Uri
         };
     }
@@ -71,8 +79,15 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
             throw new InvalidOperationException("The cluster node have not been initialized");
         }
         
+        if (Properties.NodeSetup.Port.HasValue)
+        {
+            return new DnsEndPoint(
+                Properties.NodeSetup.Hostname ?? "localhost",
+                _container.ToHostExposedEndpoint($"{Properties.NodeSetup.Port.Value}/tcp").Port
+            );    
+        }
         return new DnsEndPoint(
-            "localhost",
+            Properties.NodeSetup.Hostname ?? "localhost",
             _container.ToHostExposedEndpoint("8124/tcp").Port
         );
     }
@@ -84,10 +99,11 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
             throw new InvalidOperationException("The cluster node have not been initialized");
         }
         
+        var endpoint = GetGrpcEndpoint();
         var address = new UriBuilder
         {
-            Host = "localhost",
-            Port = _container.ToHostExposedEndpoint("8124/tcp").Port
+            Host = endpoint.Host,
+            Port = endpoint.Port
         }.Uri;
         return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
     }
@@ -113,8 +129,12 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
     {
         Files.Create();
 
-        var template = new Serializer().Serialize(Template.Serialize());
-        File.WriteAllText(Path.Combine(Files.FullName, "cluster-template.yml"), template);
+        var stream = new YamlStream(Template.Serialize());
+        using (var writer = new StringWriter())
+        {
+            stream.Save(writer, false);
+            File.WriteAllText(Path.Combine(Files.FullName, "cluster-template.yml"), writer.ToString());
+        }
         File.WriteAllText(Path.Combine(Files.FullName, "axoniq.license"), AxonClusterLicense.FromEnvironment());
         File.WriteAllText(Path.Combine(Files.FullName, "axonserver.properties"),
             string.Join(Environment.NewLine, Properties.Serialize()));
@@ -122,10 +142,24 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         var builder = new Builder()
             .UseContainer()
             .UseImage("axoniq/axonserver-enterprise:latest-dev")
-            .ExposePort(8024)
-            .ExposePort(8124)
             .Mount(Files.FullName, "/axonserver/config", MountType.ReadOnly)
             .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0));
+        if (Properties.NodeSetup.Port.HasValue)
+        {
+            builder.ExposePort(Properties.NodeSetup.Port.Value, Properties.NodeSetup.Port.Value);
+        }
+        else
+        {
+            builder.ExposePort(8124);
+        }
+        if (Properties.NodeSetup.ServerPort.HasValue)
+        {
+            builder.ExposePort(Properties.NodeSetup.ServerPort.Value, Properties.NodeSetup.ServerPort.Value);
+        }
+        else
+        {
+            builder.ExposePort(8024);
+        }
         if (!string.IsNullOrEmpty(Properties.NodeSetup.Name))
         {
             builder.WithName(Properties.NodeSetup.Name);
@@ -144,11 +178,8 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         _container = builder.Build().Start();
     }
 
-    internal async Task WaitUntilAvailableAsync(int cluster, Context[] contexts)
+    internal async Task WaitUntilAvailableAsync(int cluster)
     {
-        if (contexts == null) 
-            throw new ArgumentNullException(nameof(contexts));
-        
         if (_container == null)
             throw new InvalidOperationException("The cluster node has not been initialized");
         
@@ -164,6 +195,17 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
             Port = endpoint.Port,
             Path = "actuator/health"
         }.Uri;
+        
+        //Only test the raft status of contexts this node is hosting a replication group for 
+        var contexts =
+            Template
+                .ReplicationGroups?
+                .Where(replicationGroup =>
+                    replicationGroup.Roles?.Any(role => role.Node == Properties.NodeSetup.Name) ?? false)
+                .SelectMany(replicationGroup => replicationGroup.Contexts?.Where(context => context.Name != null)
+                    .Select(context => new Context(context.Name!)) ?? Array.Empty<Context>())
+                .ToArray() ?? Array.Empty<Context>();
+            
 
         var watch = Stopwatch.StartNew();
         while (!available && watch.Elapsed < maximumWaitTime)

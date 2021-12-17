@@ -1,5 +1,4 @@
 using System.Net;
-using Grpc.Net.Client;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
@@ -12,16 +11,16 @@ public abstract class AxonCluster : IAxonCluster
         return Cluster.InitializeAsync();
     }
 
-    public IAxonClusterNode[] Nodes => Cluster.Nodes;
+    public IReadOnlyList<IAxonClusterNode> Nodes => Cluster.Nodes;
 
-    public Context[] Contexts => Cluster.Contexts;
+    public IReadOnlyList<Context> Contexts => Cluster.Contexts;
 
-    public DnsEndPoint[] GetHttpEndpoints()
+    public IReadOnlyList<DnsEndPoint> GetHttpEndpoints()
     {
         return Cluster.GetHttpEndpoints();
     }
 
-    public DnsEndPoint[] GetGrpcEndpoints()
+    public IReadOnlyList<DnsEndPoint> GetGrpcEndpoints()
     {
         return Cluster.GetGrpcEndpoints();
     }

@@ -4,15 +4,15 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public class ClusterTemplateUserRole
 {
-    public string? Role { get; set; }
+    public string[]? Roles { get; set; }
     public string? Context { get; set; }
 
     public YamlNode Serialize()
     {
         var node = new YamlMappingNode();
-        if (!string.IsNullOrEmpty(Role))
+        if (Roles != null && Roles.Length != 0)
         {
-            node.Add("role", Role);
+            node.Add("roles", new YamlSequenceNode(Roles.Select(role => new YamlScalarNode(role))));
         }
         
         if (!string.IsNullOrEmpty(Context))

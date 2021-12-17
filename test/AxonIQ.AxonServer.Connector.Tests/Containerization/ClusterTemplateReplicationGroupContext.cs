@@ -24,6 +24,10 @@ public class ClusterTemplateReplicationGroupContext
                         new YamlScalarNode(metadatum.Value))))
             );
         }
+        else
+        {
+            node.Add("metaData", new YamlMappingNode());
+        }
 
         return node;
     }

@@ -1,16 +1,15 @@
 using System.Net;
-using Grpc.Net.Client;
 using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public interface IAxonCluster : IAsyncLifetime
 {
-    IAxonClusterNode[] Nodes { get; }
+    IReadOnlyList<IAxonClusterNode> Nodes { get; }
     
-    Context[] Contexts { get; }
+    IReadOnlyList<Context> Contexts { get; }
 
-    DnsEndPoint[] GetHttpEndpoints();
+    IReadOnlyList<DnsEndPoint> GetHttpEndpoints();
 
-    DnsEndPoint[] GetGrpcEndpoints();
+    IReadOnlyList<DnsEndPoint> GetGrpcEndpoints();
 }

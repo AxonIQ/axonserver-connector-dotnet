@@ -10,6 +10,8 @@ services:
         target: /axonserver/config/axoniq.license
       - source: axonserver-properties
         target: /axonserver/config/axonserver.properties
+      - source: cluster-template
+        target: /axonserver/config/cluster-template.yml
     environment:
       - AXONIQ_LICENSE=/axonserver/config/axoniq.license
     ports:
@@ -29,6 +31,8 @@ services:
         target: /axonserver/config/axoniq.license
       - source: axonserver-properties
         target: /axonserver/config/axonserver.properties
+      - source: cluster-template
+        target: /axonserver/config/cluster-template.yml
     environment:
       - AXONIQ_LICENSE=/axonserver/config/axoniq.license
     ports:
@@ -48,6 +52,8 @@ services:
         target: /axonserver/config/axoniq.license
       - source: axonserver-properties
         target: /axonserver/config/axonserver.properties
+      - source: cluster-template
+        target: /axonserver/config/cluster-template.yml
     environment:
       - AXONIQ_LICENSE=/axonserver/config/axoniq.license
     ports:
@@ -65,6 +71,8 @@ secrets:
     file: ./axonserver.properties
   axoniq-license:
     file: ./axoniq.license
+  cluster-template:
+    file: ./cluster-template.yml
     
 volumes:
   axonserver-1-config:

@@ -7,7 +7,7 @@ namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
 public class EmbeddedAxonCluster : IAxonCluster
 {
-    private readonly int _id = EmbeddedAxonClusterCounter.Next();
+    private readonly int _id = AxonClusterCounter.Next();
     
     private readonly EmbeddedAxonClusterNode[] _nodes;
     private readonly ILogger<EmbeddedAxonCluster> _logger;
@@ -15,17 +15,17 @@ public class EmbeddedAxonCluster : IAxonCluster
     private Context[]? _contexts;
     private INetworkService? _network;
 
-    private EmbeddedAxonCluster(EmbeddedAxonClusterNode[] nodes, ILogger<EmbeddedAxonCluster> logger)
+    public EmbeddedAxonCluster(EmbeddedAxonClusterNode[] nodes, ILogger<EmbeddedAxonCluster> logger)
     {
         _nodes = nodes ?? throw new ArgumentNullException(nameof(nodes));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public IAxonClusterNode[] Nodes => _nodes
+    public IReadOnlyList<IAxonClusterNode> Nodes => _nodes
         .Select<EmbeddedAxonClusterNode, IAxonClusterNode>(node => node)
         .ToArray();
 
-    public Context[] Contexts
+    public IReadOnlyList<Context> Contexts
     {
         get
         {
@@ -63,19 +63,19 @@ public class EmbeddedAxonCluster : IAxonCluster
         
         foreach (var node in _nodes)
         {
-            await node.WaitUntilAvailableAsync(_id, Contexts);
+            await node.WaitUntilAvailableAsync(_id);
         }
 
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster became available", _id);
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got initialized", _id);
     }
     
-    public DnsEndPoint[] GetHttpEndpoints()
+    public IReadOnlyList<DnsEndPoint> GetHttpEndpoints()
     {
         return Array.ConvertAll(_nodes, node => node.GetHttpEndpoint());
     }
 
-    public DnsEndPoint[] GetGrpcEndpoints()
+    public IReadOnlyList<DnsEndPoint> GetGrpcEndpoints()
     {
         return Array.ConvertAll(_nodes, node => node.GetGrpcEndpoint());
     }
@@ -101,8 +101,7 @@ public class EmbeddedAxonCluster : IAxonCluster
         {
             ClusterSetup =
             {
-                AutoclusterFirst = "axonserver-1",
-                AutoclusterContexts = new[] { "_admin", "default" }
+                ClusterTemplatePath = "/axonserver/config/cluster-template.yml"
             },
             AccessControl =
             {
@@ -111,20 +110,20 @@ public class EmbeddedAxonCluster : IAxonCluster
             }
         }; 
         var node1 = cluster.Clone();
-        node1.NodeSetup.Name = "axonserver-1";
-        node1.NodeSetup.Hostname = "axonserver-1";
-        node1.NodeSetup.InternalHostname = "axonserver-1";
+        node1.NodeSetup.Name = $"axonserver-{AxonServerCounter.Next()}";
+        node1.NodeSetup.Hostname = "localhost";
+        node1.NodeSetup.InternalHostname = node1.NodeSetup.Name;
         var node2 = cluster.Clone();
-        node2.NodeSetup.Name = "axonserver-2";
-        node2.NodeSetup.Hostname = "axonserver-2";
-        node2.NodeSetup.InternalHostname = "axonserver-2";
+        node2.NodeSetup.Name = $"axonserver-{AxonServerCounter.Next()}";
+        node2.NodeSetup.Hostname = "localhost";
+        node2.NodeSetup.InternalHostname = node2.NodeSetup.Name;
         var node3 = cluster.Clone();
-        node3.NodeSetup.Name = "axonserver-3";
-        node3.NodeSetup.Hostname = "axonserver-3";
-        node3.NodeSetup.InternalHostname = "axonserver-3";
+        node3.NodeSetup.Name = $"axonserver-{AxonServerCounter.Next()}";
+        node3.NodeSetup.Hostname = "localhost";
+        node3.NodeSetup.InternalHostname = node3.NodeSetup.Name;
         var template = new ClusterTemplate
         {
-            First = "axonserver-1",
+            First = node1.NodeSetup.Name,
             Applications = new ClusterTemplateApplication[]
             {
                 new()
@@ -162,17 +161,17 @@ public class EmbeddedAxonCluster : IAxonCluster
                     {
                         new()
                         {
-                            Node = "axonserver-1",
+                            Node = node1.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-2",
+                            Node = node2.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-3",
+                            Node = node3.NodeSetup.Name,
                             Role = "PRIMARY"
                         }
                     }
@@ -191,17 +190,17 @@ public class EmbeddedAxonCluster : IAxonCluster
                     {
                         new()
                         {
-                            Node = "axonserver-1",
+                            Node = node1.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-2",
+                            Node = node2.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-3",
+                            Node = node3.NodeSetup.Name,
                             Role = "PRIMARY"
                         }
                     }
@@ -223,8 +222,7 @@ public class EmbeddedAxonCluster : IAxonCluster
         {
             ClusterSetup =
             {
-                AutoclusterFirst = "axonserver-1",
-                AutoclusterContexts = new[] { Context.Admin.ToString(), Context.Default.ToString() }
+                ClusterTemplatePath = "/axonserver/config/cluster-template.yml"
             },
             AccessControl =
             {
@@ -234,20 +232,20 @@ public class EmbeddedAxonCluster : IAxonCluster
             }
         };
         var node1 = cluster.Clone();
-        node1.NodeSetup.Name = "axonserver-1";
-        node1.NodeSetup.Hostname = "axonserver-1";
-        node1.NodeSetup.InternalHostname = "axonserver-1";
+        node1.NodeSetup.Name = $"axonserver-{AxonServerCounter.Next()}";
+        node1.NodeSetup.Hostname = "localhost";
+        node1.NodeSetup.InternalHostname = node1.NodeSetup.Name;
         var node2 = cluster.Clone();
-        node2.NodeSetup.Name = "axonserver-2";
-        node2.NodeSetup.Hostname = "axonserver-2";
-        node2.NodeSetup.InternalHostname = "axonserver-2";
+        node2.NodeSetup.Name = $"axonserver-{AxonServerCounter.Next()}";
+        node2.NodeSetup.Hostname = "localhost";
+        node2.NodeSetup.InternalHostname = node2.NodeSetup.Name;
         var node3 = cluster.Clone();
-        node3.NodeSetup.Name = "axonserver-3";
-        node3.NodeSetup.Hostname = "axonserver-3";
-        node3.NodeSetup.InternalHostname = "axonserver-3";
+        node3.NodeSetup.Name = $"axonserver-{AxonServerCounter.Next()}";
+        node3.NodeSetup.Hostname = "localhost";
+        node3.NodeSetup.InternalHostname = node3.NodeSetup.Name;
         var template = new ClusterTemplate
         {
-            First = "axonserver-1",
+            First = node1.NodeSetup.Name,
             Applications = new ClusterTemplateApplication[]
             {
                 new()
@@ -285,17 +283,17 @@ public class EmbeddedAxonCluster : IAxonCluster
                     {
                         new()
                         {
-                            Node = "axonserver-1",
+                            Node = node1.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-2",
+                            Node = node2.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-3",
+                            Node = node3.NodeSetup.Name,
                             Role = "PRIMARY"
                         }
                     }
@@ -314,17 +312,17 @@ public class EmbeddedAxonCluster : IAxonCluster
                     {
                         new()
                         {
-                            Node = "axonserver-1",
+                            Node = node1.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-2",
+                            Node = node2.NodeSetup.Name,
                             Role = "PRIMARY"
                         },
                         new()
                         {
-                            Node = "axonserver-3",
+                            Node = node3.NodeSetup.Name,
                             Role = "PRIMARY"
                         }
                     }
