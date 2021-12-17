@@ -9,6 +9,6 @@ public static class TimeSpanMath
     
     public static TimeSpan Max(TimeSpan left, TimeSpan right)
     {
-        return TimeSpan.FromTicks(Math.Min(left.Ticks, right.Ticks));
+        return TimeSpan.FromTicks(Math.Max(left.Ticks, right.Ticks));
     }
 }

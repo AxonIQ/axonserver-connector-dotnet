@@ -7,6 +7,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class HeartbeatClient
 {
+    private static readonly Heartbeat HeartbeatInstance = new ();
     private readonly WritePlatformOutboundInstruction _writer;
     private readonly ILogger<HeartbeatClient> _logger;
     private readonly ConcurrentDictionary<string, ReceiveHeartbeatAcknowledgement> _responders;
@@ -31,7 +32,7 @@ public class HeartbeatClient
         var instruction = new PlatformOutboundInstruction
         {
             InstructionId = Guid.NewGuid().ToString("N"),
-            Heartbeat = new Heartbeat()
+            Heartbeat = HeartbeatInstance
         };
         var result = _writer(instruction);
         if (!_responders.TryAdd(instruction.InstructionId, responder))

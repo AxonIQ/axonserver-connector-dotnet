@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using AxonIQ.AxonServer.Grpc;
 using Microsoft.Extensions.Logging;
@@ -72,7 +73,7 @@ public class HeartbeatMonitor : IAsyncDisposable
                             {
                                 var wallTime = _clock();
                                 state = new State.Enabled(
-                                    enable.Interval, 
+                                    enable.Interval,
                                     enable.Timeout,
                                     wallTime,
                                     wallTime.Add(enable.Timeout),
@@ -82,6 +83,7 @@ public class HeartbeatMonitor : IAsyncDisposable
                                 break;
                             }
                         }
+
                         break;
                     case Protocol.Check check:
                         switch (state)
@@ -93,18 +95,28 @@ public class HeartbeatMonitor : IAsyncDisposable
                                     var wallTime = _clock();
                                     if (enabled.NextHeartbeatCheckDeadlineAt < wallTime)
                                     {
-                                        _logger.LogInformation("Did not receive heartbeat acknowledgement within {Timeout}ms", Convert.ToInt32(enabled.Timeout.TotalMilliseconds));
+                                        _logger.LogInformation(
+                                            "Did not receive heartbeat acknowledgement within {Timeout}ms",
+                                            Convert.ToInt32(enabled.Timeout.TotalMilliseconds));
                                         await _missed();
-                                        enabled = enabled with { NextHeartbeatCheckDeadlineAt = wallTime.Add(enabled.Timeout) };
+                                        enabled = enabled with
+                                        {
+                                            NextHeartbeatCheckDeadlineAt = wallTime.Add(enabled.Timeout)
+                                        };
                                     }
 
                                     if (enabled.NextHeartbeatCheckAt < wallTime)
                                     {
-                                        await _sender(ack => 
-                                            ack.Success 
-                                                ? _inbox.Writer.WriteAsync(new Protocol.CheckSucceeded(enabled.LogicalTime), ct) 
-                                                : _inbox.Writer.WriteAsync(new Protocol.CheckFailed(ack.Error, enabled.LogicalTime), ct));
-                                        enabled = enabled with { NextHeartbeatCheckAt = wallTime.Add(enabled.Interval) };
+                                        await _sender(ack =>
+                                            ack.Success
+                                                ? _inbox.Writer.WriteAsync(
+                                                    new Protocol.CheckSucceeded(enabled.LogicalTime), ct)
+                                                : _inbox.Writer.WriteAsync(
+                                                    new Protocol.CheckFailed(ack.Error, enabled.LogicalTime), ct));
+                                        enabled = enabled with
+                                        {
+                                            NextHeartbeatCheckAt = wallTime.Add(enabled.Interval)
+                                        };
                                     }
 
                                     state = enabled;
@@ -113,12 +125,14 @@ public class HeartbeatMonitor : IAsyncDisposable
                                 {
                                     _logger.LogDebug("Could not check heartbeat because the check request is too old");
                                 }
+
                                 break;
                             }
                             default:
                                 _logger.LogDebug("Could not check heartbeat because the monitor is not enabled");
                                 break;
                         }
+
                         break;
                     case Protocol.Disable disable:
                         state = new State.Disabled(disable.LogicalTime);
@@ -136,9 +150,11 @@ public class HeartbeatMonitor : IAsyncDisposable
                             case State.Paused:
                                 break;
                             case State.Disabled:
-                                _logger.LogDebug("Could not pause the heartbeat monitor because the monitor is disabled");
+                                _logger.LogDebug(
+                                    "Could not pause the heartbeat monitor because the monitor is disabled");
                                 break;
                         }
+
                         break;
                     case Protocol.Resume resume:
                         switch (state)
@@ -147,22 +163,102 @@ public class HeartbeatMonitor : IAsyncDisposable
                             {
                                 var wallTime = _clock();
                                 state = new State.Enabled(
-                                    paused.Interval, 
+                                    paused.Interval,
                                     paused.Timeout,
                                     wallTime,
                                     wallTime.Add(paused.Timeout),
                                     resume.LogicalTime);
+                                _followerClock.Follow(resume.LogicalTime);
                                 _timer.Change(TimeSpan.Zero, paused.Interval);
                                 break;
                             }
                             case State.Enabled:
                                 break;
                             case State.Disabled:
-                                _logger.LogDebug("Could not pause the heartbeat monitor because the monitor is disabled");
+                                _logger.LogDebug(
+                                    "Could not resume the heartbeat monitor because the monitor is disabled");
+                                break;
+                        }
+
+                        break;
+                    case Protocol.CheckFailed failed:
+                        // if AxonServer indicates it doesn't know this instruction, we have at least reached it.
+                        // We can assume the connection is alive
+                        // UNSUPPORTED_INSTRUCTION
+                        if (failed.Error.ErrorCode == "AXONIQ-1002") // TODO: This would make for a nice value type
+                        {
+                            switch (state)
+                            {
+                                case State.Enabled enabled:
+                                    var nextHeartbeatCheckDeadlineAt = DateTimeOffsetMath.Max(
+                                        _clock().Add(enabled.Timeout).Add(enabled.Interval),
+                                        enabled.NextHeartbeatCheckDeadlineAt);
+                                    state = enabled with
+                                    {
+                                        NextHeartbeatCheckDeadlineAt = nextHeartbeatCheckDeadlineAt
+                                    };
+                                    _logger.LogDebug("Heartbeat acknowledgement received. Extending deadline to {NewDeadLine}",
+                                        nextHeartbeatCheckDeadlineAt);
+                                    break;
+                                default:
+                                    _logger.LogDebug("Heartbeat acknowledgement received");
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogError("Heartbeat acknowledgement received but failed with a server error of {ErrorCode}: {ErrorMessage} {ErrorLocation}",
+                                failed.Error.ErrorCode,
+                                failed.Error.Message,
+                                failed.Error.Location); //TODO: Log details
+                        }
+                        break;
+                    case Protocol.CheckSucceeded succeeded:
+                        switch (state)
+                        {
+                            case State.Enabled enabled:
+                                var nextHeartbeatCheckDeadlineAt = DateTimeOffsetMath.Max(
+                                    _clock().Add(enabled.Timeout).Add(enabled.Interval),
+                                    enabled.NextHeartbeatCheckDeadlineAt);
+                                state = enabled with
+                                {
+                                    NextHeartbeatCheckDeadlineAt = nextHeartbeatCheckDeadlineAt
+                                };
+                                _logger.LogDebug("Heartbeat acknowledgement received. Extending deadline to {NewDeadLine}",
+                                    nextHeartbeatCheckDeadlineAt);
+                                break;
+                            default:
+                                _logger.LogDebug("Heartbeat acknowledgement received");
                                 break;
                         }
                         break;
-                    //TODO: Handle CheckFailed, CheckSucceeded, ReceiveServerHeartbeat
+                    case Protocol.ReceiveServerHeartbeat receive:
+                        switch (state)
+                        {
+                            case State.Enabled enabled:
+                                if (receive.LogicalTime == enabled.LogicalTime)
+                                {
+                                    var wallTime = _clock();
+                                    if (enabled.NextHeartbeatCheckAt <= wallTime)
+                                    {
+                                        enabled = enabled with
+                                        {
+                                            NextHeartbeatCheckAt = wallTime.Add(enabled.Interval)
+                                        };
+                                    }
+
+                                    enabled = enabled with
+                                    {
+                                        NextHeartbeatCheckDeadlineAt = DateTimeOffsetMath.Max(
+                                            wallTime.Add(enabled.Interval), enabled.NextHeartbeatCheckDeadlineAt)
+                                    };
+                                    state = enabled;
+                                }
+
+                                break;
+                        }
+
+                        break;
                 }
             }
         }
@@ -177,6 +273,7 @@ public class HeartbeatMonitor : IAsyncDisposable
         public record Resume(long LogicalTime) : Protocol;
         public record CheckSucceeded(long LogicalTime) : Protocol;
         public record CheckFailed(ErrorMessage Error, long LogicalTime) : Protocol;
+        public record ReceiveServerHeartbeat(long LogicalTime) : Protocol;
     }
 
     private record State
@@ -257,8 +354,15 @@ public class HeartbeatMonitor : IAsyncDisposable
             )
         );
     }
-    
-    // TODO: Receive Server Heartbeat
+
+    public async Task ReceiveServerHeartbeat()
+    {
+        await _inbox.Writer.WriteAsync(
+            new Protocol.ReceiveServerHeartbeat(
+                _leaderClock.LogicalTime
+            )
+        );
+    }
     
     public async ValueTask DisposeAsync()
     {
