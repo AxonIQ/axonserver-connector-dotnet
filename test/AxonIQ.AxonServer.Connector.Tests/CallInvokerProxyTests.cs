@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using AutoFixture;
 using Grpc.Core;
 using Xunit;

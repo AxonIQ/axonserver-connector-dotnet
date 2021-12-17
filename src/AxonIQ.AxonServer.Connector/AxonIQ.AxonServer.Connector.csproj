@@ -18,11 +18,11 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
     </ItemGroup>
     <ItemGroup>
-        <Protobuf Include="..\..\axon-server-api\src\main\proto\common.proto" GrpcServices="None" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
-        <Protobuf Include="..\..\axon-server-api\src\main\proto\admin.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
-        <Protobuf Include="..\..\axon-server-api\src\main\proto\command.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
-        <Protobuf Include="..\..\axon-server-api\src\main\proto\control.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
-        <Protobuf Include="..\..\axon-server-api\src\main\proto\event.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
-        <Protobuf Include="..\..\axon-server-api\src\main\proto\query.proto" GrpcServices="Client" Access="internal" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+        <Protobuf Include="..\..\axon-server-api\src\main\proto\common.proto" GrpcServices="None" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+        <Protobuf Include="..\..\axon-server-api\src\main\proto\admin.proto" GrpcServices="Client" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+        <Protobuf Include="..\..\axon-server-api\src\main\proto\command.proto" GrpcServices="Client" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+        <Protobuf Include="..\..\axon-server-api\src\main\proto\control.proto" GrpcServices="Client" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+        <Protobuf Include="..\..\axon-server-api\src\main\proto\event.proto" GrpcServices="Client" ProtoRoot="..\..\axon-server-api\src\main\proto" />
+        <Protobuf Include="..\..\axon-server-api\src\main\proto\query.proto" GrpcServices="Client" ProtoRoot="..\..\axon-server-api\src\main\proto" />
     </ItemGroup>
 </Project>

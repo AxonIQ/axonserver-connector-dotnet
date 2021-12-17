@@ -1,4 +1,3 @@
-using System.Xml;
 using YamlDotNet.RepresentationModel;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
