@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector;
 
@@ -10,7 +12,7 @@ public static class ServiceCollectionExtensions
         var options = AxonServerConnectionFactoryOptions
             .For(ComponentName.GenerateRandomName())
             .Build();
-        services.AddSingleton(new AxonServerConnectionFactory(options));
+        services.AddSingleton(sp => new AxonServerConnectionFactory(options));
         return services;
     }
 
@@ -22,7 +24,7 @@ public static class ServiceCollectionExtensions
         var options = AxonServerConnectionFactoryOptions
             .FromConfiguration(configuration)
             .Build();
-        services.AddSingleton(new AxonServerConnectionFactory(options));
+        services.AddSingleton(sp => new AxonServerConnectionFactory(options));
         return services;
     }
 
@@ -30,7 +32,7 @@ public static class ServiceCollectionExtensions
         AxonServerConnectionFactoryOptions options)
     {
         if (options == null) throw new ArgumentNullException(nameof(options));
-        services.AddSingleton(new AxonServerConnectionFactory(options));
+        services.AddSingleton(sp => new AxonServerConnectionFactory(options));
         return services;
     }
 
@@ -43,7 +45,7 @@ public static class ServiceCollectionExtensions
         var builder = AxonServerConnectionFactoryOptions.For(ComponentName.GenerateRandomName());
         configure(builder);
         var options = builder.Build();
-        services.AddSingleton(new AxonServerConnectionFactory(options));
+        services.AddSingleton(sp => new AxonServerConnectionFactory(options));
         return services;
     }
 }

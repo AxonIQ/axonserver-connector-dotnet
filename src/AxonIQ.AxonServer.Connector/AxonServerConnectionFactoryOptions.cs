@@ -1,5 +1,8 @@
 using System.Net;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector;
 
@@ -27,30 +30,38 @@ public class AxonServerConnectionFactoryOptions
             configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId] == null
                 ? ClientInstanceId.GenerateFrom(componentName)
                 : new ClientInstanceId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
-        var builder = new Builder(componentName, clientInstanceId);
 
-        return builder;
+        return new Builder(componentName, clientInstanceId);
     }
 
     private AxonServerConnectionFactoryOptions(
         ComponentName componentName,
         ClientInstanceId clientInstanceId,
-        IReadOnlyCollection<DnsEndPoint> routingServers,
+        IReadOnlyList<DnsEndPoint> routingServers,
         IReadOnlyDictionary<string, string> clientTags,
-        IAxonServerAuthentication authentication)
+        IAxonServerAuthentication authentication,
+        ILoggerFactory loggerFactory,
+        Func<DateTimeOffset>? clock,
+        GrpcChannelOptions? grpcChannelOptions)
     {
         ComponentName = componentName;
         ClientInstanceId = clientInstanceId;
         RoutingServers = routingServers;
         ClientTags = clientTags;
         Authentication = authentication;
+        LoggerFactory = loggerFactory;
+        Clock = clock ?? (() => DateTimeOffset.UtcNow);
+        GrpcChannelOptions = grpcChannelOptions;
     }
 
     public ComponentName ComponentName { get; }
     public ClientInstanceId ClientInstanceId { get; }
-    public IReadOnlyCollection<DnsEndPoint> RoutingServers { get; }
+    public IReadOnlyList<DnsEndPoint> RoutingServers { get; }
     public IReadOnlyDictionary<string, string> ClientTags { get; }
     public IAxonServerAuthentication Authentication { get; }
+    public ILoggerFactory LoggerFactory { get; }
+    public Func<DateTimeOffset> Clock { get; }
+    public GrpcChannelOptions? GrpcChannelOptions { get; }
 
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
@@ -61,6 +72,9 @@ public class AxonServerConnectionFactoryOptions
         private readonly List<DnsEndPoint> _routingServers;
         private readonly Dictionary<string, string> _clientTags;
         private IAxonServerAuthentication _authentication;
+        private ILoggerFactory _loggerFactory;
+        private Func<DateTimeOffset>? _clock;
+        private GrpcChannelOptions? _grpcChannelOptions;
 
         internal Builder(ComponentName componentName, ClientInstanceId clientInstanceId)
         {
@@ -74,6 +88,9 @@ public class AxonServerConnectionFactoryOptions
             }
 
             _authentication = AxonServerAuthentication.None;
+            _loggerFactory = new NullLoggerFactory();
+            _clock = null;
+            _grpcChannelOptions = null;
         }
 
         public IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name)
@@ -162,6 +179,33 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
+        public IAxonServerConnectionFactoryOptionsBuilder WithLoggerFactory(ILoggerFactory loggerFactory)
+        {
+            if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
+
+            _loggerFactory = loggerFactory;
+            
+            return this;
+        }
+
+        public IAxonServerConnectionFactoryOptionsBuilder WithClock(Func<DateTimeOffset> clock)
+        {
+            if (clock == null) throw new ArgumentNullException(nameof(clock));
+
+            _clock = clock;
+            
+            return this;
+        }
+
+        public IAxonServerConnectionFactoryOptionsBuilder WithGrpcChannelOptions(GrpcChannelOptions grpcChannelOptions)
+        {
+            if (grpcChannelOptions == null) throw new ArgumentNullException(nameof(grpcChannelOptions));
+
+            _grpcChannelOptions = grpcChannelOptions;
+
+            return this;
+        }
+
         public AxonServerConnectionFactoryOptions Build()
         {
             if (_routingServers.Count == 0)
@@ -169,8 +213,15 @@ public class AxonServerConnectionFactoryOptions
                 _routingServers.AddRange(AxonServerConnectionFactoryDefaults.RoutingServers);
             }
 
-            return new AxonServerConnectionFactoryOptions(_componentName, _clientInstanceId, _routingServers,
-                _clientTags, _authentication);
+            return new AxonServerConnectionFactoryOptions(
+                _componentName, 
+                _clientInstanceId, 
+                _routingServers,
+                _clientTags, 
+                _authentication, 
+                _loggerFactory,
+                _clock,
+                _grpcChannelOptions);
         }
     }
 }

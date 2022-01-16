@@ -1,3 +1,3 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public delegate Task SendHeartbeat(ReceiveHeartbeatAcknowledgement responder);
+public delegate ValueTask SendHeartbeat(ReceiveHeartbeatAcknowledgement responder);

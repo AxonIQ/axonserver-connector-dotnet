@@ -5,14 +5,14 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class HeartbeatClient
+public class HeartbeatChannel
 {
     private static readonly Heartbeat HeartbeatInstance = new ();
-    private readonly WritePlatformOutboundInstruction _writer;
-    private readonly ILogger<HeartbeatClient> _logger;
+    private readonly WritePlatformInboundInstruction _writer;
+    private readonly ILogger<HeartbeatChannel> _logger;
     private readonly ConcurrentDictionary<string, ReceiveHeartbeatAcknowledgement> _responders;
 
-    public HeartbeatClient(WritePlatformOutboundInstruction writer, ILogger<HeartbeatClient> logger)
+    public HeartbeatChannel(WritePlatformInboundInstruction writer, ILogger<HeartbeatChannel> logger)
     {
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -27,20 +27,19 @@ public class HeartbeatClient
             : ValueTask.CompletedTask;
     }
     
-    public Task Send(ReceiveHeartbeatAcknowledgement responder)
+    public ValueTask Send(ReceiveHeartbeatAcknowledgement responder)
     {
-        var instruction = new PlatformOutboundInstruction
+        var instruction = new PlatformInboundInstruction
         {
             InstructionId = Guid.NewGuid().ToString("N"),
             Heartbeat = HeartbeatInstance
         };
-        var result = _writer(instruction);
         if (!_responders.TryAdd(instruction.InstructionId, responder))
         {
             // As long as the instruction id is a Guid, the chance of collision is close to zero.
             _logger.LogWarning("The heartbeat instruction identifier {InstructionId} appears to be taken. Could not register a matching acknowledgement responder",
                 instruction.InstructionId);
         }
-        return result;
+        return _writer(instruction);
     }
 }

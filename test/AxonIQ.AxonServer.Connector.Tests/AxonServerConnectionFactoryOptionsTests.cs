@@ -1,7 +1,9 @@
 using System.Net;
 using AutoFixture;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
@@ -31,9 +33,6 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.NotNull(result);
         Assert.Equal(component, result.ComponentName);
         Assert.StartsWith(result.ComponentName + "_", result.ClientInstanceId.ToString());
-        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
-        Assert.Empty(result.ClientTags);
-        Assert.Same(AxonServerAuthentication.None, result.Authentication);
     }
 
     [Fact]
@@ -51,9 +50,6 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.NotNull(result);
         Assert.Equal(component, result.ComponentName);
         Assert.Equal(clientInstance, result.ClientInstanceId);
-        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
-        Assert.Empty(result.ClientTags);
-        Assert.Same(AxonServerAuthentication.None, result.Authentication);
     }
 
     private IAxonServerConnectionFactoryOptionsBuilder CreateSystemUnderTest()
@@ -415,6 +411,8 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
         Assert.Empty(result.ClientTags);
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
+        Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
+        Assert.Null(result.GrpcChannelOptions);
     }
 
     [Fact]
@@ -444,7 +442,66 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
         Assert.Empty(result.ClientTags);
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
+        Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
+        Assert.Null(result.GrpcChannelOptions);
     }
 
+    [Fact]
+    public void WithLoggerFactoryCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => CreateSystemUnderTest().WithLoggerFactory(null!));
+    }
+    
+    [Fact]
+    public void WithLoggerFactoryReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var loggerFactory = new NullLoggerFactory();
+        var result = sut.WithLoggerFactory(loggerFactory).Build();
+        
+        Assert.Same(loggerFactory, result.LoggerFactory);
+    }
+
+    [Fact]
+    public void WithoutLoggerFactoryReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
+    }
+
+    [Fact]
+    public void WithGrpcChannelOptionsCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => CreateSystemUnderTest().WithGrpcChannelOptions(null!));
+    }
+
+    [Fact]
+    public void WithGrpcChannelOptionsReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var options = new GrpcChannelOptions();
+        var result = sut.WithGrpcChannelOptions(options).Build();
+        
+        Assert.Same(options, result.GrpcChannelOptions);
+    }
+    
+    [Fact]
+    public void WithoutGrpcChannelOptionsReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.Null(result.GrpcChannelOptions);
+    }
     //TODO: Extend with tests that cover obtaining all other options from configuration
 }

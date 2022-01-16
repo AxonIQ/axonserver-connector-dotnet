@@ -1,4 +1,3 @@
-using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Grpc.Control;
 using Grpc.Core;

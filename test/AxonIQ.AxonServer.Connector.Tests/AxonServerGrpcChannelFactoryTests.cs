@@ -32,8 +32,12 @@ public class AxonServerGrpcChannelFactoryTests
             var context = _fixture.Create<Context>();
             var routingServers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
 
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = new AxonServerGrpcChannelFactory(
+                clientIdentity, 
+                AxonServerAuthentication.None,
+                routingServers, 
+                _loggerFactory,
+                null);
 
             var result = await sut.Create(context);
 
@@ -59,14 +63,19 @@ public class AxonServerGrpcChannelFactoryTests
             _loggerFactory = new TestOutputHelperLoggerFactory(output);
         }
 
+        private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers)
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
+                routingServers, _loggerFactory, null);
+        }
+
         [Fact]
         public async Task CreateReturnsExpectedResult()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers);
 
             var result = await sut.Create(context);
 
@@ -77,15 +86,13 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var servers = new List<DnsEndPoint>(
                 _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
             );
             servers.Insert(Random.Shared.Next(0, servers.Count), _server.GetGrpcEndpoint());
             var routingServers = servers.ToArray();
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers);
 
             var result = await sut.Create(context);
 
@@ -112,14 +119,26 @@ public class AxonServerGrpcChannelFactoryTests
             _loggerFactory = new TestOutputHelperLoggerFactory(output);
         }
 
+        private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers)
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
+                routingServers, _loggerFactory, null);
+        }
+        
+        private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers, IAxonServerAuthentication authentication)
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory,
+                null);
+        }
+        
         [Fact]
         public async Task CreateWithoutAuthenticationReturnsExpectedResult()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers);
 
             var result = await sut.Create(context);
 
@@ -129,16 +148,13 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateWithoutAuthenticationReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var servers = new List<DnsEndPoint>(
                 _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
             );
             servers.Insert(Random.Shared.Next(0, servers.Count), _server.GetGrpcEndpoint());
             var routingServers = servers.ToArray();
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, 
-                AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers, AxonServerAuthentication.None);
 
             var result = await sut.Create(context);
 
@@ -148,12 +164,11 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateWithAuthenticationTokenReturnsExpectedResult()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var routingServers = new[] { _server.GetGrpcEndpoint() };
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity,
-                AxonServerAuthentication.UsingToken(_server.Properties.AccessControl.AccessControlToken!),
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(
+                routingServers,
+                AxonServerAuthentication.UsingToken(_server.Properties.AccessControl.AccessControlToken!));
 
             var result = await sut.Create(context);
 
@@ -164,16 +179,14 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateWithAuthenticationTokenReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var servers = new List<DnsEndPoint>(
                 _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
             );
             servers.Insert(Random.Shared.Next(0, servers.Count), _server.GetGrpcEndpoint());
             var routingServers = servers.ToArray();
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, 
-                AxonServerAuthentication.UsingToken(_server.Properties.AccessControl.AccessControlToken!),
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers,
+                AxonServerAuthentication.UsingToken(_server.Properties.AccessControl.AccessControlToken!));
 
             var result = await sut.Create(context);
 
@@ -200,17 +213,20 @@ public class AxonServerGrpcChannelFactoryTests
             _fixture.CustomizeLocalHostDnsEndPointInReservedPortRange();
             _loggerFactory = new TestOutputHelperLoggerFactory(output);
         }
+        
+        private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers)
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
+                routingServers, _loggerFactory, null);
+        }
 
         [Fact]
         public async Task CreateReturnsExpectedResult()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = Context.Default;
             var routingServers = _cluster.GetGrpcEndpoints();
-            var sut = new AxonServerGrpcChannelFactory(
-                clientIdentity, 
-                AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut =  CreateSystemUnderTest(routingServers);
 
             var result = await sut.Create(context);
 
@@ -221,7 +237,6 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = Context.Default;
             var servers = new List<DnsEndPoint>(
                 _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
@@ -229,8 +244,7 @@ public class AxonServerGrpcChannelFactoryTests
             servers.Insert(Random.Shared.Next(0, servers.Count), _cluster.Nodes[0].GetGrpcEndpoint());
 
             var routingServers = servers.ToArray();
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers);
         
             var result = await sut.Create(context);
         
@@ -257,17 +271,27 @@ public class AxonServerGrpcChannelFactoryTests
             _fixture.CustomizeLocalHostDnsEndPointInReservedPortRange();
             _loggerFactory = new TestOutputHelperLoggerFactory(output);
         }
+        
+        private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers)
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
+                routingServers, _loggerFactory, null);
+        }
+        
+        private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers, IAxonServerAuthentication authentication)
+        {
+            var clientIdentity = _fixture.Create<ClientIdentity>();
+            return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory,
+                null);
+        }
 
         [Fact]
         public async Task CreateWithoutAuthenticationReturnsExpectedResult()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = Context.Default;
             var routingServers = _cluster.GetGrpcEndpoints();
-            var sut = new AxonServerGrpcChannelFactory(
-                clientIdentity, 
-                AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers);
 
             var result = await sut.Create(context);
 
@@ -285,8 +309,7 @@ public class AxonServerGrpcChannelFactoryTests
             servers.Insert(Random.Shared.Next(0, servers.Count), _cluster.Nodes[0].GetGrpcEndpoint());
 
             var routingServers = servers.ToArray();
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers, AxonServerAuthentication.None);
         
             var result = await sut.Create(context);
         
@@ -296,12 +319,9 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateWithAuthenticationTokenReturnsExpectedResult()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = Context.Default;
             var routingServers = _cluster.GetGrpcEndpoints();
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity,
-                AxonServerAuthentication.UsingToken(_cluster.Nodes[0].Template.Applications![0].Token!),
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers, AxonServerAuthentication.UsingToken(_cluster.Nodes[0].Template.Applications![0].Token!));
 
             var result = await sut.Create(context);
 
@@ -312,16 +332,13 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateWithAuthenticationTokenReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = Context.Default;
             var servers = new List<DnsEndPoint>(
                 _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))
             );
             servers.Insert(Random.Shared.Next(0, servers.Count), _cluster.Nodes[0].GetGrpcEndpoint());
             var routingServers = servers.ToArray();
-            var sut = new AxonServerGrpcChannelFactory(clientIdentity, 
-                AxonServerAuthentication.UsingToken(_cluster.Nodes[0].Template.Applications![0].Token!),
-                routingServers, _loggerFactory);
+            var sut = CreateSystemUnderTest(routingServers, AxonServerAuthentication.UsingToken(_cluster.Nodes[0].Template.Applications![0].Token!));
 
             var result = await sut.Create(context);
 
@@ -489,7 +506,7 @@ public class AxonServerGrpcChannelFactoryTests
                 var routingServers = cluster.GetGrpcEndpoints();
                 var sut = new AxonServerGrpcChannelFactory(clientIdentity,
                     AxonServerAuthentication.UsingToken(template.Applications![0].Token!),
-                    routingServers, _loggerFactory);
+                    routingServers, _loggerFactory, null);
 
                 var result = await sut.Create(context);
 
