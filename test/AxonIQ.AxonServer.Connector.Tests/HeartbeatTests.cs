@@ -30,7 +30,7 @@ public class HeartbeatTests
         var stream = service.OpenStream();
         await stream.RequestStream.WriteAsync(new PlatformInboundInstruction
         {
-            InstructionId = Guid.NewGuid().ToString("N"),
+            InstructionId = Guid.NewGuid().ToString("D"),
             Register = new ClientIdentification
             {
                 ClientId = "1234",
@@ -38,7 +38,7 @@ public class HeartbeatTests
                 Version = "1.0"
             }
         });
-        var instructionId = Guid.NewGuid().ToString("N");
+        var instructionId = Guid.NewGuid().ToString("D");
         await stream.RequestStream.WriteAsync(new PlatformInboundInstruction
         {
             InstructionId = instructionId,

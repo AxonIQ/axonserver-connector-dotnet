@@ -1,3 +1,4 @@
+using System.Reflection.Metadata;
 using System.Threading.Channels;
 using AxonIQ.AxonServer.Grpc.Control;
 using Grpc.Core;
@@ -21,14 +22,19 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         ClientIdentity clientIdentity, 
         Context context, 
         CallInvoker callInvoker,
+        RequestReconnect requestReconnect,
+        Func<DateTimeOffset> clock,
         ILoggerFactory loggerFactory)
     {
         if (clientIdentity == null) throw new ArgumentNullException(nameof(clientIdentity));
         if (callInvoker == null) throw new ArgumentNullException(nameof(callInvoker));
+        if (requestReconnect == null) throw new ArgumentNullException(nameof(requestReconnect));
+        if (clock == null) throw new ArgumentNullException(nameof(clock));
         if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
         ClientIdentity = clientIdentity;
         CallInvoker = callInvoker;
+        RequestReconnect = requestReconnect;
         Service = new PlatformService.PlatformServiceClient(callInvoker);
         
         _context = context;
@@ -46,12 +52,13 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                 () => _state.InstructionStream
             );
         HeartbeatChannel = new HeartbeatChannel(
+            clock,
             instruction => _inbox.Writer.WriteAsync(new Protocol.SendInstruction(instruction)),
             loggerFactory.CreateLogger<HeartbeatChannel>()
         );
         HeartbeatMonitor = new HeartbeatMonitor(
-            responder => HeartbeatChannel.Send(responder),
-            () => DateTimeOffset.UtcNow,
+            (responder, timeout) => HeartbeatChannel.Send(responder, timeout),
+            clock,
             loggerFactory.CreateLogger<HeartbeatMonitor>()
         );
         _onHeartbeatMissedHandler = (_, _) => OnHeartbeatMissed();
@@ -62,7 +69,8 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
     public ClientIdentity ClientIdentity { get; }
     
     public CallInvoker CallInvoker { get; }
-    
+    public RequestReconnect RequestReconnect { get; }
+
     public PlatformService.PlatformServiceClient Service { get; }
     
     public AsyncDuplexStreamingCallProxy<PlatformInboundInstruction,PlatformOutboundInstruction> InstructionStreamProxy
@@ -90,147 +98,196 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
 
     private async Task ConsumeResponseStream(IAsyncStreamReader<PlatformOutboundInstruction> reader, CancellationToken ct)
     {
-        await foreach (var response in reader.ReadAllAsync(ct))
+        try
         {
-            await _inbox.Writer.WriteAsync(new Protocol.ReceivedInstruction(response), ct);
+            await foreach (var response in reader.ReadAllAsync(ct))
+            {
+                await _inbox.Writer.WriteAsync(new Protocol.ReceivedInstruction(response), ct);
+            }
+        }
+        catch (ObjectDisposedException exception)
+        {
+            _logger.LogDebug(exception, "The instruction stream is no longer being read because an object got disposed");
+        }
+        catch (TaskCanceledException exception)
+        {
+            _logger.LogDebug(exception, "The instruction stream is no longer being read because a task was cancelled");
+        }
+        catch (OperationCanceledException exception)
+        {
+            _logger.LogDebug(exception, "The instruction stream is no longer being read because an operation was cancelled");
         }
     }
 
     private async Task RunChannelProtocol(CancellationToken ct)
     {
-        while (await _inbox.Reader.WaitToReadAsync(ct))
+        try
         {
-            while (_inbox.Reader.TryRead(out var message))
+            while (await _inbox.Reader.WaitToReadAsync(ct))
             {
-                switch (message)
+                while (_inbox.Reader.TryRead(out var message))
                 {
-                    case Protocol.Connect:
-                        switch (CurrentState)
-                        {
-                            case State.Paused:
-                            case State.Disconnected:
-                                var instructionStream = Service.OpenStream(cancellationToken: ct);
-                                if (instructionStream != null)
-                                {
-                                    _logger.LogInformation(
-                                        "Connected instruction stream for context '{Context}'. Sending client identification",
-                                        _context);
-                                    await instructionStream.RequestStream.WriteAsync(new PlatformInboundInstruction
+                    _logger.LogDebug("Began {Message} when {State}", message.ToString(), CurrentState.ToString());
+                    switch (message)
+                    {
+                        case Protocol.Connect:
+                            switch (CurrentState)
+                            {
+                                case State.Paused:
+                                case State.Disconnected:
+                                    var instructionStream = Service.OpenStream(cancellationToken: ct);
+                                    if (instructionStream != null)
                                     {
-                                        Register = ClientIdentity.ToClientIdentification()
-                                    });
-                                    //TODO: Handle Exceptions
-                                    await HeartbeatMonitor.Resume();
+                                        _logger.LogInformation(
+                                            "Connected instruction stream for context '{Context}'. Sending client identification",
+                                            _context);
+                                        await instructionStream.RequestStream.WriteAsync(new PlatformInboundInstruction
+                                        {
+                                            Register = ClientIdentity.ToClientIdentification()
+                                        });
+                                        //TODO: Handle Exceptions
+                                        await HeartbeatMonitor.Resume();
 
-                                    CurrentState = new State.Connected(instructionStream, ConsumeResponseStream(instructionStream.ResponseStream, ct));
-                                }
+                                        CurrentState = new State.Connected(instructionStream,
+                                            ConsumeResponseStream(instructionStream.ResponseStream, ct));
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning(
+                                            "Could not open instruction stream for context '{Context}'",
+                                            _context);
+                                    }
 
-                                break;
-                            
-                            case State.Connected:
-                                _logger.LogInformation("ControlChannel for context '{Context}' is already connected", _context.ToString());
-                                break;
-                        }
+                                    break;
 
-                        break;
-                    case Protocol.Disconnect:
-                        switch (CurrentState)
-                        {
-                            case State.Connected connected:
-                                await HeartbeatMonitor.Pause();
-                                
-                                connected.InstructionStream?.Dispose();
-                                await connected.ConsumeResponseStreamLoop;
+                                case State.Connected:
+                                    _logger.LogInformation(
+                                        "ControlChannel for context '{Context}' is already connected",
+                                        _context.ToString());
+                                    break;
+                            }
 
-                                CurrentState = new State.Disconnected();
-                                break;
-                        }
+                            break;
+                        case Protocol.Disconnect:
+                            switch (CurrentState)
+                            {
+                                case State.Connected connected:
+                                    await HeartbeatMonitor.Pause();
 
-                        break;
-                    case Protocol.Reconnect:
-                        switch (CurrentState)
-                        {
-                            case State.Connected connected:
-                                await HeartbeatMonitor.Pause();
-                                
-                                connected.InstructionStream?.Dispose();
-                                await connected.ConsumeResponseStreamLoop;
+                                    connected.InstructionStream?.Dispose();
+                                    await connected.ConsumeResponseStreamLoop;
 
-                                CurrentState = new State.Paused();
-                                break;
-                        }
+                                    CurrentState = new State.Disconnected();
+                                    break;
+                            }
 
-                        break;
-                    case Protocol.SendAwaitableInstruction send:
-                        switch (CurrentState)
-                        {
-                            case State.Connected connected:
-                                await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction);
-                                send.CompletionSource.SetResult();
-                                break;
-                            case State.Disconnected:
-                                send.CompletionSource.SetException(new AxonServerException(ClientIdentity,
-                                    ErrorCategory.InstructionAckError,
-                                    "Unable to send instruction: no connection to AxonServer"));
-                                break;
-                        }
+                            break;
+                        case Protocol.Reconnect:
+                            switch (CurrentState)
+                            {
+                                case State.Connected connected:
+                                    await HeartbeatMonitor.Pause();
 
-                        break;
-                    case Protocol.SendInstruction send:
-                        switch (CurrentState)
-                        {
-                            case State.Connected connected:
-                                await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction);
-                                break;
-                            case State.Disconnected:
-                                _logger.LogWarning("Unable to send instruction {Instruction}: no connection to AxonServer", send.Instruction);
-                                break;
-                        }
+                                    connected.InstructionStream?.Dispose();
+                                    await connected.ConsumeResponseStreamLoop;
 
-                        break;
-                    case Protocol.ReceivedInstruction received:
-                        switch (CurrentState)
-                        {
-                            case State.Connected connected:
-                                switch (received.Instruction.RequestCase)
-                                {
-                                    case PlatformOutboundInstruction.RequestOneofCase.None:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.NodeNotification:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.RequestReconnect:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.PauseEventProcessor:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.StartEventProcessor:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.ReleaseSegment:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.RequestEventProcessorInfo:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.SplitEventProcessorSegment:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.MergeEventProcessorSegment:
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.Heartbeat:
-                                        await HeartbeatMonitor.ReceiveServerHeartbeat();
-                                        await _inbox.Writer.WriteAsync(new Protocol.SendInstruction(
-                                            new PlatformInboundInstruction
-                                            {
-                                                Heartbeat = new Heartbeat()
-                                            }), ct);
-                                        break;
-                                    case PlatformOutboundInstruction.RequestOneofCase.Ack:
-                                        //NOTE: This COULD be an ack for a heartbeat but is not required to be one.
-                                        await HeartbeatChannel.Receive(received.Instruction.Ack);
-                                        break;
-                                }
-                                
-                                break;
-                        }
-                        break;
+                                    CurrentState = new State.Paused();
+                                    break;
+                            }
+
+                            break;
+                        case Protocol.SendAwaitableInstruction send:
+                            switch (CurrentState)
+                            {
+                                case State.Connected connected:
+                                    await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction);
+                                    send.CompletionSource.SetResult();
+                                    break;
+                                case State.Disconnected:
+                                    send.CompletionSource.SetException(new AxonServerException(ClientIdentity,
+                                        ErrorCategory.InstructionAckError,
+                                        "Unable to send instruction: no connection to AxonServer"));
+                                    break;
+                            }
+
+                            break;
+                        case Protocol.SendInstruction send:
+                            switch (CurrentState)
+                            {
+                                case State.Connected connected:
+                                    await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction);
+                                    break;
+                                case State.Disconnected:
+                                    _logger.LogWarning(
+                                        "Unable to send instruction {Instruction}: no connection to AxonServer",
+                                        send.Instruction);
+                                    break;
+                            }
+
+                            break;
+                        case Protocol.ReceivedInstruction received:
+                            switch (CurrentState)
+                            {
+                                case State.Connected connected:
+                                    switch (received.Instruction.RequestCase)
+                                    {
+                                        // case PlatformOutboundInstruction.RequestOneofCase.None:
+                                        //     break;
+                                        // case PlatformOutboundInstruction.RequestOneofCase.NodeNotification:
+                                        //     break;
+                                        case PlatformOutboundInstruction.RequestOneofCase.RequestReconnect:
+                                            await RequestReconnect();
+                                            break;
+                                        // case PlatformOutboundInstruction.RequestOneofCase.PauseEventProcessor:
+                                        //     break;
+                                        // case PlatformOutboundInstruction.RequestOneofCase.StartEventProcessor:
+                                        //     break;
+                                        // case PlatformOutboundInstruction.RequestOneofCase.ReleaseSegment:
+                                        //     break;
+                                        // case PlatformOutboundInstruction.RequestOneofCase.RequestEventProcessorInfo:
+                                        //     break;
+                                        // case PlatformOutboundInstruction.RequestOneofCase.SplitEventProcessorSegment:
+                                        //     break;
+                                        // case PlatformOutboundInstruction.RequestOneofCase.MergeEventProcessorSegment:
+                                        //     break;
+                                        case PlatformOutboundInstruction.RequestOneofCase.Heartbeat:
+                                            await HeartbeatMonitor.ReceiveServerHeartbeat();
+                                            await _inbox.Writer.WriteAsync(new Protocol.SendInstruction(
+                                                new PlatformInboundInstruction
+                                                {
+                                                    Heartbeat = new Heartbeat()
+                                                }), ct);
+                                            break;
+                                        case PlatformOutboundInstruction.RequestOneofCase.Ack:
+                                            //NOTE: This COULD be an ack for a heartbeat but is not required to be one.
+                                            await HeartbeatChannel.Receive(received.Instruction.Ack);
+                                            break;
+                                    }
+
+                                    break;
+                            }
+
+                            break;
+                    }
+
+                    _logger.LogDebug("Completed {Message} with {State}", message.ToString(), CurrentState.ToString());
                 }
             }
+        }
+        catch (RpcException exception) when (exception.Status.StatusCode == StatusCode.Cancelled)
+        {
+            _logger.LogDebug(exception,
+                "Control channel message loop is exciting because an rpc call was cancelled");
+        }
+        catch (TaskCanceledException exception)
+        { 
+            _logger.LogDebug(exception,
+                "Control channel message loop is exciting because a task was cancelled");
+        }
+        catch (OperationCanceledException exception)
+        { 
+            _logger.LogDebug(exception,
+                "Control channel message loop is exciting because an operation was cancelled");
         }
     }
     

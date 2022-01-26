@@ -1,0 +1,8 @@
+@startuml Control Channel
+[*]->Disconnected
+Disconnected-->Connected: Connect
+Connected-->Paused: Reconnect
+Connected->Connected: SendInstruction, ReceivedInstruction
+Paused->Connected: Connect
+
+@enduml

@@ -12,12 +12,14 @@ namespace AxonIQ.AxonServer.Connector.Tests;
 public class AxonServerConnectionIntegrationTests
 {
     private readonly IAxonServer _container;
+    private readonly ITestOutputHelper _output;
     private readonly Fixture _fixture;
     private readonly ILogger _logger;
 
     public AxonServerConnectionIntegrationTests(AxonServerWithAccessControlDisabled container, ITestOutputHelper output)
     {
         _container = container ?? throw new ArgumentNullException(nameof(container));
+        _output = output;
         _fixture = new Fixture();
         _fixture.CustomizeClientInstanceId();
         _fixture.CustomizeComponentName();
@@ -31,7 +33,8 @@ public class AxonServerConnectionIntegrationTests
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
         var builder = AxonServerConnectionFactoryOptions.For(component, clientInstance)
-            .WithRoutingServers(_container.GetGrpcEndpoint());
+            .WithRoutingServers(_container.GetGrpcEndpoint())
+            .WithLoggerFactory(new TestOutputHelperLoggerFactory(_output));
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
@@ -122,7 +125,17 @@ public class AxonServerConnectionIntegrationTests
         Assert.True(sut.IsReady);
     }
 
-    [Fact]
+    [Fact(Skip = "Just to get a sense of the message flow - for manual testing only")]
+    public async Task ShowTheFlow()
+    {
+        await using var sut = await CreateSystemUnderTest();
+
+        await sut.ControlChannel.EnableHeartbeat(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
+
+        await Task.Delay(TimeSpan.FromSeconds(20));
+    }
+
+    [Fact(Skip = "Needs work")]
     public async Task IsConnectedReturnsExpectedResultWhenConnectionIsRecoveredByHeartbeat()
     {
         var handler = new DelayedHandler

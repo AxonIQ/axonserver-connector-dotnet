@@ -1,4 +1,5 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Grpc;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
@@ -20,7 +21,7 @@ public class HearbeatMonitorTests
         
         private HeartbeatMonitor CreateSystemUnderTest(SendHeartbeat sender)
         {
-            return new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, _logger);
+            return new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, TimeSpan.Zero, _logger);
         }
         
         [Fact]
@@ -142,10 +143,77 @@ public class HearbeatMonitorTests
         
         private async Task<HeartbeatMonitor> CreateSystemUnderTest(SendHeartbeat sender)
         {
-            var sut = new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, _logger);
-            await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            var sut = new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, TimeSpan.Zero, _logger);
+            await sut.Enable(TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500));
+            await Task.Delay(TimeSpan.FromMilliseconds(50));
             return sut;
+        }
+
+        [Fact]
+        public async Task HeartbeatMissedGetsTriggeredWhenHeartbeatIsNeverAcknowledged()
+        {
+            SendHeartbeat sender = (_, _) => ValueTask.CompletedTask; 
+            await using var sut = await CreateSystemUnderTest(sender);
+
+            var signal = new ManualResetEventSlim(false);
+            sut.HeartbeatMissed += (_, _) =>
+            {
+                signal.Set();
+            };
+            
+            Assert.True(signal.Wait(TimeSpan.FromSeconds(1)));
+        }
+        
+        [Fact]
+        public async Task HeartbeatMissedGetsTriggeredWhenHeartbeatIsNotAcknowledgedInTime()
+        {
+            var responders = new List<ReceiveHeartbeatAcknowledgement>();
+            SendHeartbeat sender = (responder, _) =>
+            {
+                responders.Add(responder);
+                return ValueTask.CompletedTask;
+            };
+            await using var sut = await CreateSystemUnderTest(sender);
+
+            var signal = new ManualResetEventSlim(false);
+            sut.HeartbeatMissed += (_, _) =>
+            {
+                signal.Set();
+            };
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+            foreach (var responder in responders)
+            {
+                await responder(new InstructionAck{ Success = true });    
+            }
+            
+            Assert.True(signal.Wait(TimeSpan.FromSeconds(1)));
+        }
+        
+        [Fact]
+        public async Task HeartbeatMissedDoesNotGetTriggeredWhenHeartbeatIsAcknowledgedInTime()
+        {
+            var responders = new List<ReceiveHeartbeatAcknowledgement>();
+            SendHeartbeat sender = (responder, _) =>
+            {
+                responders.Add(responder);
+                return ValueTask.CompletedTask;
+            };
+            await using var sut = await CreateSystemUnderTest(sender);
+
+            var signal = new ManualResetEventSlim(false);
+            sut.HeartbeatMissed += (_, _) =>
+            {
+                signal.Set();
+            };
+            
+            foreach (var responder in responders)
+            {
+                await responder(new InstructionAck{ Success = true });    
+            }
+            
+            Assert.False(signal.Wait(TimeSpan.FromMilliseconds(250)));
         }
         
         [Fact]
@@ -189,7 +257,7 @@ public class HearbeatMonitorTests
 
             await sut.Resume();
             
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
         }
     }
 
@@ -204,9 +272,9 @@ public class HearbeatMonitorTests
         
         private async Task<HeartbeatMonitor> CreateSystemUnderTest(SendHeartbeat sender)
         {
-            var sut = new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, _logger);
+            var sut = new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, TimeSpan.Zero, _logger);
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            await Task.Delay(TimeSpan.FromMilliseconds(50));
             await sut.Pause();
             return sut;
         }
@@ -269,10 +337,10 @@ public class HearbeatMonitorTests
         {
             var sut = new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, _logger);
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            await Task.Delay(TimeSpan.FromMilliseconds(50));
             await sut.Pause();
             await sut.Resume();
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            await Task.Delay(TimeSpan.FromMilliseconds(50));
             return sut;
         }
         
@@ -320,11 +388,6 @@ public class HearbeatMonitorTests
             Assert.True(sender.Signal.Wait(TimeSpan.FromSeconds(2)));
         }
     }
-
-    public class WhenHeartbeatIsNeverAcknowledged
-    {
-        
-    }
     
     public class WhenHeartbeatIsNotAcknowledgedInTime
     {
@@ -333,16 +396,22 @@ public class HearbeatMonitorTests
     
     public class SentHeartbeatCountdown
     {
-        public CountdownEvent Signal { get; }
+        private int _counter;
+        public ManualResetEventSlim Signal { get; }
+        
 
         public SentHeartbeatCountdown(int from)
         {
-            Signal = new CountdownEvent(from);
+            _counter = from;
+            Signal = new ManualResetEventSlim(false);
         }
 
-        public ValueTask SendHeartbeat(ReceiveHeartbeatAcknowledgement responder)
+        public ValueTask SendHeartbeat(ReceiveHeartbeatAcknowledgement responder, TimeSpan timeout)
         {
-            Signal.Signal();
+            if (Interlocked.Decrement(ref _counter) == 0)
+            {
+                Signal.Set();
+            }
             return ValueTask.CompletedTask;
         }
     }

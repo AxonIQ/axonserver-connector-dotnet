@@ -6,8 +6,11 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class HeartbeatMonitor : IAsyncDisposable
 {
+    public static readonly TimeSpan MinimumCheckInterval = TimeSpan.FromSeconds(1.0);
+    
     private readonly SendHeartbeat _sender;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly TimeSpan _minimumCheckInterval;
     private readonly ILogger<HeartbeatMonitor> _logger;
 
     private readonly Channel<Protocol> _inbox;
@@ -19,9 +22,15 @@ public class HeartbeatMonitor : IAsyncDisposable
     private readonly FollowerClock _followerClock;
 
     public HeartbeatMonitor(SendHeartbeat sender, Func<DateTimeOffset> clock, ILogger<HeartbeatMonitor> logger)
+        : this(sender, clock, MinimumCheckInterval, logger)
+    {
+    }
+
+    internal HeartbeatMonitor(SendHeartbeat sender, Func<DateTimeOffset> clock, TimeSpan minimumCheckInterval, ILogger<HeartbeatMonitor> logger)
     {
         _sender = sender ?? throw new ArgumentNullException(nameof(sender));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _minimumCheckInterval = minimumCheckInterval;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _inbox = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
         {
@@ -61,9 +70,8 @@ public class HeartbeatMonitor : IAsyncDisposable
             {
                 while (_inbox.Reader.TryRead(out var message))
                 {
-                    _logger.LogDebug("{Message}", message.ToString());
                     var wallTime = _clock();
-
+                    _logger.LogDebug("Began {Message} when {State}", message.ToString(), state.ToString());
                     switch (message)
                     {
                         case Protocol.Enable enable:
@@ -107,7 +115,8 @@ public class HeartbeatMonitor : IAsyncDisposable
                                                 ? _inbox.Writer.WriteAsync(
                                                     new Protocol.CheckSucceeded(enabled.LogicalTime), ct)
                                                 : _inbox.Writer.WriteAsync(
-                                                    new Protocol.CheckFailed(ack.Error, enabled.LogicalTime), ct));
+                                                    new Protocol.CheckFailed(ack.Error, enabled.LogicalTime), ct),
+                                            enabled.Timeout);
                                         enabled = enabled with
                                         {
                                             NextHeartbeatCheckAt = wallTime.Add(enabled.Interval)
@@ -133,6 +142,7 @@ public class HeartbeatMonitor : IAsyncDisposable
                             break;
                         case Protocol.Disable disable:
                             _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                            _followerClock.Follow(disable.LogicalTime);
                             state = new State.Disabled(disable.LogicalTime);
                             break;
                         case Protocol.Pause pause:
@@ -141,18 +151,22 @@ public class HeartbeatMonitor : IAsyncDisposable
                                 case State.Enabled enabled:
                                 {
                                     _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                                    _followerClock.Follow(pause.LogicalTime);
                                     state = new State.Paused(enabled.Interval, enabled.Timeout, pause.LogicalTime);
                                     break;
                                 }
                                 case State.Paused:
+                                    _followerClock.Follow(pause.LogicalTime);
                                     _logger.LogDebug(
                                         "Could not pause the heartbeat monitor because the monitor is already paused");
                                     break;
                                 case State.Disabled:
+                                    _followerClock.Follow(pause.LogicalTime);
                                     _logger.LogDebug(
                                         "Could not pause the heartbeat monitor because the monitor is disabled");
                                     break;
                             }
+                            
 
                             break;
                         case Protocol.Resume resume:
@@ -170,11 +184,18 @@ public class HeartbeatMonitor : IAsyncDisposable
                                     _timer.Change(TimeSpan.Zero, paused.Interval);
                                     break;
                                 }
-                                case State.Enabled:
-                                    _logger.LogDebug(
-                                        "Could not resume the heartbeat monitor because the monitor is already enabled");
+                                case State.Enabled enabled:
+                                    state = new State.Enabled(
+                                        enabled.Interval,
+                                        enabled.Timeout,
+                                        wallTime,
+                                        wallTime.Add(enabled.Timeout),
+                                        resume.LogicalTime);
+                                    _followerClock.Follow(resume.LogicalTime);
+                                    _timer.Change(TimeSpan.Zero, enabled.Interval);
                                     break;
                                 case State.Disabled:
+                                    _followerClock.Follow(resume.LogicalTime);
                                     _logger.LogDebug(
                                         "Could not resume the heartbeat monitor because the monitor is disabled");
                                     break;
@@ -256,7 +277,9 @@ public class HeartbeatMonitor : IAsyncDisposable
                                         {
                                             NextHeartbeatCheckAt = wallTime.Add(enabled.Interval)
                                         };
-
+                                        _logger.LogDebug(
+                                            "Extended heartbeat check to {NewCheck}",
+                                            enabled.NextHeartbeatCheckAt);
                                     }
 
                                     enabled = enabled with
@@ -273,22 +296,29 @@ public class HeartbeatMonitor : IAsyncDisposable
                                     break;
                                 case State.Enabled enabled when receive.LogicalTime != enabled.LogicalTime:
                                     _logger.LogDebug(
-                                        "Axon Server Heartbeat acknowledgement received but it is outdated");
+                                        "Axon Server Heartbeat received but it is outdated");
                                     break;
                                 default:
                                     _logger.LogDebug(
-                                        "Axon Server Heartbeat acknowledgement when the monitor is disabled or paused");
+                                        "Axon Server Heartbeat received when the monitor is disabled or paused");
                                     break;
                             }
 
                             break;
                     }
+                    _logger.LogDebug("Completed {Message} with {State}", message.ToString(), state.ToString());
                 }
             }
         }
-        catch (OperationCanceledException)
-        {
-            // silently ignore the cancellation
+        catch (TaskCanceledException exception)
+        { 
+            _logger.LogDebug(exception,
+                "Heartbeat monitor message loop is exciting because a task was cancelled");
+        }
+        catch (OperationCanceledException exception)
+        { 
+            _logger.LogDebug(exception,
+                "Heartbeat monitor message loop is exciting because an operation was cancelled");
         }
     }
 
@@ -355,7 +385,7 @@ public class HeartbeatMonitor : IAsyncDisposable
     {
         await _inbox.Writer.WriteAsync(
             new Protocol.Enable(
-                TimeSpanMath.Max(interval, TimeSpan.FromSeconds(1)),
+                TimeSpanMath.Max(interval, _minimumCheckInterval),
                 timeout,
                 _leaderClock.Next()
             )
@@ -411,6 +441,7 @@ public class HeartbeatMonitor : IAsyncDisposable
         _inbox.Writer.Complete();
         await _inbox.Reader.Completion;
         await _protocol;
+        await _timer.DisposeAsync();
         _inboxCancellation.Dispose();
         _protocol.Dispose();
     }

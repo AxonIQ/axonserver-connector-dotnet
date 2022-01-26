@@ -15,7 +15,7 @@ public class MessageSinkLoggerFactory : ILoggerFactory
     public ILogger CreateLogger(string categoryName)
     {
         if (categoryName == null) throw new ArgumentNullException(nameof(categoryName));
-        return new MessageSinkLogger(_sink);
+        return new MessageSinkLogger(_sink, categoryName);
     }
 
     public void AddProvider(ILoggerProvider provider)

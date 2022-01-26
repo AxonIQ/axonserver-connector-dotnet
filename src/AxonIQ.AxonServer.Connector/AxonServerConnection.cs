@@ -47,6 +47,8 @@ public class AxonServerConnection : IAxonServerConnection
             channelFactory.ClientIdentity,
             _context,
             _callInvokerProxy,
+            () => _inbox.Writer.WriteAsync(new Protocol.Reconnect(), _inboxCancellation.Token),
+            _scheduler.Clock,
             _loggerFactory);
         _onConnectedHandler = (_, _) =>
         {
@@ -86,58 +88,83 @@ public class AxonServerConnection : IAxonServerConnection
 
     private async Task RunChannelProtocol(CancellationToken ct)
     {
-        while (await _inbox.Reader.WaitToReadAsync(ct))
+        try
         {
-            while (_inbox.Reader.TryRead(out var message))
+            while (await _inbox.Reader.WaitToReadAsync(ct))
             {
-                switch (message)
+                while (_inbox.Reader.TryRead(out var message))
                 {
-                    case Protocol.Connect:
-                        switch (CurrentState)
-                        {
-                            case State.Disconnected:
-                                var channel = await _channelFactory.Create(_context);
-                                if (channel != null)
-                                {
-                                    var callInvoker = channel.CreateCallInvoker().Intercept(metadata =>
+                    _logger.LogDebug("Began {Message} when {State}", message.ToString(), CurrentState.ToString());
+                    switch (message)
+                    {
+                        case Protocol.Connect:
+                            switch (CurrentState)
+                            {
+                                case State.Disconnected:
+                                    var channel = await _channelFactory.Create(_context);
+                                    if (channel != null)
                                     {
-                                        _channelFactory.Authentication.WriteTo(metadata);
-                                        _context.WriteTo(metadata);
-                                        return metadata;
-                                    });
-                                    //State needs to be set for the control channel to pick up
-                                    //the right call invoker
-                                    CurrentState = new State.Connected(channel, callInvoker);
-                                    await _controlChannel.Connect();
-                                }
+                                        var callInvoker = channel.CreateCallInvoker().Intercept(metadata =>
+                                        {
+                                            _channelFactory.Authentication.WriteTo(metadata);
+                                            _context.WriteTo(metadata);
+                                            return metadata;
+                                        });
+                                        //State needs to be set for the control channel to pick up
+                                        //the right call invoker
+                                        CurrentState = new State.Connected(channel, callInvoker);
+                                        await _controlChannel.Connect();
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning(
+                                            "Could not create channel for context '{Context}'",
+                                            _context);
+                                    }
 
-                                break;
-                            case State.Connected:
-                                _logger.LogInformation("AxonServerConnection for context '{Context}' is already connected", _context.ToString());
-                                break;
-                        }
+                                    break;
+                                case State.Connected:
+                                    _logger.LogInformation(
+                                        "AxonServerConnection for context '{Context}' is already connected",
+                                        _context.ToString());
+                                    break;
+                            }
 
-                        break;
-                    case Protocol.Reconnect:
-                        switch (CurrentState)
-                        {
-                            case State.Connected connected:
-                                _logger.LogInformation("Reconnect for context {Context} requested. Closing current connection", _context);
-                                await connected.Channel.ShutdownAsync();
-                                connected.Channel.Dispose();
-                                
-                                CurrentState = new State.Disconnected();
+                            break;
+                        case Protocol.Reconnect:
+                            switch (CurrentState)
+                            {
+                                case State.Connected connected:
+                                    await _controlChannel.Reconnect();
 
-                                await _controlChannel.Reconnect();
+                                    _logger.LogInformation(
+                                        "Reconnect for context {Context} requested. Closing current connection",
+                                        _context);
+                                    await connected.Channel.ShutdownAsync();
+                                    connected.Channel.Dispose();
 
-                                await _scheduler.ScheduleTask(
-                                    () => _inbox.Writer.WriteAsync(new Protocol.Connect(), ct), _scheduler.Clock());
-                                break;
-                        }
+                                    CurrentState = new State.Disconnected();
 
-                        break;
+                                    await _scheduler.ScheduleTask(
+                                        () => _inbox.Writer.WriteAsync(new Protocol.Connect(), ct), _scheduler.Clock());
+                                    break;
+                            }
+
+                            break;
+                    }
+                    _logger.LogDebug("Completed {Message} with {State}", message.ToString(), CurrentState.ToString());
                 }
             }
+        }
+        catch (TaskCanceledException exception)
+        {
+            _logger.LogDebug(exception,
+                "Axon Server connection message loop is exciting because a task was cancelled");
+        }
+        catch (OperationCanceledException exception)
+        {
+            _logger.LogDebug(exception,
+                "Axon Server connection message loop is exciting because an operation was cancelled");
         }
     }
 
