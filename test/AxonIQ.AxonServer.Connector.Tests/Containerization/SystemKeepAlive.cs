@@ -36,37 +36,37 @@ public class SystemKeepAlive
         var properties = new List<string>();
         if (HeartbeatEnabled.HasValue)
         {
-            properties.Add($"security.require-ssl={HeartbeatEnabled.Value.ToString().ToLowerInvariant()}");
+            properties.Add($"axoniq.axonserver.heartbeat.enabled={HeartbeatEnabled.Value.ToString().ToLowerInvariant()}");
         }
 
         if (KeepAliveTime.HasValue)
         {
-            properties.Add($"server.ssl.key-store-type={KeepAliveTime.Value}");
+            properties.Add($"axoniq.axonserver.keep-alive-time={KeepAliveTime.Value}");
         }
         
         if (KeepAliveTimeout.HasValue)
         {
-            properties.Add($"server.ssl.key-store-type={KeepAliveTimeout.Value}");
+            properties.Add($"axoniq.axonserver.keep-alive-timeout={KeepAliveTimeout.Value}");
         }
         
         if (MinKeepAliveTime.HasValue)
         {
-            properties.Add($"server.ssl.key-store-type={MinKeepAliveTime.Value}");
+            properties.Add($"axoniq.axonserver.min-keep-alive-time={MinKeepAliveTime.Value}");
         }
         
         if (ClientHeartbeatTimeout.HasValue)
         {
-            properties.Add($"server.ssl.key-store-type={ClientHeartbeatTimeout.Value}");
+            properties.Add($"axoniq.axonserver.client-heartbeat-timeout={ClientHeartbeatTimeout.Value}");
         }
         
         if (ClientHeartbeatCheckInitialDelay.HasValue)
         {
-            properties.Add($"server.ssl.key-store-type={ClientHeartbeatCheckInitialDelay.Value}");
+            properties.Add($"axoniq.axonserver.client-heartbeat-check-initial-delay={ClientHeartbeatCheckInitialDelay.Value}");
         }
         
         if (ClientHeartbeatCheckRate.HasValue)
         {
-            properties.Add($"server.ssl.key-store-type={ClientHeartbeatCheckRate.Value}");
+            properties.Add($"axoniq.axonserver.client-heartbeat-check-rate={ClientHeartbeatCheckRate.Value}");
         }
         
         return properties.ToArray();
