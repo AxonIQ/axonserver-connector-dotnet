@@ -28,6 +28,14 @@ public static class FixtureExtensions
                 .FromFactory((ComponentName name) => ClientInstanceId.GenerateFrom(name))
                 .OmitAutoProperties());
     }
+    
+    public static void CustomizeLoadFactor(this IFixture fixture)
+    {
+        fixture.Customize<LoadFactor>(composer =>
+            composer
+                .FromFactory((int value) => new LoadFactor(Math.Abs(value)))
+                .OmitAutoProperties());
+    }
 
     public static void CustomizeLocalHostDnsEndPointInReservedPortRange(this IFixture fixture)
     {

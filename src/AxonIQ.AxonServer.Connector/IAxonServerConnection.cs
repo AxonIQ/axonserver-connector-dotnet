@@ -7,10 +7,21 @@ public interface IAxonServerConnection : IAsyncDisposable
     /// </summary>
     IControlChannel ControlChannel { get; }
     /// <summary>
+    /// Provides access to the command channel set up with Axon Server.
+    /// </summary>
+    ICommandChannel CommandChannel { get; }
+    /// <summary>
     /// Requests to establish a connection with Axon Server.
     /// </summary>
     /// <returns>A <see cref="Task"/> that confirms the request to connect has been accepted.</returns>
     Task Connect();
+
+    /// <summary>
+    /// Waits until a connection with Axon Server has been established.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> that confirms a connection has been established.</returns>
+    Task WaitUntilConnected();
+    
     /// <summary>
     /// Raised when the connection with Axon Server was established. 
     /// </summary>
@@ -31,4 +42,10 @@ public interface IAxonServerConnection : IAsyncDisposable
     /// Indicates if the connection is able to send and receive instructions.
     /// </summary>
     bool IsReady { get; }
+    
+    /// <summary>
+    /// Waits until the connection is able to send and receive instructions.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> that confirms the connection is able to send and receive instructions.</returns>
+    Task WaitUntilReady();
 }

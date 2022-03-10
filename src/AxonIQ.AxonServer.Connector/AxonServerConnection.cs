@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
@@ -20,6 +21,7 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly CancellationTokenSource _inboxCancellation;
     private readonly Task _protocol;
     private readonly ControlChannel _controlChannel;
+    private readonly CommandChannel _commandChannel;
     private readonly EventHandler _onConnectedHandler;
     private readonly EventHandler _onHeartbeatMissedHandler;
 
@@ -49,6 +51,11 @@ public class AxonServerConnection : IAxonServerConnection
             _callInvokerProxy,
             () => _inbox.Writer.WriteAsync(new Protocol.Reconnect(), _inboxCancellation.Token),
             _scheduler.Clock,
+            _loggerFactory);
+        _commandChannel = new CommandChannel(
+            channelFactory.ClientIdentity,
+            _context,
+            _callInvokerProxy,
             _loggerFactory);
         _onConnectedHandler = (_, _) =>
         {
@@ -175,6 +182,24 @@ public class AxonServerConnection : IAxonServerConnection
         );
     }
 
+    public Task WaitUntilConnected()
+    {
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler? handler = null;
+        handler = (_, _) =>
+        {
+            source.SetResult();
+            Connected -= handler;
+        }; 
+        Connected += handler;
+        if (IsConnected)
+        {
+            Connected -= handler;
+            return Task.CompletedTask;
+        }
+        return source.Task;
+    }
+
     public event EventHandler? Connected;
     
     protected virtual void OnConnected()
@@ -199,6 +224,23 @@ public class AxonServerConnection : IAxonServerConnection
     }
 
     public bool IsReady => IsConnected && _controlChannel.IsConnected;
+    public Task WaitUntilReady()
+    {
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler? handler = null;
+        handler = (_, _) =>
+        {
+            source.SetResult();
+            Ready -= handler;
+        }; 
+        Ready += handler;
+        if (IsReady)
+        {
+            Ready -= handler;
+            return Task.CompletedTask;
+        }
+        return source.Task;
+    }
 
     private record Protocol
     {
@@ -215,6 +257,8 @@ public class AxonServerConnection : IAxonServerConnection
     }
 
     public IControlChannel ControlChannel => _controlChannel;
+
+    public ICommandChannel CommandChannel => _commandChannel;
 
     public async ValueTask DisposeAsync()
     {

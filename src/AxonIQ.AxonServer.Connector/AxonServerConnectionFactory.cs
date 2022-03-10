@@ -8,7 +8,7 @@ public class AxonServerConnectionFactory
 {
     private readonly AxonServerGrpcChannelFactory _channelFactory;
     private readonly Scheduler _scheduler;
-    private readonly ConcurrentDictionary<Context, AxonServerConnection> _connections;
+    private readonly ConcurrentDictionary<Context, Lazy<AxonServerConnection>> _connections;
 
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
@@ -25,6 +25,7 @@ public class AxonServerConnectionFactory
             options.Clock, 
             TimeSpan.FromMilliseconds(100),
             options.LoggerFactory.CreateLogger<Scheduler>());
+
         _channelFactory =
             new AxonServerGrpcChannelFactory(
                 ClientIdentity, 
@@ -32,7 +33,8 @@ public class AxonServerConnectionFactory
                 RoutingServers, 
                 options.LoggerFactory,
                 options.GrpcChannelOptions);
-        _connections = new ConcurrentDictionary<Context, AxonServerConnection>();
+
+        _connections = new ConcurrentDictionary<Context, Lazy<AxonServerConnection>>();
     }
 
     public ClientIdentity ClientIdentity { get; }
@@ -42,11 +44,9 @@ public class AxonServerConnectionFactory
 
     public async Task<IAxonServerConnection> Connect(Context context)
     {
-        //Note: The valueFactory is not thread safe, but in the odd case of a race,
-        //the instances that lost the race will be garbage collected anyway.
-        //Such an instance does not hold any precious resources until a connection is established.
         var connection = _connections.GetOrAdd(context,
-            _ => new AxonServerConnection(context, _channelFactory, _scheduler, LoggerFactory));
+            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _scheduler, LoggerFactory)))
+            .Value;
         await connection.Connect();
         return connection;
     }

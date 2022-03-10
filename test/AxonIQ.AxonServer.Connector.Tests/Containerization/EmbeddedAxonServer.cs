@@ -42,6 +42,7 @@ public class EmbeddedAxonServer : IAxonServer
         var builder = new Builder()
             .UseContainer()
             .UseImage("axoniq/axonserver")
+            .RemoveVolumesOnDispose()
             .ExposePort(8024)
             .ExposePort(8124)
             .Mount(_serverFiles.FullName, "/config", MountType.ReadOnly)

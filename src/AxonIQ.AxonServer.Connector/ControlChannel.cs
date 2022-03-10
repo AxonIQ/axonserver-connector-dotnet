@@ -1,4 +1,3 @@
-using System.Reflection.Metadata;
 using System.Threading.Channels;
 using AxonIQ.AxonServer.Grpc.Control;
 using Grpc.Core;
@@ -69,6 +68,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
     public ClientIdentity ClientIdentity { get; }
     
     public CallInvoker CallInvoker { get; }
+    
     public RequestReconnect RequestReconnect { get; }
 
     public PlatformService.PlatformServiceClient Service { get; }
