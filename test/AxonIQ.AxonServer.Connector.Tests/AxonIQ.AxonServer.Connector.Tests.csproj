@@ -25,7 +25,7 @@
         <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
         <PackageReference Include="NodaTime" Version="3.0.9" />
-        <PackageReference Include="NodaTime.Testing" Version="3.0.9" />
+        <PackageReference Include="NodaTime.Testing" Version="3.0.10" />
         <PackageReference Include="shortid" Version="3.0.1" />
         <PackageReference Include="Xunit" Version="2.4.1" />
         <PackageReference Include="Xunit.Runner.Console" Version="2.4.1">
