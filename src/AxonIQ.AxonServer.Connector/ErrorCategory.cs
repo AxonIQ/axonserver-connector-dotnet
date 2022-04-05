@@ -44,7 +44,7 @@ public class ErrorCategory
     //Default
     public static readonly ErrorCategory Other = new("AXONIQ-0001");
 
-    public static readonly IReadOnlyCollection<ErrorCategory> All = new[]
+    public static readonly IReadOnlyList<ErrorCategory> All = new[]
     {
         AuthenticationTokenMissing,
         AuthenticationInvalidToken,

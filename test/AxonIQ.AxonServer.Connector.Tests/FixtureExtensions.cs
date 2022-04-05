@@ -29,11 +29,43 @@ public static class FixtureExtensions
                 .OmitAutoProperties());
     }
     
+    public static void CustomizeCommandHandlerId(this IFixture fixture)
+    {
+        fixture.Customize<CommandHandlerId>(composer =>
+            composer
+                .FromFactory(CommandHandlerId.New)
+                .OmitAutoProperties());
+    }
+    
+    public static void CustomizeSubscriptionId(this IFixture fixture)
+    {
+        fixture.Customize<SubscriptionId>(composer =>
+            composer
+                .FromFactory(SubscriptionId.New)
+                .OmitAutoProperties());
+    }
+    
     public static void CustomizeLoadFactor(this IFixture fixture)
     {
         fixture.Customize<LoadFactor>(composer =>
             composer
                 .FromFactory((int value) => new LoadFactor(Math.Abs(value)))
+                .OmitAutoProperties());
+    }
+    
+    public static void CustomizePermitCount(this IFixture fixture)
+    {
+        fixture.Customize<PermitCount>(composer =>
+            composer
+                .FromFactory((long value) => new PermitCount(value == 0L ? 1 : Math.Abs(value)))
+                .OmitAutoProperties());
+    }
+    
+    public static void CustomizePermitCounter(this IFixture fixture)
+    {
+        fixture.Customize<PermitCounter>(composer =>
+            composer
+                .FromFactory((long value) => new PermitCounter(Math.Abs(value)))
                 .OmitAutoProperties());
     }
 

@@ -42,7 +42,9 @@ public class AxonServerConnectionFactoryOptions
         IAxonServerAuthentication authentication,
         ILoggerFactory loggerFactory,
         Func<DateTimeOffset>? clock,
-        GrpcChannelOptions? grpcChannelOptions)
+        GrpcChannelOptions? grpcChannelOptions,
+        PermitCount commandPermits,
+        PermitCount queryPermits)
     {
         ComponentName = componentName;
         ClientInstanceId = clientInstanceId;
@@ -52,6 +54,8 @@ public class AxonServerConnectionFactoryOptions
         LoggerFactory = loggerFactory;
         Clock = clock ?? (() => DateTimeOffset.UtcNow);
         GrpcChannelOptions = grpcChannelOptions;
+        CommandPermits = commandPermits;
+        QueryPermits = queryPermits;
     }
 
     public ComponentName ComponentName { get; }
@@ -62,6 +66,8 @@ public class AxonServerConnectionFactoryOptions
     public ILoggerFactory LoggerFactory { get; }
     public Func<DateTimeOffset> Clock { get; }
     public GrpcChannelOptions? GrpcChannelOptions { get; }
+    public PermitCount CommandPermits { get; }
+    public PermitCount QueryPermits { get; }
 
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
@@ -75,6 +81,8 @@ public class AxonServerConnectionFactoryOptions
         private ILoggerFactory _loggerFactory;
         private Func<DateTimeOffset>? _clock;
         private GrpcChannelOptions? _grpcChannelOptions;
+        private PermitCount _commandPermits;
+        private PermitCount _queryPermits;
 
         internal Builder(ComponentName componentName, ClientInstanceId clientInstanceId)
         {
@@ -91,6 +99,8 @@ public class AxonServerConnectionFactoryOptions
             _loggerFactory = new NullLoggerFactory();
             _clock = null;
             _grpcChannelOptions = null;
+            _commandPermits = AxonServerConnectionFactoryDefaults.DefaultCommandPermits;
+            _queryPermits = AxonServerConnectionFactoryDefaults.DefaultQueryPermits;
         }
 
         public IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name)
@@ -206,6 +216,20 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
+        public IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(PermitCount count)
+        {
+            _commandPermits = PermitCount.Max(AxonServerConnectionFactoryDefaults.MinimumCommandPermits, count);
+
+            return this;
+        }
+
+        public IAxonServerConnectionFactoryOptionsBuilder WithQueryPermits(PermitCount count)
+        {
+            _queryPermits = PermitCount.Max(AxonServerConnectionFactoryDefaults.MinimumQueryPermits, count);
+
+            return this;
+        }
+
         public AxonServerConnectionFactoryOptions Build()
         {
             if (_routingServers.Count == 0)
@@ -221,7 +245,9 @@ public class AxonServerConnectionFactoryOptions
                 _authentication, 
                 _loggerFactory,
                 _clock,
-                _grpcChannelOptions);
+                _grpcChannelOptions,
+                _commandPermits,
+                _queryPermits);
         }
     }
 }

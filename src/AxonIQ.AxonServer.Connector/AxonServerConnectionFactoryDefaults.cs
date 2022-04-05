@@ -12,4 +12,9 @@ public static class AxonServerConnectionFactoryDefaults
     public static readonly IAxonServerAuthentication Authentication = AxonServerAuthentication.None;
 
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(10_000);
+
+    public static readonly PermitCount MinimumCommandPermits = new PermitCount(16);
+    public static readonly PermitCount MinimumQueryPermits = new PermitCount(16);
+    public static readonly PermitCount DefaultQueryPermits = new PermitCount(5000);
+    public static readonly PermitCount DefaultCommandPermits = new PermitCount(5000);
 }

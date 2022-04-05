@@ -19,6 +19,8 @@ public interface IAxonServerConnectionFactoryOptionsBuilder
     IAxonServerConnectionFactoryOptionsBuilder WithLoggerFactory(ILoggerFactory loggerFactory);
     IAxonServerConnectionFactoryOptionsBuilder WithClock(Func<DateTimeOffset> clock);
     IAxonServerConnectionFactoryOptionsBuilder WithGrpcChannelOptions(GrpcChannelOptions grpcChannelOptions);
+    IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(PermitCount count);
+    IAxonServerConnectionFactoryOptionsBuilder WithQueryPermits(PermitCount count);
 
     AxonServerConnectionFactoryOptions Build();
 }

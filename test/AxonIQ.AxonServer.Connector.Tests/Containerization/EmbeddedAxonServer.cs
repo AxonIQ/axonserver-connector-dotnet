@@ -192,6 +192,13 @@ public class EmbeddedAxonServer : IAxonServer
             KeepAlive =
             {
                 HeartbeatEnabled = true
+            },
+            Logging =
+            {
+                LogLevels = new []
+                {
+                    new KeyValuePair<string, string>("io.axoniq.axonserver", "DEBUG") 
+                }
             }
         };
         return new EmbeddedAxonServer(properties, logger);

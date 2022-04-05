@@ -29,6 +29,7 @@ public class AxonServerConnection : IAxonServerConnection
         Context context,
         AxonServerGrpcChannelFactory channelFactory,
         IScheduler scheduler,
+        PermitCount commandPermits,
         ILoggerFactory loggerFactory)
     {
         _context = context;
@@ -55,7 +56,10 @@ public class AxonServerConnection : IAxonServerConnection
         _commandChannel = new CommandChannel(
             channelFactory.ClientIdentity,
             _context,
+            scheduler.Clock,
             _callInvokerProxy,
+            commandPermits,
+            new PermitCount(commandPermits.ToInt64() / 4L),
             _loggerFactory);
         _onConnectedHandler = (_, _) =>
         {
@@ -184,11 +188,15 @@ public class AxonServerConnection : IAxonServerConnection
 
     public Task WaitUntilConnected()
     {
+        if (IsConnected)
+        {
+            return Task.CompletedTask;
+        }
         var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         EventHandler? handler = null;
         handler = (_, _) =>
         {
-            source.SetResult();
+            source.TrySetResult();
             Connected -= handler;
         }; 
         Connected += handler;
@@ -226,11 +234,15 @@ public class AxonServerConnection : IAxonServerConnection
     public bool IsReady => IsConnected && _controlChannel.IsConnected;
     public Task WaitUntilReady()
     {
+        if (IsReady)
+        {
+            return Task.CompletedTask;
+        }
         var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         EventHandler? handler = null;
         handler = (_, _) =>
         {
-            source.SetResult();
+            source.TrySetResult();
             Ready -= handler;
         }; 
         Ready += handler;

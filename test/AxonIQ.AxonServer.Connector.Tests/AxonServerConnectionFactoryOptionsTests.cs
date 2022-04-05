@@ -369,6 +369,21 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.Equal(new Dictionary<string, string> { { key, "2" } }, result.ClientTags);
     }
 
+    [Theory]
+    [InlineData(15, 16)]
+    [InlineData(32, 32)]
+    public void WithQueryPermitsReturnsExpectedResult(long value, long expected)
+    {
+        var sut =
+            CreateSystemUnderTest()
+                .WithQueryPermits(new PermitCount(value));
+        
+        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        var result = sut.Build();
+        
+        Assert.Equal(new PermitCount(expected), result.QueryPermits);
+    }
+
     [Fact]
     public void FromConfigurationCanNotBeNull()
     {

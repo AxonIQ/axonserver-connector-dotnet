@@ -289,6 +289,12 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             _logger.LogDebug(exception,
                 "Control channel message loop is exciting because an operation was cancelled");
         }
+        catch (Exception exception)
+        {
+            _logger.LogCritical(
+                exception,
+                "Control channel message pump is exciting because of an unexpected exception");
+        }
     }
     
     private record Protocol
