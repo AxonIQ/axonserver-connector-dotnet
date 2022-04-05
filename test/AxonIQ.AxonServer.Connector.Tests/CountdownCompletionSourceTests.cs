@@ -4,52 +4,12 @@ namespace AxonIQ.AxonServer.Connector.Tests;
 
 public class CountdownCompletionSourceTests
 {
-    [Fact]
-    public void InitialCountCanNotBeNegative()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void InitialCountCanNotBeZeroOrNegative(int initialCount)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new CountdownCompletionSource(-1));
-    }
-
-    public class WhenInitialCountIsZero
-    {
-        private readonly CountdownCompletionSource _sut;
-
-        public WhenInitialCountIsZero()
-        {
-            _sut = new CountdownCompletionSource(0);
-        }
-        
-        [Fact]
-        public void CompletesImmediately()
-        {
-            Assert.Same(Task.CompletedTask, _sut.Completion);
-        }
-
-        [Fact]
-        public void InitialCountReturnsExpectedValue()
-        {
-            Assert.Equal(0, _sut.InitialCount);
-        }
-        
-        [Fact]
-        public void CurrentCountReturnsExpectedValue()
-        {
-            Assert.Equal(0, _sut.InitialCount);
-        }
-
-        [Fact]
-        public void SignalFaultReturnsExpectedResult()
-        {
-            Assert.False(_sut.SignalFault(new Exception()));
-            Assert.Equal(0, _sut.CurrentCount);
-        }
-        
-        [Fact]
-        public void SignalSuccessReturnsExpectedResult()
-        {
-            Assert.False(_sut.SignalSuccess());
-            Assert.Equal(0, _sut.CurrentCount);
-        }
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CountdownCompletionSource(initialCount));
     }
     
     public class WhenInitialCountIsOne
@@ -122,7 +82,7 @@ public class CountdownCompletionSourceTests
         public void ExactlyOneSignalFaultReturnsExpectedFinalResult()
         {
             var exception = new Exception();
-            var randomSignalFaultAtIndex = Random.Shared.Next(2, _sut.InitialCount);
+            var randomSignalFaultAtIndex = Random.Shared.Next(0, _sut.InitialCount);
             for (var index = 0; index < _sut.InitialCount; index++)
             {
                 if (index == randomSignalFaultAtIndex)

@@ -1,6 +1,5 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Grpc;
-using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -32,7 +31,7 @@ public class HearbeatMonitorTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
             
-            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -43,7 +42,7 @@ public class HearbeatMonitorTests
             
             await sut.Disable();
 
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -54,7 +53,7 @@ public class HearbeatMonitorTests
             
             await sut.Pause();
 
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -65,7 +64,7 @@ public class HearbeatMonitorTests
             
             await sut.Resume();
 
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
     }
 
@@ -93,7 +92,7 @@ public class HearbeatMonitorTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
 
-            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -104,7 +103,7 @@ public class HearbeatMonitorTests
 
             await sut.Disable();
 
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -115,7 +114,7 @@ public class HearbeatMonitorTests
 
             await sut.Pause();
 
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -126,7 +125,7 @@ public class HearbeatMonitorTests
 
             await sut.Resume();
 
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
     }
 
@@ -155,13 +154,13 @@ public class HearbeatMonitorTests
             SendHeartbeat sender = (_, _) => ValueTask.CompletedTask; 
             await using var sut = await CreateSystemUnderTest(sender);
 
-            var signal = new ManualResetEventSlim(false);
+            var source = new TaskCompletionSource();
             sut.HeartbeatMissed += (_, _) =>
             {
-                signal.Set();
+                source.TrySetResult();
             };
             
-            Assert.True(signal.Wait(TimeSpan.FromSeconds(1)));
+            Assert.True(source.Task.Wait(TimeSpan.FromSeconds(1)));
         }
         
         [Fact]
@@ -175,10 +174,10 @@ public class HearbeatMonitorTests
             };
             await using var sut = await CreateSystemUnderTest(sender);
 
-            var signal = new ManualResetEventSlim(false);
+            var source = new TaskCompletionSource(false);
             sut.HeartbeatMissed += (_, _) =>
             {
-                signal.Set();
+                source.TrySetResult();
             };
 
             await Task.Delay(TimeSpan.FromMilliseconds(500));
@@ -188,7 +187,7 @@ public class HearbeatMonitorTests
                 await responder(new InstructionAck{ Success = true });    
             }
             
-            Assert.True(signal.Wait(TimeSpan.FromSeconds(1)));
+            Assert.True(source.Task.Wait(TimeSpan.FromSeconds(1)));
         }
         
         [Fact]
@@ -202,10 +201,10 @@ public class HearbeatMonitorTests
             };
             await using var sut = await CreateSystemUnderTest(sender);
 
-            var signal = new ManualResetEventSlim(false);
+            var source = new TaskCompletionSource();
             sut.HeartbeatMissed += (_, _) =>
             {
-                signal.Set();
+                source.TrySetResult();
             };
             
             foreach (var responder in responders)
@@ -213,7 +212,7 @@ public class HearbeatMonitorTests
                 await responder(new InstructionAck{ Success = true });    
             }
             
-            Assert.False(signal.Wait(TimeSpan.FromMilliseconds(250)));
+            Assert.False(source.Task.Wait(TimeSpan.FromMilliseconds(250)));
         }
         
         [Fact]
@@ -224,7 +223,7 @@ public class HearbeatMonitorTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             
-            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -235,7 +234,7 @@ public class HearbeatMonitorTests
 
             await sut.Disable();
             
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -246,7 +245,7 @@ public class HearbeatMonitorTests
 
             await sut.Pause();
             
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -257,7 +256,7 @@ public class HearbeatMonitorTests
 
             await sut.Resume();
             
-            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
     }
 
@@ -287,7 +286,7 @@ public class HearbeatMonitorTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             
-            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -298,7 +297,7 @@ public class HearbeatMonitorTests
 
             await sut.Disable();
             
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -309,7 +308,7 @@ public class HearbeatMonitorTests
 
             await sut.Pause();
             
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -320,7 +319,7 @@ public class HearbeatMonitorTests
 
             await sut.Resume();
             
-            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
     }
 
@@ -352,7 +351,7 @@ public class HearbeatMonitorTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             
-            Assert.True(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -363,7 +362,7 @@ public class HearbeatMonitorTests
 
             await sut.Disable();
             
-            Assert.False(sender.Signal.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -374,7 +373,7 @@ public class HearbeatMonitorTests
 
             await sut.Pause();
             
-            Assert.False(sender.Signal.Wait(TimeSpan.FromSeconds(2)));
+            Assert.False(sender.Completed.Wait(TimeSpan.FromSeconds(2)));
         }
         
         [Fact]
@@ -385,7 +384,7 @@ public class HearbeatMonitorTests
 
             await sut.Resume();
             
-            Assert.True(sender.Signal.Wait(TimeSpan.FromSeconds(2)));
+            Assert.True(sender.Completed.Wait(TimeSpan.FromSeconds(2)));
         }
     }
     
@@ -397,22 +396,24 @@ public class HearbeatMonitorTests
     public class SentHeartbeatCountdown
     {
         private int _counter;
-        public ManualResetEventSlim Signal { get; }
+        public TaskCompletionSource _source;
         
 
         public SentHeartbeatCountdown(int from)
         {
             _counter = from;
-            Signal = new ManualResetEventSlim(false);
+            _source = new TaskCompletionSource();
         }
 
         public ValueTask SendHeartbeat(ReceiveHeartbeatAcknowledgement responder, TimeSpan timeout)
         {
             if (Interlocked.Decrement(ref _counter) == 0)
             {
-                Signal.Set();
+                _source.TrySetResult();
             }
             return ValueTask.CompletedTask;
         }
+
+        public Task Completed => _source.Task;
     }
 }

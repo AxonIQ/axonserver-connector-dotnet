@@ -301,7 +301,6 @@ public class AxonServerGrpcChannelFactoryTests
         [Fact]
         public async Task CreateWithoutAuthenticationReturnsExpectedResultWhenAtLeastOneRoutingServerIsReachable()
         {
-            var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = Context.Default;
             var servers = new List<DnsEndPoint>(
                 _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5))

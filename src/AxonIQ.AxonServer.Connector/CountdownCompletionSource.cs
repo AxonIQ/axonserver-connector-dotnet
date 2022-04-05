@@ -8,9 +8,9 @@ public class CountdownCompletionSource
 
     public CountdownCompletionSource(int initialCount)
     {
-        if (initialCount < 0)
+        if (initialCount <= 0)
             throw new ArgumentOutOfRangeException(nameof(initialCount), initialCount,
-                "The initial count can not be less than 0");
+                "The initial count can not be less than or equal to 0");
 
         InitialCount = initialCount;
         CurrentCount = 0;

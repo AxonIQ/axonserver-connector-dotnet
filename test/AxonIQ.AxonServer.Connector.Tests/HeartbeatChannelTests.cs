@@ -38,17 +38,17 @@ public class HeartbeatChannelTests
                 return ValueTask.CompletedTask;
             } 
         );
-        var signal = new ManualResetEventSlim(false);
+        var source = new TaskCompletionSource();
         ReceiveHeartbeatAcknowledgement responder = _ =>
         {
-            signal.Set();
+            source.TrySetResult();
             return ValueTask.CompletedTask;
         };
         await sut.Send(responder, TimeSpan.FromSeconds(10));
         
         await sut.Receive(ack);
         
-        Assert.True(signal.Wait(TimeSpan.FromMilliseconds(50)));
+        Assert.True(source.Task.Wait(TimeSpan.FromMilliseconds(50)));
     }
     
     [Fact]
@@ -61,17 +61,17 @@ public class HeartbeatChannelTests
                 return ValueTask.CompletedTask;
             }, TimeSpan.FromHours(1) 
         );
-        var signal = new ManualResetEventSlim(false);
+        var source = new TaskCompletionSource();
         ReceiveHeartbeatAcknowledgement responder = _ =>
         {
-            signal.Set();
+            source.TrySetResult();
             return ValueTask.CompletedTask;
         };
         await sut.Send(responder, TimeSpan.FromMilliseconds(10));
         await Task.Delay(TimeSpan.FromMilliseconds(10));
         await sut.Receive(ack);
         
-        Assert.True(signal.Wait(TimeSpan.FromMilliseconds(50)));
+        Assert.True(source.Task.Wait(TimeSpan.FromMilliseconds(50)));
     }
     
     [Fact]
@@ -84,16 +84,16 @@ public class HeartbeatChannelTests
                 return ValueTask.CompletedTask;
             }, TimeSpan.FromMilliseconds(250) 
         );
-        var signal = new ManualResetEventSlim(false);
+        var source = new TaskCompletionSource();
         ReceiveHeartbeatAcknowledgement responder = _ =>
         {
-            signal.Set();
+            source.TrySetResult();
             return ValueTask.CompletedTask;
         };
         await sut.Send(responder, TimeSpan.FromMilliseconds(10));
         await Task.Delay(TimeSpan.FromMilliseconds(500));
         await sut.Receive(ack);
         
-        Assert.False(signal.Wait(TimeSpan.FromMilliseconds(50)));
+        Assert.False(source.Task.Wait(TimeSpan.FromMilliseconds(50)));
     }
 }

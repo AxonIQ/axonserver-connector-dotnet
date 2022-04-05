@@ -67,13 +67,12 @@ public class AxonServerConnectionIntegrationTests
     {
         await using var sut = await CreateSystemUnderTest();
 
-        var signal = new ManualResetEventSlim(false); 
+        var source = new TaskCompletionSource(); 
         sut.Connected += (_, _) =>
         {
-            signal.Set();
+            source.TrySetResult();
         };
-        signal.Wait(TimeSpan.FromSeconds(10));
-        Assert.True(signal.IsSet);
+        source.Task.Wait(TimeSpan.FromSeconds(10));
     }
     
     [Fact]
@@ -81,12 +80,12 @@ public class AxonServerConnectionIntegrationTests
     {
         await using var sut = await CreateSystemUnderTest();
 
-        var signal = new ManualResetEventSlim(false); 
+        var source = new TaskCompletionSource(); 
         sut.Connected += (_, _) =>
         {
-            signal.Set();
+            source.TrySetResult();
         };
-        signal.Wait(TimeSpan.FromSeconds(10));
+        source.Task.Wait(TimeSpan.FromSeconds(10));
         Assert.True(sut.IsConnected);
     }
     
@@ -116,12 +115,12 @@ public class AxonServerConnectionIntegrationTests
     {
         await using var sut = await CreateSystemUnderTest();
 
-        var signal = new ManualResetEventSlim(false); 
+        var source = new TaskCompletionSource(); 
         sut.Ready += (_, _) =>
         {
-            signal.Set();
+            source.TrySetResult();
         };
-        signal.Wait(TimeSpan.FromSeconds(10));
+        source.Task.Wait(TimeSpan.FromSeconds(10));
         Assert.True(sut.IsReady);
     }
 
@@ -153,12 +152,12 @@ public class AxonServerConnectionIntegrationTests
                 });
             });
         await sut.ControlChannel.EnableHeartbeat(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
-        var signal = new ManualResetEventSlim(false); 
+        var source = new TaskCompletionSource(); 
         sut.Connected += (_, _) =>
         {
-            signal.Set();
+            source.TrySetResult();
         };
-        signal.Wait(TimeSpan.FromSeconds(10));
+        source.Task.Wait(TimeSpan.FromSeconds(10));
         Assert.True(sut.IsConnected);
         
         _logger.LogDebug("Connection status is READY");
