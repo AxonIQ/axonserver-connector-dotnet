@@ -1,3 +1,4 @@
+using System.Net;
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
@@ -44,7 +45,8 @@ public class CommandChannelIntegrationTests
     [Fact]
     public async Task RegisterCommandHandlerWhileDisconnectedHasExpectedResult()
     {
-        var connection = await CreateSystemUnderTest();
+        var connection = await CreateSystemUnderTest(builder =>
+            builder.WithRoutingServers(new DnsEndPoint("127.0.0.0", AxonServerConnectionFactoryDefaults.Port)));
         
         var sut = connection.CommandChannel;
 

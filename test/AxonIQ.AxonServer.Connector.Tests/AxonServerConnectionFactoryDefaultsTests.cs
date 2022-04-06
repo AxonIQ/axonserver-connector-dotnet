@@ -6,6 +6,14 @@ namespace AxonIQ.AxonServer.Connector.Tests;
 public class AxonServerConnectionFactoryDefaultsTests
 {
     [Fact]
+    public void PortReturnsExpectedResult()
+    {
+        var result = AxonServerConnectionFactoryDefaults.Port;
+
+        Assert.Equal(8124, result);
+    }
+    
+    [Fact]
     public void RoutingServersReturnsExpectedResult()
     {
         var result = AxonServerConnectionFactoryDefaults.RoutingServers;
