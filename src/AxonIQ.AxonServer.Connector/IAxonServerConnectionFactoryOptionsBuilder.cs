@@ -1,4 +1,6 @@
 using System.Net;
+using Grpc.Net.Client;
+using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
@@ -14,6 +16,11 @@ public interface IAxonServerConnectionFactoryOptionsBuilder
     IAxonServerConnectionFactoryOptionsBuilder WithClientTag(string key, string value);
     IAxonServerConnectionFactoryOptionsBuilder WithClientTags(params KeyValuePair<string, string>[] tags);
     IAxonServerConnectionFactoryOptionsBuilder WithClientTags(IEnumerable<KeyValuePair<string, string>> tags);
+    IAxonServerConnectionFactoryOptionsBuilder WithLoggerFactory(ILoggerFactory loggerFactory);
+    IAxonServerConnectionFactoryOptionsBuilder WithClock(Func<DateTimeOffset> clock);
+    IAxonServerConnectionFactoryOptionsBuilder WithGrpcChannelOptions(GrpcChannelOptions grpcChannelOptions);
+    IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(PermitCount count);
+    IAxonServerConnectionFactoryOptionsBuilder WithQueryPermits(PermitCount count);
 
     AxonServerConnectionFactoryOptions Build();
 }

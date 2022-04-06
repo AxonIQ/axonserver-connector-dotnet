@@ -15,7 +15,7 @@ public class TestOutputHelperLoggerFactory : ILoggerFactory
     public ILogger CreateLogger(string categoryName)
     {
         if (categoryName == null) throw new ArgumentNullException(nameof(categoryName));
-        return new TestOutputHelperLogger(_output);
+        return new TestOutputHelperLogger(_output, categoryName);
     }
 
     public void AddProvider(ILoggerProvider provider)

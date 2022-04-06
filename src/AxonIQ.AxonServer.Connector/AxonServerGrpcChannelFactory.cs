@@ -8,40 +8,40 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class AxonServerGrpcChannelFactory
 {
-    private readonly ClientIdentity _clientIdentity;
-    private readonly IAxonServerAuthentication _authentication;
-    private readonly IReadOnlyList<DnsEndPoint> _routingServers;
-    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<AxonServerGrpcChannelFactory> _logger;
 
-    public AxonServerGrpcChannelFactory(
-        ClientIdentity clientIdentity,
+    public AxonServerGrpcChannelFactory(ClientIdentity clientIdentity,
         IAxonServerAuthentication authentication,
         IReadOnlyList<DnsEndPoint> routingServers,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        GrpcChannelOptions? grpcChannelOptions)
     {
-        _clientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
-        _authentication = authentication ?? throw new ArgumentNullException(nameof(authentication));
-        _routingServers = routingServers ?? throw new ArgumentNullException(nameof(routingServers));
-        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        ClientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
+        Authentication = authentication ?? throw new ArgumentNullException(nameof(authentication));
+        RoutingServers = routingServers ?? throw new ArgumentNullException(nameof(routingServers));
+        LoggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        GrpcChannelOptions = grpcChannelOptions;
         _logger = loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>();
     }
+    
+    public ClientIdentity ClientIdentity { get; }
+    public IAxonServerAuthentication Authentication { get; }
+    public IReadOnlyList<DnsEndPoint> RoutingServers { get; }
+    public ILoggerFactory LoggerFactory { get; }
+    public GrpcChannelOptions? GrpcChannelOptions { get; }
 
     public async Task<GrpcChannel?> Create(Context context)
     {
         GrpcChannel? channel = null;
         var index = 0;
-        while (channel == null && index < _routingServers.Count)
+        while (channel == null && index < RoutingServers.Count)
         {
-            var server = _routingServers[index];
+            var server = RoutingServers[index];
             _logger.LogInformation("Requesting connection details from {Host}:{Port}", server.Host, server.Port);
-            var candidate = GrpcChannel.ForAddress(server.ToUri(), new GrpcChannelOptions
-            {
-                LoggerFactory = _loggerFactory
-            });
+            var candidate = GrpcChannel.ForAddress(server.ToUri(), GrpcChannelOptions ?? new GrpcChannelOptions());
             var callInvoker = candidate.Intercept(metadata =>
             {
-                _authentication.WriteTo(metadata);
+                Authentication.WriteTo(metadata);
                 context.WriteTo(metadata);
                 return metadata;
             });
@@ -49,7 +49,7 @@ public class AxonServerGrpcChannelFactory
             {
                 var service = new PlatformService.PlatformServiceClient(callInvoker);
                 var info = await service.GetPlatformServerAsync(
-                    _clientIdentity.ToClientIdentification()
+                    ClientIdentity.ToClientIdentification()
                     //, new CallOptions(deadline: DateTime.Now)
                 );
                 _logger.LogDebug("Received PlatformInfo suggesting [{NodeName}] ({Host}:{Port}), {SameConnection}",
@@ -72,10 +72,7 @@ public class AxonServerGrpcChannelFactory
                         info.Primary.HostName,
                         info.Primary.GrpcPort);
                     var primaryServer = new DnsEndPoint(info.Primary.HostName, info.Primary.GrpcPort);
-                    channel = GrpcChannel.ForAddress(primaryServer.ToUri(), new GrpcChannelOptions
-                    {
-                        LoggerFactory = _loggerFactory
-                    });
+                    channel = GrpcChannel.ForAddress(primaryServer.ToUri(), GrpcChannelOptions ?? new GrpcChannelOptions());
                 }
             }
             catch (Exception exception)

@@ -42,6 +42,7 @@ public class EmbeddedAxonServer : IAxonServer
         var builder = new Builder()
             .UseContainer()
             .UseImage("axoniq/axonserver")
+            .RemoveVolumesOnDispose()
             .ExposePort(8024)
             .ExposePort(8124)
             .Mount(_serverFiles.FullName, "/config", MountType.ReadOnly)
@@ -191,6 +192,13 @@ public class EmbeddedAxonServer : IAxonServer
             KeepAlive =
             {
                 HeartbeatEnabled = true
+            },
+            Logging =
+            {
+                LogLevels = new []
+                {
+                    new KeyValuePair<string, string>("io.axoniq.axonserver", "DEBUG") 
+                }
             }
         };
         return new EmbeddedAxonServer(properties, logger);

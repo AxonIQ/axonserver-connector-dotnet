@@ -1,7 +1,6 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using Microsoft.Extensions.Logging;
 using Xunit.Abstractions;
-using Xunit.Sdk;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 

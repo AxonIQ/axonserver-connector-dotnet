@@ -1,5 +1,4 @@
 using Grpc.Core;
-using Grpc.Core.Interceptors;
 
 namespace AxonIQ.AxonServer.Connector;
 

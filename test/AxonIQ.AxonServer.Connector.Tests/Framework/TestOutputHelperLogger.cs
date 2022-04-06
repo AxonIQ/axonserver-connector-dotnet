@@ -6,15 +6,25 @@ namespace AxonIQ.AxonServer.Connector.Tests.Framework;
 public class TestOutputHelperLogger : ILogger
 {
     private readonly ITestOutputHelper _output;
+    private readonly string? _categoryName;
 
     public TestOutputHelperLogger(ITestOutputHelper output)
     {
         _output = output ?? throw new ArgumentNullException(nameof(output));
+        _categoryName = null;
     }
     
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+    public TestOutputHelperLogger(ITestOutputHelper output, string categoryName)
     {
-        _output.WriteLine($"[{logLevel.ToString()}]:{formatter(state, exception)}");
+        _output = output ?? throw new ArgumentNullException(nameof(output));
+        _categoryName = categoryName ?? throw new ArgumentNullException(nameof(categoryName));
+    }
+    
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        _output.WriteLine(_categoryName != null
+            ? $"[{logLevel.ToString()}]:{_categoryName}:{formatter(state, exception)}"
+            : $"[{logLevel.ToString()}]:{formatter(state, exception)}");
     }
 
     public bool IsEnabled(LogLevel logLevel)

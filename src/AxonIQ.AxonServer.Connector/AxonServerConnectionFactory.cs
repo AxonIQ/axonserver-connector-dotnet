@@ -1,11 +1,15 @@
 using System.Collections.Concurrent;
 using System.Net;
+using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
 public class AxonServerConnectionFactory
 {
-    private readonly ConcurrentDictionary<Context, AxonServerConnection> _connections;
+    private readonly AxonServerGrpcChannelFactory _channelFactory;
+    private readonly Scheduler _scheduler;
+    private readonly ConcurrentDictionary<Context, Lazy<AxonServerConnection>> _connections;
+    private readonly PermitCount _commandPermits;
 
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
@@ -16,22 +20,37 @@ public class AxonServerConnectionFactory
             options.ComponentName, options.ClientInstanceId, options.ClientTags, new Version(1, 0));
         RoutingServers = options.RoutingServers;
         Authentication = options.Authentication;
+        LoggerFactory = options.LoggerFactory;
 
-        _connections = new ConcurrentDictionary<Context, AxonServerConnection>();
+        _scheduler = new Scheduler(
+            options.Clock, 
+            TimeSpan.FromMilliseconds(100),
+            options.LoggerFactory.CreateLogger<Scheduler>());
+
+        _channelFactory =
+            new AxonServerGrpcChannelFactory(
+                ClientIdentity, 
+                Authentication, 
+                RoutingServers, 
+                options.LoggerFactory,
+                options.GrpcChannelOptions);
+
+        _commandPermits = options.CommandPermits;
+
+        _connections = new ConcurrentDictionary<Context, Lazy<AxonServerConnection>>();
     }
 
     public ClientIdentity ClientIdentity { get; }
-    public IReadOnlyCollection<DnsEndPoint> RoutingServers { get; }
+    public IReadOnlyList<DnsEndPoint> RoutingServers { get; }
     public IAxonServerAuthentication Authentication { get; }
+    public ILoggerFactory LoggerFactory { get; }
 
-    public Task<AxonServerConnection> Connect(Context context)
+    public async Task<IAxonServerConnection> Connect(Context context)
     {
-        //Note: The valueFactory is not thread safe, but in the odd case of a race,
-        //the instances that lost the race will be garbage collected anyway (they don't hold any precious resources). 
-        return Task.FromResult(_connections.GetOrAdd(context,
-            _ => new AxonServerConnection(
-                ClientIdentity,
-                RoutingServers,
-                context)));
+        var connection = _connections.GetOrAdd(context,
+            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _scheduler, _commandPermits, LoggerFactory)))
+            .Value;
+        await connection.Connect();
+        return connection;
     }
 }

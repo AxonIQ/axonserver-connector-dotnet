@@ -107,6 +107,10 @@ public class EmbeddedAxonCluster : IAxonCluster
             {
                 AccessControlEnabled = false,
                 AccessControlInternalToken = Guid.NewGuid().ToString("N")
+            },
+            KeepAlive =
+            {
+                HeartbeatEnabled = true
             }
         }; 
         var node1 = cluster.Clone();
@@ -229,6 +233,10 @@ public class EmbeddedAxonCluster : IAxonCluster
                 AccessControlEnabled = true,
                 AccessControlInternalToken = Guid.NewGuid().ToString("N"),
                 AccessControlSystemToken = Guid.NewGuid().ToString("N")
+            },
+            KeepAlive =
+            {
+                HeartbeatEnabled = true
             }
         };
         var node1 = cluster.Clone();

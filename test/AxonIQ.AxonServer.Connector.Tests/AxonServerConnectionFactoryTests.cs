@@ -1,5 +1,6 @@
 using System.Net;
 using AutoFixture;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
@@ -45,5 +46,6 @@ public class AxonServerConnectionFactoryTests
         Assert.Equal(servers, sut.RoutingServers);
         var authentication = Assert.IsType<TokenBasedServerAuthentication>(sut.Authentication);
         Assert.Equal(token, authentication.Token);
+        Assert.IsType<NullLoggerFactory>(sut.LoggerFactory);
     }
 }
