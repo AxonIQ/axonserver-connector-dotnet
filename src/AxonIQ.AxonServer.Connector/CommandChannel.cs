@@ -154,12 +154,12 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                 case State.Connected connected:
                                     subscriptions.RegisterCommandHandler(
                                         subscribe.CommandHandlerId,
-                                        subscribe.CompletionSource);
+                                        subscribe.CompletionSource,
+                                        subscribe.LoadFactor,
+                                        subscribe.Handler);
 
-                                    foreach (var command in subscribe.Commands)
+                                    foreach (var (subscriptionId, command) in subscribe.SubscribedCommands)
                                     {
-                                        var subscriptionId = SubscriptionId.New();
-
                                         _logger.LogInformation(
                                             "Registered handler for command '{CommandName}' in context '{Context}'",
                                             command.ToString(), _context.ToString());
@@ -167,11 +167,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                         var instructionId = subscriptions.SubscribeToCommand(
                                             subscriptionId,
                                             subscribe.CommandHandlerId,
-                                            command,
-                                            subscribe.LoadFactor,
-                                            subscribe.Handler);
-                                        // if (instructionId.HasValue)
-                                        // {
+                                            command);
                                         var request = new CommandProviderOutbound
                                         {
                                             InstructionId = instructionId.ToString(),
@@ -185,7 +181,6 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                             }
                                         };
                                         await connected.Stream.RequestStream.WriteAsync(request);
-                                        // }
                                     }
 
                                     break;
@@ -197,8 +192,57 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                 "Unable to subscribe commands and handler: no connection to AxonServer")))
                                     {
                                         _logger.LogWarning(
-                                            "Could not fault the completion source of command handler '{CommandHandlerId}'",
+                                            "Could not fault the subscribe completion source of command handler '{CommandHandlerId}'",
                                             subscribe.CommandHandlerId.ToString());
+                                    }
+
+                                    break;
+                            }
+
+                            break;
+                        case Protocol.UnsubscribeCommandHandler unsubscribe:
+                            switch (_state)
+                            {
+                                case State.Connected connected:
+                                    subscriptions.UnregisterCommandHandler(
+                                        unsubscribe.CommandHandlerId,
+                                        unsubscribe.CompletionSource);
+                                    
+                                    foreach (var (subscriptionId, command) in unsubscribe.SubscribedCommands)
+                                    {
+                                        var instructionId = subscriptions.UnsubscribeFromCommand(subscriptionId);
+                                        if (instructionId.HasValue)
+                                        {
+                                            _logger.LogInformation(
+                                                "Unregistered handler for command '{CommandName}' in context '{Context}'",
+                                                command.ToString(), _context.ToString());
+
+                                            var request = new CommandProviderOutbound
+                                            {
+                                                InstructionId = instructionId.ToString(),
+                                                Unsubscribe = new CommandSubscription
+                                                {
+                                                    MessageId = instructionId.ToString(),
+                                                    Command = command.ToString(),
+                                                    ClientId = ClientIdentity.ClientInstanceId.ToString(),
+                                                    ComponentName = ClientIdentity.ComponentName.ToString()
+                                                }
+                                            };
+                                            await connected.Stream.RequestStream.WriteAsync(request);
+                                        }
+                                    }
+
+                                    break;
+                                case State.Disconnected:
+                                    if (!unsubscribe.CompletionSource.Fault(
+                                            new AxonServerException(
+                                                ClientIdentity,
+                                                ErrorCategory.Other,
+                                                "Unable to unsubscribe commands and handler: no connection to AxonServer")))
+                                    {
+                                        _logger.LogWarning(
+                                            "Could not fault the unsubscribe completion source of command handler '{CommandHandlerId}'",
+                                            unsubscribe.CommandHandlerId.ToString());
                                     }
 
                                     break;
@@ -429,6 +473,8 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     public Func<DateTimeOffset> Clock { get; }
     public CommandService.CommandServiceClient Service { get; }
 
+    private record SubscribedCommand(SubscriptionId SubscriptionId, CommandName CommandName);
+    
     private record Protocol
     {
         public record Connect : Protocol;
@@ -441,11 +487,12 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             CommandHandlerId CommandHandlerId,
             Func<Command, CancellationToken, Task<CommandResponse>> Handler,
             LoadFactor LoadFactor,
-            CommandName[] Commands,
+            SubscribedCommand[] SubscribedCommands,
             CountdownCompletionSource CompletionSource) : Protocol;
 
         public record UnsubscribeCommandHandler(
             CommandHandlerId CommandHandlerId,
+            SubscribedCommand[] SubscribedCommands,
             CountdownCompletionSource CompletionSource) : Protocol;
 
         public record Reconnect : Protocol;
@@ -474,15 +521,23 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 nameof(commandNames));
 
         var commandHandlerId = CommandHandlerId.New();
+        var subscribedCommands = commandNames.Select(name => new SubscribedCommand(SubscriptionId.New(), name)).ToArray();
         var subscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
         await _channel.Writer.WriteAsync(new Protocol.Connect());
-        await _channel.Writer.WriteAsync(new Protocol.SubscribeCommandHandler(commandHandlerId, handler, loadFactor,
-            commandNames, subscribeCompletionSource));
+        await _channel.Writer.WriteAsync(new Protocol.SubscribeCommandHandler(
+            commandHandlerId, 
+            handler, 
+            loadFactor,
+            subscribedCommands, 
+            subscribeCompletionSource));
         return new CommandHandlerRegistration(subscribeCompletionSource.Completion, async () =>
         {
             var unsubscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
             await _channel.Writer.WriteAsync(
-                new Protocol.UnsubscribeCommandHandler(commandHandlerId, unsubscribeCompletionSource));
+                new Protocol.UnsubscribeCommandHandler(
+                    commandHandlerId,
+                    subscribedCommands,
+                    unsubscribeCompletionSource));
             await unsubscribeCompletionSource.Completion;
         });
     }

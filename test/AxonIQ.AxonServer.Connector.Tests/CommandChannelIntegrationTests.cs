@@ -92,4 +92,49 @@ public class CommandChannelIntegrationTests
         Assert.Equal(responseId.ToString(), result.MessageIdentifier);
         Assert.Equal(requestId.ToString(), result.RequestIdentifier);
     }
+    
+    [Fact]
+    public async Task UnregisterCommandHandlerHasExpectedResult()
+    {
+        var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilConnected();
+        
+        var sut = connection.CommandChannel;
+
+        var requestId = InstructionId.New();
+        var responseId = InstructionId.New();
+        var commandName = _fixture.Create<CommandName>();
+        var registration = await sut.RegisterCommandHandler((command, ct) => Task.FromResult(new CommandResponse
+        {
+            MessageIdentifier = responseId.ToString(),
+            Payload = new SerializedObject
+            {
+                Type = "pong",
+                Revision = "0",
+                Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+            }
+            
+        }), new LoadFactor(1), commandName);
+
+        await registration.WaitUntilCompleted();
+
+        var result = await sut.SendCommand(new Command
+        {
+            Name = commandName.ToString(),
+            MessageIdentifier = requestId.ToString()
+        }, CancellationToken.None);
+                
+        Assert.Equal(responseId.ToString(), result.MessageIdentifier);
+        Assert.Equal(requestId.ToString(), result.RequestIdentifier);
+
+        await registration.DisposeAsync();
+        
+        var response = await sut.SendCommand(new Command
+        {
+            Name = commandName.ToString(),
+            MessageIdentifier = requestId.ToString()
+        }, CancellationToken.None);
+        
+        Assert.Equal(response.ErrorCode, ErrorCategory.NoHandlerForCommand.ToString());
+    }
 }
