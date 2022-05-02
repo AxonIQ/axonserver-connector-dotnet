@@ -37,7 +37,7 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="YamlDotNet" Version="11.2.1" />
-        <PackageReference Include="Yarp.ReverseProxy" Version="1.0.0" />
+        <PackageReference Include="Yarp.ReverseProxy" Version="1.1.0" />
     </ItemGroup>
 
 </Project>
