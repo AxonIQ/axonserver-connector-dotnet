@@ -1,6 +1,6 @@
 using System.Threading.Channels;
-using AxonIQ.AxonServer.Grpc;
-using AxonIQ.AxonServer.Grpc.Command;
+using Io.Axoniq.Axonserver.Grpc;
+using Io.Axoniq.Axonserver.Grpc.Command;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 
@@ -18,7 +18,6 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     private readonly Task _protocol;
 
     private State _state;
-    private readonly PermitCount _permitCount;
 
     public CommandChannel(
         ClientIdentity clientIdentity,
@@ -41,7 +40,8 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         _permitsBatch = permitsBatch;
         Service = new CommandService.CommandServiceClient(callInvoker);
         _logger = loggerFactory.CreateLogger<CommandChannel>();
-        _permitCount = new PermitCount(500);
+        _permits = permits;
+        _permitsBatch = permitsBatch;
 
         _state = new State.Disconnected();
         _channel = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
@@ -85,6 +85,56 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         }
     }
 
+    private async Task EnsureConnected(CancellationToken ct)
+    {
+        switch (_state)
+        {
+            case State.Disconnected:
+                try
+                {
+                    var stream = Service.OpenStream(cancellationToken: ct);
+                    if (stream != null)
+                    {
+                        _logger.LogInformation(
+                            "Opened command stream for context '{Context}'",
+                            _context);
+
+                        await stream.RequestStream.WriteAsync(new CommandProviderOutbound
+                        {
+                            FlowControl = new FlowControl
+                            {
+                                ClientId = ClientIdentity.ClientInstanceId.ToString(),
+                                Permits = _permits.ToInt64()
+                            }
+                        });
+
+                        _state = new State.Connected(
+                            stream,
+                            ConsumeResponseStream(stream.ResponseStream, ct)
+                        );
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Could not open command stream for context '{Context}'",
+                            _context);
+                    }
+                }
+                catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
+                {
+                    _logger.LogWarning(
+                        "Could not open command stream for context '{Context}': no connection to AxonServer",
+                        _context.ToString());
+                }
+
+                break;
+            case State.Connected:
+                _logger.LogDebug("CommandChannel for context '{Context}' is already connected",
+                    _context.ToString());
+                break;
+        }
+    }
+
     private async Task RunChannelProtocol(CancellationToken ct)
     {
         var subscriptions = new CommandSubscriptions(ClientIdentity, Clock);
@@ -100,55 +150,11 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                     switch (message)
                     {
                         case Protocol.Connect:
-                            switch (_state)
-                            {
-                                case State.Disconnected:
-                                    try
-                                    {
-                                        var stream = Service.OpenStream(cancellationToken: ct);
-                                        if (stream != null)
-                                        {
-                                            _logger.LogInformation(
-                                                "Opened command stream for context '{Context}'",
-                                                _context);
-
-                                            await stream.RequestStream.WriteAsync(new CommandProviderOutbound
-                                            {
-                                                FlowControl = new FlowControl
-                                                {
-                                                    ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                                    Permits = _permitCount.ToInt64()
-                                                }
-                                            });
-
-                                            _state = new State.Connected(
-                                                stream,
-                                                ConsumeResponseStream(stream.ResponseStream, ct)
-                                            );
-                                        }
-                                        else
-                                        {
-                                            _logger.LogWarning(
-                                                "Could not open command stream for context '{Context}'",
-                                                _context);
-                                        }
-                                    }
-                                    catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
-                                    {
-                                        _logger.LogWarning(
-                                            "Could not open command stream for context '{Context}': no connection to AxonServer",
-                                            _context.ToString());
-                                    }
-
-                                    break;
-                                case State.Connected:
-                                    _logger.LogDebug("CommandChannel for context '{Context}' is already connected",
-                                        _context.ToString());
-                                    break;
-                            }
+                            await EnsureConnected(ct);
 
                             break;
                         case Protocol.SubscribeCommandHandler subscribe:
+                            await EnsureConnected(ct);
                             switch (_state)
                             {
                                 case State.Connected connected:
@@ -523,7 +529,6 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         var commandHandlerId = CommandHandlerId.New();
         var subscribedCommands = commandNames.Select(name => new SubscribedCommand(SubscriptionId.New(), name)).ToArray();
         var subscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
-        await _channel.Writer.WriteAsync(new Protocol.Connect());
         await _channel.Writer.WriteAsync(new Protocol.SubscribeCommandHandler(
             commandHandlerId, 
             handler, 
@@ -582,7 +587,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             throw new AxonServerException(
                 ClientIdentity,
                 ErrorCategory.CommandDispatchError,
-                "An error occurred while attempting to dispatch a message",
+                "An error occurred while attempting to dispatch a command",
                 exception);
         }
     }

@@ -11,6 +11,10 @@ public interface IAxonServerConnection : IAsyncDisposable
     /// </summary>
     ICommandChannel CommandChannel { get; }
     /// <summary>
+    /// Provides access to the command channel set up with Axon Server.
+    /// </summary>
+    IQueryChannel QueryChannel { get; }
+    /// <summary>
     /// Requests to establish a connection with Axon Server.
     /// </summary>
     /// <returns>A <see cref="Task"/> that confirms the request to connect has been accepted.</returns>

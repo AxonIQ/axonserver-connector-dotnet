@@ -1,6 +1,6 @@
 using AutoFixture;
-using AxonIQ.AxonServer.Grpc;
-using AxonIQ.AxonServer.Grpc.Command;
+using Io.Axoniq.Axonserver.Grpc;
+using Io.Axoniq.Axonserver.Grpc.Command;
 using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
@@ -498,5 +498,42 @@ public class CommandSubscriptionsTests
             sut.UnsubscribeCompletionSources);
         Assert.Empty(sut.UnsubscribeInstructions);
         Assert.Empty(sut.AllCommandHandlers);
+    }
+    
+    [Fact]
+    public void UnsubscribeToCommandHasExpectedResult()
+    {
+        var sut = new CommandSubscriptions(_clientIdentity, _clock);
+        var subscriptionId = _fixture.Create<SubscriptionId>();
+        var handlerId = _fixture.Create<CommandHandlerId>();
+        var command = _fixture.Create<CommandName>();
+        
+        var subscribeInstructionId = sut.SubscribeToCommand(
+            subscriptionId,
+            handlerId,
+            command
+        );
+        
+        sut.Acknowledge(new InstructionAck
+        {
+            Success = true, InstructionId = subscribeInstructionId.ToString()
+        });
+        
+        var unsubscribeInstructionId = sut.UnsubscribeFromCommand(subscriptionId);
+
+        Assert.True(unsubscribeInstructionId.HasValue);
+        Assert.Equal(
+            new[]
+            {
+                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId,
+                    new CommandSubscriptions.Subscription(
+                        handlerId,
+                        subscriptionId,
+                        command
+                    ))
+            }, sut.AllSubscriptions);
+        Assert.Equal(
+            new[] { new KeyValuePair<InstructionId, SubscriptionId>(unsubscribeInstructionId!.Value, subscriptionId) },
+            sut.UnsubscribeInstructions);
     }
 }

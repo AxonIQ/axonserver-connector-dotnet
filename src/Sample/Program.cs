@@ -1,8 +1,7 @@
-﻿using System.Net;
-using AxonIQ.AxonServer.Connector;
+﻿using AxonIQ.AxonServer.Connector;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
-using AxonIQ.AxonServer.Grpc;
-using AxonIQ.AxonServer.Grpc.Command;
+using Io.Axoniq.Axonserver.Grpc;
+using Io.Axoniq.Axonserver.Grpc.Command;
 using Google.Protobuf;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

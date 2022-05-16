@@ -1,5 +1,5 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
-using AxonIQ.AxonServer.Grpc;
+using Io.Axoniq.Axonserver.Grpc;
 using Xunit;
 using Xunit.Abstractions;
 
