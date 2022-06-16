@@ -51,8 +51,8 @@ public class CommandSubscriptions
     }
         
     public InstructionId SubscribeToCommand(
-        SubscriptionId subscriptionId,
         CommandHandlerId commandHandlerId,
+        SubscriptionId subscriptionId,
         CommandName command)
     {
         if (!AllSubscriptions.ContainsKey(subscriptionId))

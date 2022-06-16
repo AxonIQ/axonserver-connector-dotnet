@@ -59,7 +59,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         {
             await foreach (var response in reader.ReadAllAsync(ct))
             {
-                await _channel.Writer.WriteAsync(new Protocol.ReceivedServerMessage(response), ct);
+                await _channel.Writer.WriteAsync(new Protocol.ReceiveCommandProviderInbound(response), ct);
             }
         }
         catch (ObjectDisposedException exception)
@@ -170,10 +170,8 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                             "Registered handler for command '{CommandName}' in context '{Context}'",
                                             command.ToString(), _context.ToString());
 
-                                        var instructionId = subscriptions.SubscribeToCommand(
-                                            subscriptionId,
-                                            subscribe.CommandHandlerId,
-                                            command);
+                                        var instructionId = subscriptions.SubscribeToCommand(subscribe.CommandHandlerId,
+                                            subscriptionId, command);
                                         var request = new CommandProviderOutbound
                                         {
                                             InstructionId = instructionId.ToString(),
@@ -271,16 +269,16 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.ReceivedServerMessage received:
+                        case Protocol.ReceiveCommandProviderInbound receive:
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    switch (received.Message.RequestCase)
+                                    switch (receive.Message.RequestCase)
                                     {
                                         case CommandProviderInbound.RequestOneofCase.None:
                                             break;
                                         case CommandProviderInbound.RequestOneofCase.Ack:
-                                            subscriptions.Acknowledge(received.Message.Ack);
+                                            subscriptions.Acknowledge(receive.Message.Ack);
                                             
                                             if (flowController.Increment())
                                             {
@@ -296,24 +294,24 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                             break;
                                         case CommandProviderInbound.RequestOneofCase.Command:
                                             if (subscriptions.ActiveHandlers.TryGetValue(
-                                                    new CommandName(received.Message.Command.Name), out var handler))
+                                                    new CommandName(receive.Message.Command.Name), out var handler))
                                             {
-                                                if (received.Message.InstructionId != null)
+                                                if (receive.Message.InstructionId != null)
                                                 {
                                                     await connected.Stream.RequestStream.WriteAsync(
                                                         new CommandProviderOutbound
                                                         {
                                                             Ack = new InstructionAck
                                                             {
-                                                                InstructionId = received.Message.InstructionId,
+                                                                InstructionId = receive.Message.InstructionId,
                                                                 Success = true
                                                             }
                                                         }
                                                     );
                                                 }
 
-                                                commandsInFlight.Add(received.Message.Command,
-                                                    handler(received.Message.Command, ct)
+                                                commandsInFlight.Add(receive.Message.Command,
+                                                    handler(receive.Message.Command, ct)
                                                     .ContinueWith(
                                                         continuation =>
                                                         {
@@ -333,9 +331,9 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                                             Location = "Client",
                                                                             Message = continuation.Exception?.Message ?? ""
                                                                         },
-                                                                        RequestIdentifier = received.Message.Command.MessageIdentifier
+                                                                        RequestIdentifier = receive.Message.Command.MessageIdentifier
                                                                     };
-                                                                    if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(received.Message.Command, response)))
+                                                                    if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(receive.Message.Command, response)))
                                                                     {
                                                                         _logger.LogWarning(
                                                                             "Could not tell the command channel to send the command response after handling a command was completed faulty because the channel refused to accept the message");
@@ -346,9 +344,9 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                                     var response =
                                                                         new CommandResponse(continuation.Result)
                                                                         {
-                                                                            RequestIdentifier = received.Message.Command.MessageIdentifier
+                                                                            RequestIdentifier = receive.Message.Command.MessageIdentifier
                                                                         };
-                                                                    if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(received.Message.Command, response)))
+                                                                    if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(receive.Message.Command, response)))
                                                                     {
                                                                         _logger.LogWarning(
                                                                             "Could not tell the command channel to send the command response after handling a command was completed successfully because the channel refused to accept the message");
@@ -369,14 +367,14 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                             }
                                             else
                                             {
-                                                if (received.Message.InstructionId != null)
+                                                if (receive.Message.InstructionId != null)
                                                 {
                                                     await connected.Stream.RequestStream.WriteAsync(
                                                         new CommandProviderOutbound
                                                         {
                                                             Ack = new InstructionAck
                                                             {
-                                                                InstructionId = received.Message.InstructionId,
+                                                                InstructionId = receive.Message.InstructionId,
                                                                 Success = false,
                                                                 Error = new ErrorMessage()
                                                             }
@@ -390,7 +388,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                         CommandResponse = new CommandResponse
                                                         {
                                                             RequestIdentifier =
-                                                                received.Message.Command.MessageIdentifier,
+                                                                receive.Message.Command.MessageIdentifier,
                                                             ErrorCode = ErrorCategory.NoHandlerForCommand.ToString(),
                                                             ErrorMessage = new ErrorMessage
                                                                 { Message = "No Handler for command" }
@@ -418,15 +416,15 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
                             break;
 
-                        case Protocol.SendCommandResponse completed:
+                        case Protocol.SendCommandResponse send:
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    if (commandsInFlight.Remove(completed.Command))
+                                    if (commandsInFlight.Remove(send.Command))
                                     {
                                         await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
                                         {
-                                            CommandResponse = completed.CommandResponse
+                                            CommandResponse = send.CommandResponse
                                         });
 
                                         if (flowController.Increment())
@@ -485,7 +483,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     {
         public record Connect : Protocol;
 
-        public record ReceivedServerMessage(CommandProviderInbound Message) : Protocol;
+        public record ReceiveCommandProviderInbound(CommandProviderInbound Message) : Protocol;
 
         public record SendCommandResponse(Command Command, CommandResponse CommandResponse) : Protocol;
 

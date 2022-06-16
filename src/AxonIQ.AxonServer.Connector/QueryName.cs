@@ -1,10 +1,10 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct CommandName
+public readonly struct QueryName
 {
     private readonly string _value;
 
-    public CommandName(string value)
+    public QueryName(string value)
     {
         if (value == null)
         {
@@ -13,14 +13,14 @@ public readonly struct CommandName
         
         if (value == "")
         {
-            throw new ArgumentException("The command name can not be empty.", nameof(value));
+            throw new ArgumentException("The query name can not be empty.", nameof(value));
         }
 
         _value = value;
     }
     
-    public bool Equals(CommandName other) => other._value.Equals(_value);
-    public override bool Equals(object? obj) => obj is CommandName other && other.Equals(this);
+    public bool Equals(QueryName other) => other._value.Equals(_value);
+    public override bool Equals(object? obj) => obj is QueryName other && other.Equals(this);
     public override int GetHashCode() => HashCode.Combine(_value);
     public override string ToString() => _value;
 }

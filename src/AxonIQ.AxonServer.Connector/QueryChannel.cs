@@ -59,7 +59,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         {
             await foreach (var response in reader.ReadAllAsync(ct))
             {
-                await _channel.Writer.WriteAsync(new Protocol.ReceivedServerMessage(response), ct);
+                await _channel.Writer.WriteAsync(new Protocol.ReceiveQueryProviderInbound(response), ct);
             }
         }
         catch (ObjectDisposedException exception)
@@ -137,9 +137,9 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
 
     private async Task RunChannelProtocol(CancellationToken ct)
     {
-        var subscriptions = new CommandSubscriptions(ClientIdentity, Clock);
+        var subscriptions = new QuerySubscriptions(ClientIdentity, Clock);
         var flowController = new FlowController(_permitsBatch);
-        //var commandsInFlight = new Dictionary<Command, Task>();
+        var queriesInFlight = new Dictionary<QueryRequest, Task>();
         try
         {
             while (await _channel.Reader.WaitToReadAsync(ct))
@@ -158,36 +158,35 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    // subscriptions.RegisterCommandHandler(
-                                    //     subscribe.CommandHandlerId,
-                                    //     subscribe.CompletionSource,
-                                    //     subscribe.LoadFactor,
-                                    //     subscribe.Handler);
-                                    //
-                                    // foreach (var (subscriptionId, command) in subscribe.SubscribedCommands)
-                                    // {
-                                    //     _logger.LogInformation(
-                                    //         "Registered handler for command '{CommandName}' in context '{Context}'",
-                                    //         command.ToString(), _context.ToString());
-                                    //
-                                    //     var instructionId = subscriptions.SubscribeToCommand(
-                                    //         subscriptionId,
-                                    //         subscribe.CommandHandlerId,
-                                    //         command);
-                                    //     var request = new CommandProviderOutbound
-                                    //     {
-                                    //         InstructionId = instructionId.ToString(),
-                                    //         Subscribe = new CommandSubscription
-                                    //         {
-                                    //             MessageId = instructionId.ToString(),
-                                    //             Command = command.ToString(),
-                                    //             LoadFactor = subscribe.LoadFactor.ToInt32(),
-                                    //             ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                    //             ComponentName = ClientIdentity.ComponentName.ToString()
-                                    //         }
-                                    //     };
-                                    //     await connected.Stream.RequestStream.WriteAsync(request);
-                                    // }
+                                    subscriptions.RegisterQueryHandler(
+                                        subscribe.QueryHandlerId,
+                                        subscribe.CompletionSource,
+                                        subscribe.Handler);
+                                    
+                                    foreach (var (subscriptionId, query) in subscribe.SubscribedQueries)
+                                    {
+                                        _logger.LogInformation(
+                                            "Registered handler for query '{Query}' in context '{Context}'",
+                                            query.QueryName.ToString(), _context.ToString());
+                                    
+                                        var instructionId = subscriptions.SubscribeToQuery(
+                                            subscriptionId,
+                                            subscribe.QueryHandlerId,
+                                            query);
+                                        var request = new QueryProviderOutbound
+                                        {
+                                            InstructionId = instructionId.ToString(),
+                                            Subscribe = new QuerySubscription
+                                            {
+                                                MessageId = instructionId.ToString(),
+                                                Query = query.QueryName.ToString(),
+                                                ResultName = query.ResultType,
+                                                ClientId = ClientIdentity.ClientInstanceId.ToString(),
+                                                ComponentName = ClientIdentity.ComponentName.ToString()
+                                            }
+                                        };
+                                        await connected.Stream.RequestStream.WriteAsync(request);
+                                    }
 
                                     break;
                                 case State.Disconnected:
@@ -271,149 +270,16 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.ReceivedServerMessage received:
+                        case Protocol.ReceiveQueryProviderInbound receive:
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    switch (received.Message.RequestCase)
+                                    switch (receive.Message.RequestCase)
                                     {
-                                        // case CommandProviderInbound.RequestOneofCase.None:
-                                        //     break;
-                                        // case CommandProviderInbound.RequestOneofCase.Ack:
-                                        //     subscriptions.Acknowledge(received.Message.Ack);
-                                        //     
-                                        //     if (flowController.Increment())
-                                        //     {
-                                        //         await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
-                                        //         {
-                                        //             FlowControl = new FlowControl
-                                        //             {
-                                        //                 ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                        //                 Permits = _permitsBatch.ToInt64()
-                                        //             }
-                                        //         });
-                                        //     }
-                                        //     break;
-                                        // case CommandProviderInbound.RequestOneofCase.Command:
-                                        //     if (subscriptions.ActiveHandlers.TryGetValue(
-                                        //             new CommandName(received.Message.Command.Name), out var handler))
-                                        //     {
-                                        //         if (received.Message.InstructionId != null)
-                                        //         {
-                                        //             await connected.Stream.RequestStream.WriteAsync(
-                                        //                 new CommandProviderOutbound
-                                        //                 {
-                                        //                     Ack = new InstructionAck
-                                        //                     {
-                                        //                         InstructionId = received.Message.InstructionId,
-                                        //                         Success = true
-                                        //                     }
-                                        //                 }
-                                        //             );
-                                        //         }
-                                        //
-                                        //         commandsInFlight.Add(received.Message.Command,
-                                        //             handler(received.Message.Command, ct)
-                                        //             .ContinueWith(
-                                        //                 continuation =>
-                                        //                 {
-                                        //                     if (!continuation.IsCanceled)
-                                        //                     {
-                                        //                         if (continuation.IsFaulted)
-                                        //                         {
-                                        //                             var response = new CommandResponse
-                                        //                             {
-                                        //                                 ErrorCode = ErrorCategory.CommandExecutionError.ToString(),
-                                        //                                 ErrorMessage = new ErrorMessage
-                                        //                                 {
-                                        //                                     Details =
-                                        //                                     {
-                                        //                                         continuation.Exception?.ToString() ?? ""
-                                        //                                     },
-                                        //                                     Location = "Client",
-                                        //                                     Message = continuation.Exception?.Message ?? ""
-                                        //                                 },
-                                        //                                 RequestIdentifier = received.Message.Command.MessageIdentifier
-                                        //                             };
-                                        //                             if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(received.Message.Command, response)))
-                                        //                             {
-                                        //                                 _logger.LogWarning(
-                                        //                                     "Could not tell the command channel to send the command response after handling a command was completed faulty because the channel refused to accept the message");
-                                        //                             }
-                                        //                         }
-                                        //                         else if (continuation.IsCompletedSuccessfully)
-                                        //                         {
-                                        //                             var response =
-                                        //                                 new CommandResponse(continuation.Result)
-                                        //                                 {
-                                        //                                     RequestIdentifier = received.Message.Command.MessageIdentifier
-                                        //                                 };
-                                        //                             if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(received.Message.Command, response)))
-                                        //                             {
-                                        //                                 _logger.LogWarning(
-                                        //                                     "Could not tell the command channel to send the command response after handling a command was completed successfully because the channel refused to accept the message");
-                                        //                             }
-                                        //                         }
-                                        //                         else
-                                        //                         {
-                                        //                             _logger.LogWarning(
-                                        //                                 "Handling a command completed in an unexpected way and a response will not be sent");
-                                        //                         }
-                                        //                     }
-                                        //                     else
-                                        //                     {
-                                        //                         _logger.LogDebug(
-                                        //                             "Handling a command was cancelled and a response will not be sent");
-                                        //                     }
-                                        //                 }, ct));
-                                        //     }
-                                        //     else
-                                        //     {
-                                        //         if (received.Message.InstructionId != null)
-                                        //         {
-                                        //             await connected.Stream.RequestStream.WriteAsync(
-                                        //                 new CommandProviderOutbound
-                                        //                 {
-                                        //                     Ack = new InstructionAck
-                                        //                     {
-                                        //                         InstructionId = received.Message.InstructionId,
-                                        //                         Success = false,
-                                        //                         Error = new ErrorMessage()
-                                        //                     }
-                                        //                 }
-                                        //             );
-                                        //         }
-                                        //
-                                        //         await connected.Stream.RequestStream.WriteAsync(
-                                        //             new CommandProviderOutbound
-                                        //             {
-                                        //                 CommandResponse = new CommandResponse
-                                        //                 {
-                                        //                     RequestIdentifier =
-                                        //                         received.Message.Command.MessageIdentifier,
-                                        //                     ErrorCode = ErrorCategory.NoHandlerForCommand.ToString(),
-                                        //                     ErrorMessage = new ErrorMessage
-                                        //                         { Message = "No Handler for command" }
-                                        //                 }
-                                        //             });
-                                        //         
-                                        //         if (flowController.Increment())
-                                        //         {
-                                        //             await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
-                                        //             {
-                                        //                 FlowControl = new FlowControl
-                                        //                 {
-                                        //                     ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                        //                     Permits = _permitsBatch.ToInt64()
-                                        //                 }
-                                        //             });
-                                        //         }
-                                        //     }
-                                        //     break;
                                         case QueryProviderInbound.RequestOneofCase.None:
                                             break;
                                         case QueryProviderInbound.RequestOneofCase.Ack:
-                                            subscriptions.Acknowledge(received.Message.Ack);
+                                            subscriptions.Acknowledge(receive.Message.Ack);
                                             
                                             if (flowController.Increment())
                                             {
@@ -428,9 +294,36 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                             }
                                             break;
                                         case QueryProviderInbound.RequestOneofCase.Query:
+                                            if (subscriptions.ActiveHandlers.TryGetValue(
+                                                    new QueryName(receive.Message.Query.Query), out var handlers))
+                                            {
+                                                foreach (var handler in handlers)
+                                                {
+                                                    queriesInFlight.Add(receive.Message.Query,
+                                                        handler.Handle(receive.Message.Query, new QueryResponseChannel(
+                                                            receive.Message.Query,
+                                                            instruction =>
+                                                                _channel.Writer.WriteAsync(
+                                                                    new Protocol.SendQueryProviderOutbound(instruction),
+                                                                    ct))));
+                                                }
+                                            }
+                                            else
+                                            {
+                                                await connected.Stream.RequestStream.WriteAsync(new QueryProviderOutbound
+                                                {
+                                                    QueryResponse = new QueryResponse
+                                                    {
+                                                        RequestIdentifier = receive.Message.Query.MessageIdentifier,
+                                                        ErrorCode = ErrorCategory.NoHandlerForQuery.ToString(),
+                                                        ErrorMessage = new ErrorMessage
+                                                            { Message = "No handler for query" }
+                                                    }
+                                                });
+                                            }
                                             break;
                                         case QueryProviderInbound.RequestOneofCase.SubscriptionQueryRequest:
-                                            switch(received.Message.SubscriptionQueryRequest.RequestCase)
+                                            switch(receive.Message.SubscriptionQueryRequest.RequestCase)
                                             {
                                                 case SubscriptionQueryRequest.RequestOneofCase.None:
                                                     break;
@@ -444,9 +337,26 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                     break;
                                             }
                                             break;
+                                        case QueryProviderInbound.RequestOneofCase.QueryCancel:
+                                            break;
+                                        case QueryProviderInbound.RequestOneofCase.QueryFlowControl:
+                                            break;
+                                        default:
+                                            throw new ArgumentOutOfRangeException();
                                     }
 
 
+                                    break;
+                            }
+
+                            break;
+                        case Protocol.SendQueryProviderOutbound send:
+                            switch (_state)
+                            {
+                                case State.Connected connected:
+                                    await connected.Stream.RequestStream.WriteAsync(send.Instruction);
+                                    break;
+                                case State.Disconnected disconnected:
                                     break;
                             }
 
@@ -488,7 +398,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
     {
         public record Connect : Protocol;
 
-        public record ReceivedServerMessage(QueryProviderInbound Message) : Protocol;
+        public record ReceiveQueryProviderInbound(QueryProviderInbound Message) : Protocol;
 
         public record Reconnect : Protocol;
 
@@ -504,6 +414,8 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
             QueryHandlerId QueryHandlerId,
             SubscribedQuery[] SubscribedQueries,
             CountdownCompletionSource CompletionSource) : Protocol;
+
+        public record SendQueryProviderOutbound(QueryProviderOutbound Instruction) : Protocol;
     }
     
     private record SubscribedQuery(SubscriptionId SubscriptionId, QueryDefinition Query);
@@ -557,7 +469,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         try
         {
             var stream = Service.Query(query, cancellationToken: ct);
-            return new DisposableAsyncEnumerable<QueryResponse>(stream.ResponseStream.ReadAllAsync(ct), stream);
+            return new QueryResponseConsumerStream(stream.ResponseStream.ReadAllAsync(ct), stream);
         }
         catch (Exception exception)
         {
