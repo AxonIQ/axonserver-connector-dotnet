@@ -1,5 +1,5 @@
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
-using AxonIQ.AxonServer.Grpc.Control;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Xunit;

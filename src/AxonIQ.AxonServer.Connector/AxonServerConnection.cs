@@ -22,6 +22,7 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly Task _protocol;
     private readonly ControlChannel _controlChannel;
     private readonly CommandChannel _commandChannel;
+    private readonly QueryChannel _queryChannel;
     private readonly EventHandler _onConnectedHandler;
     private readonly EventHandler _onHeartbeatMissedHandler;
 
@@ -30,6 +31,7 @@ public class AxonServerConnection : IAxonServerConnection
         AxonServerGrpcChannelFactory channelFactory,
         IScheduler scheduler,
         PermitCount commandPermits,
+        PermitCount queryPermits,
         ILoggerFactory loggerFactory)
     {
         _context = context;
@@ -60,6 +62,14 @@ public class AxonServerConnection : IAxonServerConnection
             _callInvokerProxy,
             commandPermits,
             new PermitCount(commandPermits.ToInt64() / 4L),
+            _loggerFactory);
+        _queryChannel = new QueryChannel(
+            channelFactory.ClientIdentity,
+            _context,
+            scheduler.Clock,
+            _callInvokerProxy,
+            queryPermits,
+            new PermitCount(queryPermits.ToInt64() / 4L),
             _loggerFactory);
         _onConnectedHandler = (_, _) =>
         {
@@ -271,6 +281,8 @@ public class AxonServerConnection : IAxonServerConnection
     public IControlChannel ControlChannel => _controlChannel;
 
     public ICommandChannel CommandChannel => _commandChannel;
+
+    public IQueryChannel QueryChannel => _queryChannel;
 
     public async ValueTask DisposeAsync()
     {

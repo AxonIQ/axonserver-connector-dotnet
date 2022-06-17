@@ -1,5 +1,5 @@
 using System.Net;
-using AxonIQ.AxonServer.Grpc.Control;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;

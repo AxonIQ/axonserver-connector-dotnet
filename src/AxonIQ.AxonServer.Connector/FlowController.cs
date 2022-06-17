@@ -2,20 +2,20 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class FlowController
 {
-    private readonly PermitCount _threshold;
-    
     private PermitCounter _current;
     
     public FlowController(PermitCount threshold)
     {
-        _threshold = threshold;
+        Threshold = threshold;
         _current = PermitCounter.Zero;
     }
+    
+    public PermitCount Threshold { get; }
 
     public bool Increment()
     {
         _current = _current.Increment();
-        if (_threshold != _current) return false;
+        if (Threshold != _current) return false;
         _current = PermitCounter.Zero;
         return true;
     }

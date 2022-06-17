@@ -1,4 +1,4 @@
-using AxonIQ.AxonServer.Grpc.Command;
+using Io.Axoniq.Axonserver.Grpc.Command;
 
 namespace AxonIQ.AxonServer.Connector;
 

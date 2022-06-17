@@ -10,6 +10,7 @@ public class AxonServerConnectionFactory
     private readonly Scheduler _scheduler;
     private readonly ConcurrentDictionary<Context, Lazy<AxonServerConnection>> _connections;
     private readonly PermitCount _commandPermits;
+    private readonly PermitCount _queryPermits;
 
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
@@ -36,6 +37,7 @@ public class AxonServerConnectionFactory
                 options.GrpcChannelOptions);
 
         _commandPermits = options.CommandPermits;
+        _queryPermits = options.QueryPermits;
 
         _connections = new ConcurrentDictionary<Context, Lazy<AxonServerConnection>>();
     }
@@ -48,7 +50,7 @@ public class AxonServerConnectionFactory
     public async Task<IAxonServerConnection> Connect(Context context)
     {
         var connection = _connections.GetOrAdd(context,
-            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _scheduler, _commandPermits, LoggerFactory)))
+            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _scheduler, _commandPermits, _queryPermits, LoggerFactory)))
             .Value;
         await connection.Connect();
         return connection;

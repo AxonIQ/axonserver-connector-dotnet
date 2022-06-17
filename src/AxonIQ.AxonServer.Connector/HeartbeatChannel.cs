@@ -1,6 +1,6 @@
 using System.Threading.Channels;
-using AxonIQ.AxonServer.Grpc;
-using AxonIQ.AxonServer.Grpc.Control;
+using Io.Axoniq.Axonserver.Grpc;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;

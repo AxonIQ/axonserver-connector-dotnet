@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using AxonIQ.AxonServer.Grpc.Control;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 

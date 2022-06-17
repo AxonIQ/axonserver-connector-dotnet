@@ -1,19 +1,20 @@
-using AxonIQ.AxonServer.Grpc;
-using AxonIQ.AxonServer.Grpc.Query;
+using Io.Axoniq.Axonserver.Grpc;
+using Io.Axoniq.Axonserver.Grpc.Query;
 
 namespace AxonIQ.AxonServer.Connector;
 
 public interface IQueryChannel
 {
-    IAsyncEnumerable<IQueryHandlerRegistration> RegisterQueryHandler(
-        Func<QueryRequest, CancellationToken, Task<IAsyncEnumerable<QueryResponse>>> handler,
+    Task<IQueryHandlerRegistration> RegisterQueryHandler(
+        IQueryHandler handler,
         params QueryDefinition[] queries);
 
-    IAsyncEnumerable<QueryResponse> Query(QueryRequest request);
+    IAsyncEnumerable<QueryResponse> Query(QueryRequest query, CancellationToken ct);
     
-    IAsyncEnumerable<QueryResponse> SubscribeToQuery(
-        QueryRequest request, 
+    Task<IQuerySubscriptionResult> SubscribeToQuery(
+        QueryRequest query, 
         SerializedObject updateType,
-        int bufferSize,
-        int fetchSize);
+        PermitCount bufferSize,
+        PermitCount fetchSize,
+        CancellationToken ct);
 }
