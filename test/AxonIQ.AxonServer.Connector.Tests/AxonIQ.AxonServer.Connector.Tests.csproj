@@ -23,7 +23,7 @@
         <PackageReference Include="AutoFixture.Xunit2" Version="4.17.0" />
         <PackageReference Include="Ductus.FluentDocker" Version="2.10.45" />
         <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.0" />
         <PackageReference Include="NodaTime" Version="3.0.10" />
         <PackageReference Include="NodaTime.Testing" Version="3.0.10" />
         <PackageReference Include="shortid" Version="3.0.1" />
