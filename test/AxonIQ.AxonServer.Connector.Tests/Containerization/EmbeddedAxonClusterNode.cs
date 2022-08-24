@@ -24,10 +24,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         Template = template ?? throw new ArgumentNullException(nameof(template));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         Files = new DirectoryInfo(
-            Path.Combine(Path.GetTempPath(), shortid.ShortId.Generate(new GenerationOptions
-            {
-                UseSpecialCharacters = false
-            })));
+            Path.Combine(Path.GetTempPath(), shortid.ShortId.Generate(new GenerationOptions(useSpecialCharacters: false))));
     }
 
     public SystemProperties Properties { get; }

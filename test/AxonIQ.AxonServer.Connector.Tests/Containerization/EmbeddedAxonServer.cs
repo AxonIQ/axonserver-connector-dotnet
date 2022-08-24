@@ -31,10 +31,7 @@ public class EmbeddedAxonServer : IAxonServer
         _logger.LogDebug("Embedded Axon Server is being initialized");
         
         _serverFiles = new DirectoryInfo(
-            Path.Combine(Path.GetTempPath(), shortid.ShortId.Generate(new GenerationOptions
-            {
-                UseSpecialCharacters = false
-            })));
+            Path.Combine(Path.GetTempPath(), shortid.ShortId.Generate(new GenerationOptions(useSpecialCharacters: false))));
         _serverFiles.Create();
         
         await File.WriteAllTextAsync(Path.Combine(_serverFiles.FullName, "axonserver.properties"), string.Join(Environment.NewLine, Properties.Serialize()));
