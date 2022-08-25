@@ -5,9 +5,22 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>AxonIQ.AxonServer.Connector</RootNamespace>
+        <Authors>Yves Reynhout</Authors>
+        <Copyright>AxonIQ 2022</Copyright>
+        <RepositoryUrl>https://github.com/AxonIQ/axonserver-connector-dotnet</RepositoryUrl>
+        <Company>AxonIQ</Company>
+        <Product>AxonServer</Product>
+        <IsPackable>true</IsPackable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <MinVerDefaultPreReleasePhase>preview</MinVerDefaultPreReleasePhase>
+        <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All"/>
+        <PackageReference Include="MinVer" Version="4.2.0" PrivateAssets="All" />
         <PackageReference Include="Google.Protobuf" Version="3.21.5" />
         <PackageReference Include="Grpc.Net.Client" Version="2.48.0" />
         <PackageReference Include="Grpc.Tools" Version="2.48.0">

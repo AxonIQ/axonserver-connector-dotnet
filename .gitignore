@@ -1,10 +1,11 @@
-bin
-obj
+.attic
+.artifacts
 .env
 .fake
-.ionide
-.attic
 .idea
+.ionide
+bin
+obj
 *.user
 axoniq.license
 axonserver.properties

@@ -23,6 +23,7 @@ jobs:
         run: make ci
         env:
           AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:
