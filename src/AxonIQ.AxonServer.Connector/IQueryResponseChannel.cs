@@ -5,7 +5,18 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface IQueryResponseChannel
 {
-    ValueTask WriteAsync(QueryResponse response);
+    ValueTask SendAsync(QueryResponse response);
+    async ValueTask SendLastAsync(QueryResponse response)
+    {
+        try
+        {
+            await SendAsync(response);
+        }
+        finally
+        {
+            await CompleteAsync();
+        }
+    }
     ValueTask CompleteAsync();
     ValueTask CompleteWithErrorAsync(ErrorMessage errorMessage);
     ValueTask CompleteWithErrorAsync(ErrorCategory errorCategory, ErrorMessage errorMessage);

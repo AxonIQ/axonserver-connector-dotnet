@@ -1,15 +1,19 @@
+using Io.Axoniq.Axonserver.Grpc;
+
 namespace AxonIQ.AxonServer.Connector;
 
 public class FlowController
 {
     private PermitCounter _current;
     
-    public FlowController(PermitCount threshold)
+    public FlowController(PermitCount initial, PermitCount threshold)
     {
+        Initial = initial;
         Threshold = threshold;
         _current = PermitCounter.Zero;
     }
-    
+
+    public PermitCount Initial { get; }
     public PermitCount Threshold { get; }
 
     public bool Increment()

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Channels;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Command;
@@ -8,9 +9,6 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class CommandChannel : ICommandChannel, IAsyncDisposable
 {
-    private readonly Context _context;
-    private readonly PermitCount _permits;
-    private readonly PermitCount _permitsBatch;
     private readonly ILogger<CommandChannel> _logger;
 
     private readonly Channel<Protocol> _channel;
@@ -35,15 +33,14 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
         ClientIdentity = clientIdentity;
         Clock = clock;
-        _context = context;
-        _permits = permits;
-        _permitsBatch = permitsBatch;
+        Context = context;
         Service = new CommandService.CommandServiceClient(callInvoker);
         _logger = loggerFactory.CreateLogger<CommandChannel>();
-        _permits = permits;
-        _permitsBatch = permitsBatch;
 
-        _state = new State.Disconnected();
+        _state = new State.Disconnected(
+            new CommandSubscriptions(clientIdentity, clock),
+            new FlowController(permits, permitsBatch),
+            new Dictionary<Command, CommandTask>());
         _channel = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -89,7 +86,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     {
         switch (_state)
         {
-            case State.Disconnected:
+            case State.Disconnected disconnected:
                 try
                 {
                     var stream = Service.OpenStream(cancellationToken: ct);
@@ -97,49 +94,76 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                     {
                         _logger.LogInformation(
                             "Opened command stream for context '{Context}'",
-                            _context);
+                            Context);
+
+                        foreach (var entry in disconnected.CommandSubscriptions.AllSubscriptions)
+                        {
+                            var handler =
+                                disconnected.CommandSubscriptions.AllCommandHandlers[entry.Value.CommandHandlerId];
+
+                            var instructionId =
+                                disconnected.CommandSubscriptions.SubscribeToCommand(handler.CommandHandlerId,
+                                    entry.Key, entry.Value.Command);
+                            
+                            var request = new CommandProviderOutbound
+                            {
+                                InstructionId = instructionId.ToString(),
+                                Subscribe = new CommandSubscription
+                                {
+                                    MessageId = instructionId.ToString(),
+                                    Command = entry.Value.Command.ToString(),
+                                    LoadFactor = handler.LoadFactor.ToInt32(),
+                                    ClientId = ClientIdentity.ClientInstanceId.ToString(),
+                                    ComponentName = ClientIdentity.ComponentName.ToString()
+                                }
+                            };
+
+                            await stream.RequestStream.WriteAsync(request, ct);
+                        }
 
                         await stream.RequestStream.WriteAsync(new CommandProviderOutbound
                         {
                             FlowControl = new FlowControl
                             {
                                 ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                Permits = _permits.ToInt64()
+                                Permits = disconnected.Flow.Initial.ToInt64()
                             }
-                        });
+                        }, ct);
 
+                        disconnected.Flow.Reset();
+                        
                         _state = new State.Connected(
                             stream,
-                            ConsumeResponseStream(stream.ResponseStream, ct)
+                            ConsumeResponseStream(stream.ResponseStream, ct),
+                            disconnected.CommandSubscriptions,
+                            disconnected.Flow,
+                            disconnected.CommandTasks
                         );
                     }
                     else
                     {
                         _logger.LogWarning(
                             "Could not open command stream for context '{Context}'",
-                            _context);
+                            Context);
                     }
                 }
                 catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
                 {
                     _logger.LogWarning(
                         "Could not open command stream for context '{Context}': no connection to AxonServer",
-                        _context.ToString());
+                        Context.ToString());
                 }
 
                 break;
             case State.Connected:
                 _logger.LogDebug("CommandChannel for context '{Context}' is already connected",
-                    _context.ToString());
+                    Context.ToString());
                 break;
         }
     }
 
     private async Task RunChannelProtocol(CancellationToken ct)
     {
-        var subscriptions = new CommandSubscriptions(ClientIdentity, Clock);
-        var flowController = new FlowController(_permitsBatch);
-        var commandsInFlight = new Dictionary<Command, Task>();
         try
         {
             while (await _channel.Reader.WaitToReadAsync(ct))
@@ -158,7 +182,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    subscriptions.RegisterCommandHandler(
+                                    connected.CommandSubscriptions.RegisterCommandHandler(
                                         subscribe.CommandHandlerId,
                                         subscribe.CompletionSource,
                                         subscribe.LoadFactor,
@@ -168,9 +192,9 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                     {
                                         _logger.LogInformation(
                                             "Registered handler for command '{CommandName}' in context '{Context}'",
-                                            command.ToString(), _context.ToString());
+                                            command.ToString(), Context.ToString());
 
-                                        var instructionId = subscriptions.SubscribeToCommand(subscribe.CommandHandlerId,
+                                        var instructionId = connected.CommandSubscriptions.SubscribeToCommand(subscribe.CommandHandlerId,
                                             subscriptionId, command);
                                         var request = new CommandProviderOutbound
                                         {
@@ -184,7 +208,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                 ComponentName = ClientIdentity.ComponentName.ToString()
                                             }
                                         };
-                                        await connected.Stream.RequestStream.WriteAsync(request);
+                                        await connected.Stream.RequestStream.WriteAsync(request, ct);
                                     }
 
                                     break;
@@ -208,18 +232,18 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    subscriptions.UnregisterCommandHandler(
+                                    connected.CommandSubscriptions.UnregisterCommandHandler(
                                         unsubscribe.CommandHandlerId,
                                         unsubscribe.CompletionSource);
                                     
                                     foreach (var (subscriptionId, command) in unsubscribe.SubscribedCommands)
                                     {
-                                        var instructionId = subscriptions.UnsubscribeFromCommand(subscriptionId);
+                                        var instructionId = connected.CommandSubscriptions.UnsubscribeFromCommand(subscriptionId);
                                         if (instructionId.HasValue)
                                         {
                                             _logger.LogInformation(
                                                 "Unregistered handler for command '{CommandName}' in context '{Context}'",
-                                                command.ToString(), _context.ToString());
+                                                command.ToString(), Context.ToString());
 
                                             var request = new CommandProviderOutbound
                                             {
@@ -232,7 +256,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                     ComponentName = ClientIdentity.ComponentName.ToString()
                                                 }
                                             };
-                                            await connected.Stream.RequestStream.WriteAsync(request);
+                                            await connected.Stream.RequestStream.WriteAsync(request, ct);
                                         }
                                     }
 
@@ -278,22 +302,22 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                         case CommandProviderInbound.RequestOneofCase.None:
                                             break;
                                         case CommandProviderInbound.RequestOneofCase.Ack:
-                                            subscriptions.Acknowledge(receive.Message.Ack);
+                                            connected.CommandSubscriptions.Acknowledge(receive.Message.Ack);
                                             
-                                            if (flowController.Increment())
+                                            if (connected.Flow.Increment())
                                             {
                                                 await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
                                                 {
                                                     FlowControl = new FlowControl
                                                     {
                                                         ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                                        Permits = _permitsBatch.ToInt64()
+                                                        Permits = connected.Flow.Threshold.ToInt64()
                                                     }
-                                                });
+                                                }, ct);
                                             }
                                             break;
                                         case CommandProviderInbound.RequestOneofCase.Command:
-                                            if (subscriptions.ActiveHandlers.TryGetValue(
+                                            if (connected.CommandSubscriptions.ActiveHandlers.TryGetValue(
                                                     new CommandName(receive.Message.Command.Name), out var handler))
                                             {
                                                 if (receive.Message.InstructionId != null)
@@ -306,64 +330,77 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                                 InstructionId = receive.Message.InstructionId,
                                                                 Success = true
                                                             }
-                                                        }
-                                                    );
+                                                        }, ct);
                                                 }
 
-                                                commandsInFlight.Add(receive.Message.Command,
-                                                    handler(receive.Message.Command, ct)
-                                                    .ContinueWith(
-                                                        continuation =>
-                                                        {
-                                                            if (!continuation.IsCanceled)
-                                                            {
-                                                                if (continuation.IsFaulted)
+                                                connected.CommandTasks.Add(receive.Message.Command,
+                                                    new CommandTask(
+                                                        handler(receive.Message.Command, ct)
+                                                            .ContinueWith(
+                                                                continuation =>
                                                                 {
-                                                                    var response = new CommandResponse
+                                                                    if (!continuation.IsCanceled)
                                                                     {
-                                                                        ErrorCode = ErrorCategory.CommandExecutionError.ToString(),
-                                                                        ErrorMessage = new ErrorMessage
+                                                                        if (continuation.IsFaulted)
                                                                         {
-                                                                            Details =
+                                                                            var response = new CommandResponse
                                                                             {
-                                                                                continuation.Exception?.ToString() ?? ""
-                                                                            },
-                                                                            Location = "Client",
-                                                                            Message = continuation.Exception?.Message ?? ""
-                                                                        },
-                                                                        RequestIdentifier = receive.Message.Command.MessageIdentifier
-                                                                    };
-                                                                    if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(receive.Message.Command, response)))
-                                                                    {
-                                                                        _logger.LogWarning(
-                                                                            "Could not tell the command channel to send the command response after handling a command was completed faulty because the channel refused to accept the message");
-                                                                    }
-                                                                }
-                                                                else if (continuation.IsCompletedSuccessfully)
-                                                                {
-                                                                    var response =
-                                                                        new CommandResponse(continuation.Result)
+                                                                                ErrorCode = ErrorCategory
+                                                                                    .CommandExecutionError.ToString(),
+                                                                                ErrorMessage = new ErrorMessage
+                                                                                {
+                                                                                    Details =
+                                                                                    {
+                                                                                        continuation.Exception
+                                                                                            ?.ToString() ?? ""
+                                                                                    },
+                                                                                    Location = "Client",
+                                                                                    Message = continuation.Exception
+                                                                                        ?.Message ?? ""
+                                                                                },
+                                                                                RequestIdentifier =
+                                                                                    receive.Message.Command
+                                                                                        .MessageIdentifier
+                                                                            };
+                                                                            if (!_channel.Writer.TryWrite(
+                                                                                    new Protocol.SendCommandResponse(
+                                                                                        receive.Message.Command,
+                                                                                        response)))
+                                                                            {
+                                                                                _logger.LogWarning(
+                                                                                    "Could not tell the command channel to send the command response after handling a command was completed faulty because the channel refused to accept the message");
+                                                                            }
+                                                                        }
+                                                                        else if (continuation.IsCompletedSuccessfully)
                                                                         {
-                                                                            RequestIdentifier = receive.Message.Command.MessageIdentifier
-                                                                        };
-                                                                    if (!_channel.Writer.TryWrite(new Protocol.SendCommandResponse(receive.Message.Command, response)))
-                                                                    {
-                                                                        _logger.LogWarning(
-                                                                            "Could not tell the command channel to send the command response after handling a command was completed successfully because the channel refused to accept the message");
+                                                                            var response =
+                                                                                new CommandResponse(continuation.Result)
+                                                                                {
+                                                                                    RequestIdentifier =
+                                                                                        receive.Message.Command
+                                                                                            .MessageIdentifier
+                                                                                };
+                                                                            if (!_channel.Writer.TryWrite(
+                                                                                    new Protocol.SendCommandResponse(
+                                                                                        receive.Message.Command,
+                                                                                        response)))
+                                                                            {
+                                                                                _logger.LogWarning(
+                                                                                    "Could not tell the command channel to send the command response after handling a command was completed successfully because the channel refused to accept the message");
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            _logger.LogWarning(
+                                                                                "Handling a command completed in an unexpected way and a response will not be sent");
+                                                                        }
                                                                     }
-                                                                }
-                                                                else
-                                                                {
-                                                                    _logger.LogWarning(
-                                                                        "Handling a command completed in an unexpected way and a response will not be sent");
-                                                                }
-                                                            }
-                                                            else
-                                                            {
-                                                                _logger.LogDebug(
-                                                                    "Handling a command was cancelled and a response will not be sent");
-                                                            }
-                                                        }, ct));
+                                                                    else
+                                                                    {
+                                                                        _logger.LogDebug(
+                                                                            "Handling a command was cancelled and a response will not be sent");
+                                                                    }
+                                                                }, ct)));
                                             }
                                             else
                                             {
@@ -393,18 +430,18 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                             ErrorMessage = new ErrorMessage
                                                                 { Message = "No Handler for command" }
                                                         }
-                                                    });
+                                                    }, ct);
                                                 
-                                                if (flowController.Increment())
+                                                if (connected.Flow.Increment())
                                                 {
                                                     await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
                                                     {
                                                         FlowControl = new FlowControl
                                                         {
                                                             ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                                            Permits = _permitsBatch.ToInt64()
+                                                            Permits = connected.Flow.Threshold.ToInt64()
                                                         }
-                                                    });
+                                                    }, ct);
                                                 }
                                             }
                                             break;
@@ -420,21 +457,21 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    if (commandsInFlight.Remove(send.Command))
+                                    if (connected.CommandTasks.Remove(send.Command))
                                     {
                                         await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
                                         {
                                             CommandResponse = send.CommandResponse
                                         });
 
-                                        if (flowController.Increment())
+                                        if (connected.Flow.Increment())
                                         {
                                             await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
                                             {
                                                 FlowControl = new FlowControl
                                                 {
                                                     ClientId = ClientIdentity.ClientInstanceId.ToString(),
-                                                    Permits = _permitsBatch.ToInt64()
+                                                    Permits = connected.Flow.Threshold.ToInt64()
                                                 }
                                             });
                                         }
@@ -474,6 +511,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     }
 
     public ClientIdentity ClientIdentity { get; }
+    public Context Context { get; }
     public Func<DateTimeOffset> Clock { get; }
     public CommandService.CommandServiceClient Service { get; }
 
@@ -506,11 +544,17 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
     private record State
     {
-        public record Disconnected : State;
+        public record Disconnected(
+            CommandSubscriptions CommandSubscriptions,
+            FlowController Flow,
+            Dictionary<Command, CommandTask> CommandTasks) : State;
 
         public record Connected(
             AsyncDuplexStreamingCall<CommandProviderOutbound, CommandProviderInbound> Stream,
-            Task ConsumeResponseStreamLoop) : State;
+            Task ConsumeResponseStreamLoop,
+            CommandSubscriptions CommandSubscriptions,
+            FlowController Flow,
+            Dictionary<Command, CommandTask> CommandTasks) : State;
     }
 
     public async Task<ICommandHandlerRegistration> RegisterCommandHandler(
@@ -598,5 +642,20 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         await _protocol;
         _channelCancellation.Dispose();
         _protocol.Dispose();
+    }
+}
+
+public class CommandTask : IDisposable
+{
+    private readonly Task _task;
+
+    public CommandTask(Task task)
+    {
+        _task = task ?? throw new ArgumentNullException(nameof(task));
+    }
+
+    public void Dispose()
+    {
+        _task.Dispose();
     }
 }

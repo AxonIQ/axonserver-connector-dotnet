@@ -8,21 +8,29 @@ namespace AxonIQ.AxonServer.Connector;
 public class QuerySubscriptionResult : IQuerySubscriptionResult
 {
     private readonly ClientIdentity _clientIdentity;
+    private readonly QueryRequest _request;
     private readonly AsyncDuplexStreamingCall<SubscriptionQueryRequest, SubscriptionQueryResponse> _call;
     private readonly ILogger<QuerySubscriptionResult> _logger;
-    private readonly TaskCompletionSource<QueryResponse> _initialResult;
+    private readonly TaskCompletionSource<QueryResponse> _initialResultSource;
     private readonly Channel<QueryUpdate> _updateChannel;
     private readonly Task _consumer;
+    private Task<QueryResponse>? _initialResult;
 
-    public QuerySubscriptionResult(ClientIdentity clientIdentity, PermitCount threshold,
+    public QuerySubscriptionResult(
+        ClientIdentity clientIdentity,
+        QueryRequest request,
+        PermitCount threshold,
         AsyncDuplexStreamingCall<SubscriptionQueryRequest, SubscriptionQueryResponse> call,
-        ILogger<QuerySubscriptionResult> logger, CancellationToken ct)
+        ILogger<QuerySubscriptionResult> logger,
+        CancellationToken ct)
     {
         _clientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
+        _request = request ?? throw new ArgumentNullException(nameof(request));
         _call = call ?? throw new ArgumentNullException(nameof(call));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumer = ConsumeResponseStream(_call.ResponseStream, ct);
-        _initialResult = new TaskCompletionSource<QueryResponse>();
+        _initialResultSource = new TaskCompletionSource<QueryResponse>();
+        _initialResult = null;
         _updateChannel = Channel.CreateUnbounded<QueryUpdate>(new UnboundedChannelOptions
             { SingleReader = false, SingleWriter = true, AllowSynchronousContinuations = false });
         Updates = new FlowControlAwareAsyncEnumerable(threshold, _call.RequestStream, _updateChannel.Reader.ReadAllAsync(ct));
@@ -40,7 +48,7 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
                         _logger.LogDebug("Received subscription query initial result. Subscription Id: {SubscriptionId}. Message Id: {MessageId}",
                             response.SubscriptionIdentifier,
                             response.MessageIdentifier);
-                        _initialResult.TrySetResult(response.InitialResult);
+                        _initialResultSource.TrySetResult(response.InitialResult);
                         break;
                     case SubscriptionQueryResponse.ResponseOneofCase.Update:
                         _logger.LogDebug("Received subscription query update. Subscription Id: {SubscriptionId}. Message Id: {MessageId}",
@@ -62,7 +70,7 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
                             response.CompleteExceptionally.ErrorMessage.Message
                         );
                         _updateChannel.Writer.Complete(exception);
-                        _initialResult.TrySetException(exception);
+                        _initialResultSource.TrySetException(exception);
                         break;
                     default:
                         _logger.LogInformation("Received unsupported message from subscription query. It doesn't declare one of the expected types");
@@ -93,29 +101,32 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
         }
     }
 
-    public Task<QueryResponse> InitialResult => _initialResult.Task;
+    private async Task<QueryResponse> GetInitialResultAsync()
+    {
+        if (Interlocked.CompareExchange(ref _initialResult, _initialResultSource.Task, null) == null)
+        {
+            await _call.RequestStream.WriteAsync(new SubscriptionQueryRequest
+            {
+                GetInitialResult = new SubscriptionQuery
+                {
+                    QueryRequest = _request,
+                    SubscriptionIdentifier = _request.MessageIdentifier
+                }
+            });
+        }
 
-    // if (Interlocked.CompareExchange(ref _initialResult, _initialResultSource.Task, null) == null)
-    // {
-    //     await _call.RequestStream.WriteAsync(new SubscriptionQueryRequest
-    //     {
-    //         Subscribe = new SubscriptionQuery
-    //         {
-    //             QueryRequest = request,
-    //             SubscriptionIdentifier = request.MessageIdentifier,
-    //             UpdateResponseType = updateType
-    //         }
-    //     });
-    // }
-    //
-    // return await _initialResult;
+        return await _initialResult;
+    }
+
+    public Task<QueryResponse> InitialResult => GetInitialResultAsync();
+    
     public IAsyncEnumerable<QueryUpdate> Updates { get; }
     
     public async ValueTask DisposeAsync()
     {
         _call.Dispose();
         await _consumer;
-        _initialResult.TrySetCanceled();
+        _initialResultSource.TrySetCanceled();
     }
 
     private class FlowControlAwareAsyncEnumerable : IAsyncEnumerable<QueryUpdate>
@@ -147,7 +158,7 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
         {
             _writer = writer ?? throw new ArgumentNullException(nameof(writer));
             _enumerator = enumerator ?? throw new ArgumentNullException(nameof(enumerator));
-            _controller = new FlowController(threshold);
+            _controller = new FlowController(threshold, threshold); //TODO: Revisit what initial means here
         }
 
         public async ValueTask<bool> MoveNextAsync()
