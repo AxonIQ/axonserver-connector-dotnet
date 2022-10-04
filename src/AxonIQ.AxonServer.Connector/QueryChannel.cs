@@ -634,7 +634,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                 request,
                 PermitsBatch, 
                 call,
-                _loggerFactory.CreateLogger<QuerySubscriptionResult>(),
+                _loggerFactory,
                 ct);
         }
         catch (Exception exception)
