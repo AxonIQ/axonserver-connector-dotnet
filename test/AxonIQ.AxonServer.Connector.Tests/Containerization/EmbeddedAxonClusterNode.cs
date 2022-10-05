@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Ductus.FluentDocker.Builders;
+using Ductus.FluentDocker.Extensions;
 using Ductus.FluentDocker.Model.Builders;
 using Ductus.FluentDocker.Services;
 using Ductus.FluentDocker.Services.Extensions;
@@ -30,6 +31,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
     public SystemProperties Properties { get; }
     public ClusterTemplate Template { get; }
     public DirectoryInfo Files { get; }
+    public bool EmitNodeLogsOnStop { get; set; }
 
     public DnsEndPoint GetHttpEndpoint()
     {
@@ -267,6 +269,16 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         if(_container != null)
         {
             network?.Detach(_container);
+            
+            if (EmitNodeLogsOnStop)
+            {
+                _logger.LogDebug("Embedded Axon Cluster Node {Name} logs", Properties.NodeSetup.Name ?? Properties.NodeSetup.Hostname ?? "localhost");
+                foreach (var line in _container.Logs().ReadToEnd())
+                {
+                    // ReSharper disable once TemplateIsNotCompileTimeConstantProblem
+                    _logger.LogDebug(line);
+                }
+            }
 
             _container.Remove(true);
             _container.Dispose();

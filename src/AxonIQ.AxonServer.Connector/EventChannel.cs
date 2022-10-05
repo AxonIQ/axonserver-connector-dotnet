@@ -102,7 +102,7 @@ public class EventChannel : IEventChannel
             TrackingToken = token.ToInt64() + 1L,
             NumberOfPermits = initial.ToInt64()
         });
-        return new EventStream( initial, threshold, call, _loggerFactory);
+        return new EventStream(initial, threshold, call, _loggerFactory);
     }
 
     public IAggregateEventStream OpenStream(AggregateId id, bool allowSnapshots = true)

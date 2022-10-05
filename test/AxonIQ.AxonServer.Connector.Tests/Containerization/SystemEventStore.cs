@@ -68,7 +68,7 @@ public class SystemEventStore
     /// <summary>
     /// Size for new storage segments. Default value is 256Mb.
     /// </summary>
-    public string SnapshotSegmentSize { get; set; }
+    public string? SnapshotSegmentSize { get; set; }
     
     /// <summary>
     /// Interval (ms) to check if there are files that are complete and can be closed. Default value is 1000. 

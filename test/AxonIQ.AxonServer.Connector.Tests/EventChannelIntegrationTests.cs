@@ -240,7 +240,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var sut = connection.EventChannel;
 
-        var token = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), CreateEvent("payload"));
+        var token = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), CreateEvent("payload1"));
         
         var ack = await sut.CancelSchedule(token);
         
@@ -256,11 +256,12 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var sut = connection.EventChannel;
 
-        var @event = CreateEvent("payload");
+        var @event = CreateEvent("payload2");
         
         var scheduleToken = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), @event);
         
-        var rescheduleToken = await sut.Reschedule(scheduleToken, DateTimeOffset.UtcNow, @event);
+        //var rescheduleToken = await sut.Reschedule(scheduleToken, DateTimeOffset.UtcNow, @event);
+        var rescheduleToken = await sut.Reschedule(scheduleToken, Duration.FromTimeSpan(TimeSpan.FromDays(2)), @event);
         
         var ack = await sut.CancelSchedule(rescheduleToken);
         
@@ -643,8 +644,8 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         await sut.AppendEvents(CreateEvent("LastEvent"));
 
-        var expected2 = "LastEvent";
-        var actual2 = await stream.Take(1).Select(entry => entry.GetValueAsString("payloadData")).SingleAsync();
+        var expected2 = new HashSet<string>(new[] {"LastEvent"});
+        var actual2 = await stream.Take(1).Select(entry => entry.GetValueAsString("payloadData")).ToHashSetAsync();
         
         Assert.Equal(expected2, actual2);
     }
@@ -704,7 +705,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         var id = new AggregateId(Guid.NewGuid().ToString("D"));
         
         using var transaction1 = sut.StartAppendEventsTransaction();
-        var count = Random.Shared.Next(1, 5);
+        var count = Random.Shared.Next(2, 5);
         var events = 
             Enumerable
                 .Range(0, count)
