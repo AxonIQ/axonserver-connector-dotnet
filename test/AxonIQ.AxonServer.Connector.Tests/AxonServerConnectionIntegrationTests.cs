@@ -121,7 +121,9 @@ public class AxonServerConnectionIntegrationTests
             source.TrySetResult();
         };
         source.Task.Wait(TimeSpan.FromSeconds(10));
-        Assert.True(sut.IsReady);
+        Assert.True(sut.IsConnected, "Connection not connected");
+        Assert.True(((ControlChannel)sut.ControlChannel).IsConnected, "ControlChannel not connected");
+        Assert.True(sut.IsReady, "Connection not ready");
     }
 
     [Fact(Skip = "Just to get a sense of the message flow - for manual testing only")]
