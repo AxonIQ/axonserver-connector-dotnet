@@ -87,12 +87,9 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         get => _state;
         set
         {
-            if (_state is not State.Connected && value is State.Connected)
-            {
-                OnConnected();
-            }
-
+            var connected = _state is not State.Connected && value is State.Connected;
             _state = value;
+            if (connected) OnConnected();
         }
     }
 
@@ -144,7 +141,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                         await instructionStream.RequestStream.WriteAsync(new PlatformInboundInstruction
                                         {
                                             Register = ClientIdentity.ToClientIdentification()
-                                        });
+                                        }, ct);
                                         //TODO: Handle Exceptions
                                         await HeartbeatMonitor.Resume();
 
