@@ -246,6 +246,26 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         Assert.True(ack.Success);
     }
+
+    [Fact(Skip = "Awaiting Axon Server fix")]
+    public async Task ScheduleAndRescheduleImmediatelyAndCancelHaveExpectedResult()
+    {
+        var connection = await CreateSystemUnderTest();
+
+        await connection.WaitUntilReady();
+        
+        var sut = connection.EventChannel;
+
+        var @event = CreateEvent("payload2");
+        
+        var scheduleToken = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), @event);
+        
+        var rescheduleToken = await sut.Reschedule(scheduleToken, DateTimeOffset.UtcNow, @event);
+        
+        var ack = await sut.CancelSchedule(rescheduleToken);
+        
+        Assert.True(ack.Success);
+    }
     
     [Fact]
     public async Task ScheduleAndRescheduleAndCancelHaveExpectedResult()
@@ -260,7 +280,6 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var scheduleToken = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), @event);
         
-        //var rescheduleToken = await sut.Reschedule(scheduleToken, DateTimeOffset.UtcNow, @event);
         var rescheduleToken = await sut.Reschedule(scheduleToken, Duration.FromTimeSpan(TimeSpan.FromDays(2)), @event);
         
         var ack = await sut.CancelSchedule(rescheduleToken);
