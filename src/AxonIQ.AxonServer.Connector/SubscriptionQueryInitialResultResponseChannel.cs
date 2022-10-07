@@ -3,13 +3,15 @@ using Io.Axoniq.Axonserver.Grpc.Query;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class QueryResponseChannel : IQueryResponseChannel
+public class SubscriptionQueryInitialResultResponseChannel : IQueryResponseChannel
 {
+    private readonly SubscriptionIdentifier _subscriptionIdentifier;
     private readonly QueryRequest _request;
     private readonly WriteQueryProviderOutbound _writer;
 
-    public QueryResponseChannel(QueryRequest request, WriteQueryProviderOutbound writer)
+    public SubscriptionQueryInitialResultResponseChannel(SubscriptionIdentifier subscriptionIdentifier, QueryRequest request, WriteQueryProviderOutbound writer)
     {
+        _subscriptionIdentifier = subscriptionIdentifier;
         _request = request ?? throw new ArgumentNullException(nameof(request));
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
     }
@@ -18,8 +20,12 @@ public class QueryResponseChannel : IQueryResponseChannel
     {
         return _writer(new QueryProviderOutbound
         {
-            QueryResponse = response,
-            InstructionId = InstructionId.New().ToString()
+            SubscriptionQueryResponse = new SubscriptionQueryResponse
+            {
+                SubscriptionIdentifier = _subscriptionIdentifier.ToString(),
+                InitialResult = response,
+                MessageIdentifier = response.MessageIdentifier
+            }
         });
     }
 

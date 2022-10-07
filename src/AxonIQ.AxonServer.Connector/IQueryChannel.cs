@@ -11,7 +11,7 @@ public interface IQueryChannel
 
     IAsyncEnumerable<QueryResponse> Query(QueryRequest query, CancellationToken ct);
     
-    Task<IQuerySubscriptionResult> SubscribeToQuery(
+    Task<IQuerySubscriptionResult> SubscriptionQuery(
         QueryRequest query, 
         SerializedObject updateType,
         PermitCount bufferSize,

@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Ductus.FluentDocker.Builders;
+using Ductus.FluentDocker.Extensions;
 using Ductus.FluentDocker.Model.Builders;
 using Ductus.FluentDocker.Services;
 using Ductus.FluentDocker.Services.Extensions;
@@ -25,6 +26,8 @@ public class EmbeddedAxonServer : IAxonServer
     }
 
     public SystemProperties Properties { get; }
+    
+    public bool EmitServerLogsOnDispose { get; set; }
 
     public async Task InitializeAsync()
     {
@@ -38,6 +41,7 @@ public class EmbeddedAxonServer : IAxonServer
 
         var builder = new Builder()
             .UseContainer()
+            .ReuseIfExists()
             .UseImage("axoniq/axonserver")
             .RemoveVolumesOnDispose()
             .ExposePort(8024)
@@ -163,6 +167,16 @@ public class EmbeddedAxonServer : IAxonServer
         _logger.LogDebug("Embedded Axon Server is being disposed");
         if (_container != null)
         {
+            if (EmitServerLogsOnDispose)
+            {
+                _logger.LogDebug("Embedded Axon Server logs");
+                foreach (var line in _container.Logs().ReadToEnd())
+                {
+                    // ReSharper disable once TemplateIsNotCompileTimeConstantProblem
+                    _logger.LogDebug(line);
+                }
+            }
+
             _container.Remove(true);
             _container.Dispose();
         }
@@ -171,7 +185,7 @@ public class EmbeddedAxonServer : IAxonServer
         return Task.CompletedTask;
     }
 
-    public static IAxonServer WithAccessControlDisabled(ILogger<EmbeddedAxonServer> logger)
+    public static IAxonServer WithAccessControlDisabled(ILogger<EmbeddedAxonServer> logger, bool emitServerLogs = false)
     {
         var suffix = AxonServerCounter.Next();
         var properties = new SystemProperties
@@ -198,10 +212,13 @@ public class EmbeddedAxonServer : IAxonServer
                 }
             }
         };
-        return new EmbeddedAxonServer(properties, logger);
+        return new EmbeddedAxonServer(properties, logger)
+        {
+            EmitServerLogsOnDispose = emitServerLogs
+        };
     }
 
-    public static IAxonServer WithAccessControlEnabled(ILogger<EmbeddedAxonServer> logger)
+    public static IAxonServer WithAccessControlEnabled(ILogger<EmbeddedAxonServer> logger, bool emitServerLogs = false)
     {
         var suffix = AxonServerCounter.Next();
         var properties = new SystemProperties
@@ -223,6 +240,9 @@ public class EmbeddedAxonServer : IAxonServer
                 HeartbeatEnabled = true
             }
         };
-        return new EmbeddedAxonServer(properties, logger);
+        return new EmbeddedAxonServer(properties, logger)
+        {
+            EmitServerLogsOnDispose = emitServerLogs
+        };
     }
 }

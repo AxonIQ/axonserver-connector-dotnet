@@ -13,7 +13,7 @@ public class SystemProperties
     public SystemHttpPortSecurity HttpPortSecurity { get; } = new();
     public SystemGrpcPortSecurity GrpcPortSecurity { get; } = new();
     public SystemKeepAlive KeepAlive { get; } = new();
-    //TODO: EventStore
+    public SystemEventStore EventStore { get; } = new();
     //TODO: Replication
     //TODO: MaintenanceTasks
     //TODO: Performance
@@ -34,6 +34,7 @@ public class SystemProperties
         HttpPortSecurity.CopyTo(clone.HttpPortSecurity);
         GrpcPortSecurity.CopyTo(clone.GrpcPortSecurity);
         KeepAlive.CopyTo(clone.KeepAlive);
+        EventStore.CopyTo(clone.EventStore);
         return clone;
     }
     
@@ -51,6 +52,7 @@ public class SystemProperties
         properties.AddRange(HttpPortSecurity.Serialize());
         properties.AddRange(GrpcPortSecurity.Serialize());
         properties.AddRange(KeepAlive.Serialize());
+        properties.AddRange(EventStore.Serialize());
         return properties.ToArray();
     }
 

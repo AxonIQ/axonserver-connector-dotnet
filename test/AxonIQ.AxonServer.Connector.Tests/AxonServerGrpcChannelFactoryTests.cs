@@ -80,7 +80,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
 
             Assert.NotNull(result);
-            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
+            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result.Target);
         }
         
         [Fact]
@@ -97,7 +97,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
 
             Assert.NotNull(result);
-            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
+            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result.Target);
         }
     }
 
@@ -173,7 +173,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
 
             Assert.NotNull(result);
-            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
+            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result.Target);
         }
         
         [Fact]
@@ -191,7 +191,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
 
             Assert.NotNull(result);
-            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result!.Target);
+            Assert.Equal(_server.GetGrpcEndpoint().ToUri().Authority, result.Target);
         }
     }
     
@@ -231,7 +231,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
 
             Assert.NotNull(result);
-            Assert.Equal(routingServers[0].ToUri().Authority, result!.Target);
+            Assert.Equal(routingServers[0].ToUri().Authority, result.Target);
         }
         
         [Fact]
@@ -249,7 +249,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
         
             Assert.NotNull(result);
-            Assert.Equal(_cluster.Nodes[0].GetGrpcEndpoint().ToUri().Authority, result!.Target);
+            Assert.Equal(_cluster.Nodes[0].GetGrpcEndpoint().ToUri().Authority, result.Target);
         }
     }
     
@@ -325,7 +325,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
 
             Assert.NotNull(result);
-            Assert.Equal(_cluster.Nodes[0].GetGrpcEndpoint().ToUri().Authority, result!.Target);
+            Assert.Equal(_cluster.Nodes[0].GetGrpcEndpoint().ToUri().Authority, result.Target);
         }
         
         [Fact]
@@ -342,7 +342,7 @@ public class AxonServerGrpcChannelFactoryTests
             var result = await sut.Create(context);
 
             Assert.NotNull(result);
-            Assert.Equal(_cluster.Nodes[0].GetGrpcEndpoint().ToUri().Authority, result!.Target);
+            Assert.Equal(_cluster.Nodes[0].GetGrpcEndpoint().ToUri().Authority, result.Target);
         }
     }
 
@@ -510,7 +510,7 @@ public class AxonServerGrpcChannelFactoryTests
                 var result = await sut.Create(context);
 
                 Assert.NotNull(result);
-                Assert.Contains(result!.Target, new[]
+                Assert.Contains(result.Target, new[]
                 {
                     cluster.Nodes[1].GetGrpcEndpoint().ToUri().Authority,
                     cluster.Nodes[2].GetGrpcEndpoint().ToUri().Authority

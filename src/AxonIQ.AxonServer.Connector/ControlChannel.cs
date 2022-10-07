@@ -52,7 +52,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             );
         HeartbeatChannel = new HeartbeatChannel(
             clock,
-            instruction => _inbox.Writer.WriteAsync(new Protocol.SendInstruction(instruction)),
+            instruction => _inbox.Writer.WriteAsync(new Protocol.SendPlatformInboundInstruction(instruction)),
             loggerFactory.CreateLogger<HeartbeatChannel>()
         );
         HeartbeatMonitor = new HeartbeatMonitor(
@@ -87,12 +87,9 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         get => _state;
         set
         {
-            if (_state is not State.Connected && value is State.Connected)
-            {
-                OnConnected();
-            }
-
+            var connected = _state is not State.Connected && value is State.Connected;
             _state = value;
+            if (connected) OnConnected();
         }
     }
 
@@ -102,7 +99,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         {
             await foreach (var response in reader.ReadAllAsync(ct))
             {
-                await _inbox.Writer.WriteAsync(new Protocol.ReceivedInstruction(response), ct);
+                await _inbox.Writer.WriteAsync(new Protocol.ReceivePlatformOutboundInstruction(response), ct);
             }
         }
         catch (ObjectDisposedException exception)
@@ -144,7 +141,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                         await instructionStream.RequestStream.WriteAsync(new PlatformInboundInstruction
                                         {
                                             Register = ClientIdentity.ToClientIdentification()
-                                        });
+                                        }, ct);
                                         //TODO: Handle Exceptions
                                         await HeartbeatMonitor.Resume();
 
@@ -196,7 +193,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.SendAwaitableInstruction send:
+                        case Protocol.SendAwaitablePlatformInboundInstruction send:
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
@@ -211,7 +208,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.SendInstruction send:
+                        case Protocol.SendPlatformInboundInstruction send:
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
@@ -225,7 +222,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.ReceivedInstruction received:
+                        case Protocol.ReceivePlatformOutboundInstruction received:
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
@@ -252,7 +249,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                         //     break;
                                         case PlatformOutboundInstruction.RequestOneofCase.Heartbeat:
                                             await HeartbeatMonitor.ReceiveServerHeartbeat();
-                                            await _inbox.Writer.WriteAsync(new Protocol.SendInstruction(
+                                            await _inbox.Writer.WriteAsync(new Protocol.SendPlatformInboundInstruction(
                                                 new PlatformInboundInstruction
                                                 {
                                                     Heartbeat = new Heartbeat()
@@ -305,13 +302,13 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         
         public record Reconnect : Protocol;
 
-        public record SendInstruction
+        public record SendPlatformInboundInstruction
             (PlatformInboundInstruction Instruction) : Protocol;
         
-        public record SendAwaitableInstruction
+        public record SendAwaitablePlatformInboundInstruction
             (PlatformInboundInstruction Instruction, TaskCompletionSource CompletionSource) : Protocol;
 
-        public record ReceivedInstruction(PlatformOutboundInstruction Instruction) : Protocol;
+        public record ReceivePlatformOutboundInstruction(PlatformOutboundInstruction Instruction) : Protocol;
     }
 
     private record State(AsyncDuplexStreamingCall<PlatformInboundInstruction,PlatformOutboundInstruction>? InstructionStream)
@@ -357,7 +354,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         }
         var completionSource = new TaskCompletionSource();
         if (!_inbox.Writer.TryWrite(
-                new Protocol.SendAwaitableInstruction(instruction, completionSource)))
+                new Protocol.SendAwaitablePlatformInboundInstruction(instruction, completionSource)))
         {
             throw new AxonServerException(
                 ClientIdentity,

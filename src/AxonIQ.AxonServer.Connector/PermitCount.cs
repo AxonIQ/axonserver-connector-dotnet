@@ -27,6 +27,7 @@ public readonly struct PermitCount : IEquatable<PermitCount>, IComparable<Permit
     public override string ToString() => _value.ToString(CultureInfo.InvariantCulture);
 
     public static PermitCount Max(PermitCount left, PermitCount right) => new(Math.Max(left._value, right._value));
+    public static PermitCount Min(PermitCount left, PermitCount right) => new(Math.Min(left._value, right._value));
     
     public static bool operator ==(PermitCount left, PermitCount right) => left.Equals(right);
     public static bool operator !=(PermitCount left, PermitCount right) => !left.Equals(right);

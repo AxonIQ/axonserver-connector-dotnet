@@ -95,7 +95,8 @@ public class EmbeddedAxonCluster : IAxonCluster
         return Task.CompletedTask;
     }
 
-    public static IAxonCluster WithAccessControlDisabled(ILogger<EmbeddedAxonCluster> logger)
+    public static IAxonCluster
+        WithAccessControlDisabled(ILogger<EmbeddedAxonCluster> logger, bool emitNodeLogs = false)
     {
         var cluster = new SystemProperties
         {
@@ -213,14 +214,23 @@ public class EmbeddedAxonCluster : IAxonCluster
         };
         var nodes = new[]
         {
-            new EmbeddedAxonClusterNode(node1, template, logger), 
-            new EmbeddedAxonClusterNode(node2, template, logger), 
+            new EmbeddedAxonClusterNode(node1, template, logger)
+            {
+                EmitNodeLogsOnStop = emitNodeLogs
+            }, 
+            new EmbeddedAxonClusterNode(node2, template, logger)
+            {
+                EmitNodeLogsOnStop = emitNodeLogs
+            }, 
             new EmbeddedAxonClusterNode(node3, template, logger)
+            {
+                EmitNodeLogsOnStop = emitNodeLogs
+            }
         };
         return new EmbeddedAxonCluster(nodes, logger);
     }
 
-    public static IAxonCluster WithAccessControlEnabled(ILogger<EmbeddedAxonCluster> logger)
+    public static IAxonCluster WithAccessControlEnabled(ILogger<EmbeddedAxonCluster> logger, bool emitNodeLogs = false)
     {
         var cluster = new SystemProperties
         {
@@ -339,9 +349,18 @@ public class EmbeddedAxonCluster : IAxonCluster
         };
         var nodes = new[]
         {
-            new EmbeddedAxonClusterNode(node1, template, logger), 
-            new EmbeddedAxonClusterNode(node2, template, logger), 
+            new EmbeddedAxonClusterNode(node1, template, logger)
+            {
+                EmitNodeLogsOnStop = emitNodeLogs
+            }, 
+            new EmbeddedAxonClusterNode(node2, template, logger)
+            {
+                EmitNodeLogsOnStop = emitNodeLogs
+            }, 
             new EmbeddedAxonClusterNode(node3, template, logger)
+            {
+                EmitNodeLogsOnStop = emitNodeLogs
+            }
         };
         return new EmbeddedAxonCluster(nodes, logger);
     }
