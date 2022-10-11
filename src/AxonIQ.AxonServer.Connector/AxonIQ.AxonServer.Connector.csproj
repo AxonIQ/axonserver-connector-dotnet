@@ -28,7 +28,7 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.1" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.1" />
     </ItemGroup>
     <ItemGroup>
         <Protobuf Include="..\..\axon-server-api\src\main\proto\common.proto" GrpcServices="None" ProtoRoot="..\..\axon-server-api\src\main\proto" />
