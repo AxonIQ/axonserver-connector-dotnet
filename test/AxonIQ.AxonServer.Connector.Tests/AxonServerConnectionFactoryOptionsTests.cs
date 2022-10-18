@@ -1,5 +1,6 @@
 using System.Net;
 using AutoFixture;
+using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
@@ -428,6 +429,7 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
         Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
         Assert.Null(result.GrpcChannelOptions);
+        Assert.Empty(result.Interceptors);
     }
 
     [Fact]
@@ -459,6 +461,7 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
         Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
         Assert.Null(result.GrpcChannelOptions);
+        Assert.Empty(result.Interceptors);
     }
 
     [Fact]
@@ -518,5 +521,39 @@ public class AxonServerConnectionFactoryOptionsTests
         
         Assert.Null(result.GrpcChannelOptions);
     }
+    
+    [Fact]
+    public void WithInterceptorsCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => CreateSystemUnderTest().WithInterceptors(null!));
+    }
+
+    [Fact]
+    public void WithInterceptorsReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var interceptors = new Interceptor[]
+        {
+            new FakeInterceptor()
+        };
+        var result = sut.WithInterceptors(interceptors).Build();
+        
+        Assert.Equal(interceptors, result.Interceptors);
+    }
+    
+    [Fact]
+    public void WithoutInterceptorsReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.Empty(result.Interceptors);
+    }
     //TODO: Extend with tests that cover obtaining all other options from configuration
+    
+    private class FakeInterceptor : Interceptor { }
 }

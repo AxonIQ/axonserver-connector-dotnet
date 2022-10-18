@@ -197,7 +197,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
-                                    await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction);
+                                    await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction, ct);
                                     send.CompletionSource.SetResult();
                                     break;
                                 case State.Disconnected:

@@ -1,4 +1,5 @@
 using System.Net;
+using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +20,7 @@ public interface IAxonServerConnectionFactoryOptionsBuilder
     IAxonServerConnectionFactoryOptionsBuilder WithLoggerFactory(ILoggerFactory loggerFactory);
     IAxonServerConnectionFactoryOptionsBuilder WithClock(Func<DateTimeOffset> clock);
     IAxonServerConnectionFactoryOptionsBuilder WithGrpcChannelOptions(GrpcChannelOptions grpcChannelOptions);
+    IAxonServerConnectionFactoryOptionsBuilder WithInterceptors(params Interceptor[] interceptors);
     IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(PermitCount count);
     IAxonServerConnectionFactoryOptionsBuilder WithQueryPermits(PermitCount count);
 

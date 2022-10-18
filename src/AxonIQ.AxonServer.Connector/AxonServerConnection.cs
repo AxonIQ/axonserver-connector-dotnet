@@ -10,6 +10,7 @@ namespace AxonIQ.AxonServer.Connector;
 public class AxonServerConnection : IAxonServerConnection
 {
     private readonly AxonServerGrpcChannelFactory _channelFactory;
+    private readonly IReadOnlyList<Interceptor> _interceptors;
     private readonly Context _context;
     private readonly IScheduler _scheduler;
     private readonly ILoggerFactory _loggerFactory;
@@ -27,9 +28,9 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly EventHandler _onConnectedHandler;
     private readonly EventHandler _onHeartbeatMissedHandler;
 
-    public AxonServerConnection(
-        Context context,
+    public AxonServerConnection(Context context,
         AxonServerGrpcChannelFactory channelFactory,
+        IReadOnlyList<Interceptor> interceptors,
         IScheduler scheduler,
         PermitCount commandPermits,
         PermitCount queryPermits,
@@ -37,6 +38,7 @@ public class AxonServerConnection : IAxonServerConnection
     {
         _context = context;
         _channelFactory = channelFactory ?? throw new ArgumentNullException(nameof(channelFactory));
+        _interceptors = interceptors ?? throw new ArgumentNullException(nameof(interceptors));
         _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = loggerFactory.CreateLogger<AxonServerConnection>();
@@ -100,17 +102,11 @@ public class AxonServerConnection : IAxonServerConnection
         get => _state;
         set
         {
-            if (_state is not State.Connected && value is State.Connected)
-            {
-                OnConnected();
-            }
-
-            if (_state is not State.Disconnected && value is State.Disconnected)
-            {
-                OnDisconnected();
-            }
-
+            var connected = _state is not State.Connected && value is State.Connected;
+            var disconnected = _state is not State.Disconnected && value is State.Disconnected;
             _state = value;
+            if (connected) OnConnected();
+            if (disconnected) OnDisconnected();
         }
     }
 
@@ -132,12 +128,15 @@ public class AxonServerConnection : IAxonServerConnection
                                     var channel = await _channelFactory.Create(_context);
                                     if (channel != null)
                                     {
-                                        var callInvoker = channel.CreateCallInvoker().Intercept(metadata =>
-                                        {
-                                            _channelFactory.Authentication.WriteTo(metadata);
-                                            _context.WriteTo(metadata);
-                                            return metadata;
-                                        });
+                                        var callInvoker = channel
+                                            .CreateCallInvoker()
+                                            .Intercept(_interceptors.ToArray())
+                                            .Intercept(metadata =>
+                                            {
+                                                _channelFactory.Authentication.WriteTo(metadata);
+                                                _context.WriteTo(metadata);
+                                                return metadata;
+                                            });
                                         //State needs to be set for the control channel to pick up
                                         //the right call invoker
                                         CurrentState = new State.Connected(channel, callInvoker);

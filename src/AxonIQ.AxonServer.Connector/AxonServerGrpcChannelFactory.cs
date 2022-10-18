@@ -10,17 +10,20 @@ public class AxonServerGrpcChannelFactory
 {
     private readonly ILogger<AxonServerGrpcChannelFactory> _logger;
 
-    public AxonServerGrpcChannelFactory(ClientIdentity clientIdentity,
+    public AxonServerGrpcChannelFactory(
+        ClientIdentity clientIdentity,
         IAxonServerAuthentication authentication,
         IReadOnlyList<DnsEndPoint> routingServers,
         ILoggerFactory loggerFactory,
-        GrpcChannelOptions? grpcChannelOptions)
+        IReadOnlyList<Interceptor> interceptors,
+        GrpcChannelOptions grpcChannelOptions)
     {
         ClientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
         Authentication = authentication ?? throw new ArgumentNullException(nameof(authentication));
         RoutingServers = routingServers ?? throw new ArgumentNullException(nameof(routingServers));
         LoggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-        GrpcChannelOptions = grpcChannelOptions;
+        Interceptors = interceptors ?? throw new ArgumentNullException(nameof(interceptors));
+        GrpcChannelOptions = grpcChannelOptions ?? throw new ArgumentNullException(nameof(grpcChannelOptions));
         _logger = loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>();
     }
     
@@ -28,7 +31,8 @@ public class AxonServerGrpcChannelFactory
     public IAxonServerAuthentication Authentication { get; }
     public IReadOnlyList<DnsEndPoint> RoutingServers { get; }
     public ILoggerFactory LoggerFactory { get; }
-    public GrpcChannelOptions? GrpcChannelOptions { get; }
+    public IReadOnlyList<Interceptor> Interceptors { get; }
+    public GrpcChannelOptions GrpcChannelOptions { get; }
 
     public async Task<GrpcChannel?> Create(Context context)
     {
@@ -38,13 +42,13 @@ public class AxonServerGrpcChannelFactory
         {
             var server = RoutingServers[index];
             _logger.LogInformation("Requesting connection details from {Host}:{Port}", server.Host, server.Port);
-            var candidate = GrpcChannel.ForAddress(server.ToUri(), GrpcChannelOptions ?? new GrpcChannelOptions());
+            var candidate = GrpcChannel.ForAddress(server.ToUri(), GrpcChannelOptions);
             var callInvoker = candidate.Intercept(metadata =>
             {
                 Authentication.WriteTo(metadata);
                 context.WriteTo(metadata);
                 return metadata;
-            });
+            }).Intercept(Interceptors.ToArray());
             try
             {
                 var service = new PlatformService.PlatformServiceClient(callInvoker);
@@ -72,7 +76,7 @@ public class AxonServerGrpcChannelFactory
                         info.Primary.HostName,
                         info.Primary.GrpcPort);
                     var primaryServer = new DnsEndPoint(info.Primary.HostName, info.Primary.GrpcPort);
-                    channel = GrpcChannel.ForAddress(primaryServer.ToUri(), GrpcChannelOptions ?? new GrpcChannelOptions());
+                    channel = GrpcChannel.ForAddress(primaryServer.ToUri(), GrpcChannelOptions);
                 }
             }
             catch (Exception exception)
