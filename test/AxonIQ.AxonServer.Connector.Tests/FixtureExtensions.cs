@@ -72,7 +72,7 @@ public static class FixtureExtensions
     public static void CustomizeLocalHostDnsEndPointInReservedPortRange(this IFixture fixture)
     {
         // REMARK: Due to the randomization of data we might accidentally pick a port on which an AxonServer is listening.
-        // By s no Axon Server will be listening on a host and port in the reserved port range [0..1024], we prevent this
+        // Since no Axon Server will be listening on a host and port in the reserved port range [0..1024], we prevent this
         // accident from happening.
         fixture.Customize<DnsEndPoint>(composer =>
             composer

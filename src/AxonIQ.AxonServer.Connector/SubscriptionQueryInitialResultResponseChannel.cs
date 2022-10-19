@@ -54,7 +54,7 @@ public class SubscriptionQueryInitialResultResponseChannel : IQueryResponseChann
                 MessageIdentifier = instructionId1
             },
             InstructionId = instructionId1
-        });
+        }).ConfigureAwait(false);
         
         var instructionId2 = InstructionId.New().ToString();
         await _writer(new QueryProviderOutbound
@@ -65,7 +65,7 @@ public class SubscriptionQueryInitialResultResponseChannel : IQueryResponseChann
                 MessageId = instructionId2
             },
             InstructionId = instructionId2
-        });
+        }).ConfigureAwait(false);
     }
 
     public async ValueTask CompleteWithErrorAsync(ErrorCategory errorCategory, ErrorMessage errorMessage)
@@ -80,7 +80,7 @@ public class SubscriptionQueryInitialResultResponseChannel : IQueryResponseChann
                 MessageIdentifier = instructionId1
             },
             InstructionId = instructionId1
-        });
+        }).ConfigureAwait(false);
         
         var instructionId2 = InstructionId.New().ToString();
         await _writer(new QueryProviderOutbound
@@ -91,6 +91,6 @@ public class SubscriptionQueryInitialResultResponseChannel : IQueryResponseChann
                 MessageId = instructionId2
             },
             InstructionId = instructionId2
-        });
+        }).ConfigureAwait(false);
     }
 }

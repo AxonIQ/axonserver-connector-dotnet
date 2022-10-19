@@ -36,8 +36,8 @@ internal class AsyncDisposableAsyncEnumerable<T> : IAsyncEnumerable<T>
 
         public async ValueTask DisposeAsync()
         {
-            await _enumerator.DisposeAsync();
-            await _disposable.DisposeAsync();
+            await _enumerator.DisposeAsync().ConfigureAwait(false);
+            await _disposable.DisposeAsync().ConfigureAwait(false);
         }
     }
 }

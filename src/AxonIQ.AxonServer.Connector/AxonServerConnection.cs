@@ -10,6 +10,7 @@ namespace AxonIQ.AxonServer.Connector;
 public class AxonServerConnection : IAxonServerConnection
 {
     private readonly AxonServerGrpcChannelFactory _channelFactory;
+    private readonly IReadOnlyList<Interceptor> _interceptors;
     private readonly Context _context;
     private readonly IScheduler _scheduler;
     private readonly ILoggerFactory _loggerFactory;
@@ -27,9 +28,9 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly EventHandler _onConnectedHandler;
     private readonly EventHandler _onHeartbeatMissedHandler;
 
-    public AxonServerConnection(
-        Context context,
+    public AxonServerConnection(Context context,
         AxonServerGrpcChannelFactory channelFactory,
+        IReadOnlyList<Interceptor> interceptors,
         IScheduler scheduler,
         PermitCount commandPermits,
         PermitCount queryPermits,
@@ -37,6 +38,7 @@ public class AxonServerConnection : IAxonServerConnection
     {
         _context = context;
         _channelFactory = channelFactory ?? throw new ArgumentNullException(nameof(channelFactory));
+        _interceptors = interceptors ?? throw new ArgumentNullException(nameof(interceptors));
         _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = loggerFactory.CreateLogger<AxonServerConnection>();
@@ -100,17 +102,11 @@ public class AxonServerConnection : IAxonServerConnection
         get => _state;
         set
         {
-            if (_state is not State.Connected && value is State.Connected)
-            {
-                OnConnected();
-            }
-
-            if (_state is not State.Disconnected && value is State.Disconnected)
-            {
-                OnDisconnected();
-            }
-
+            var connected = _state is not State.Connected && value is State.Connected;
+            var disconnected = _state is not State.Disconnected && value is State.Disconnected;
             _state = value;
+            if (connected) OnConnected();
+            if (disconnected) OnDisconnected();
         }
     }
 
@@ -118,7 +114,7 @@ public class AxonServerConnection : IAxonServerConnection
     {
         try
         {
-            while (await _inbox.Reader.WaitToReadAsync(ct))
+            while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (_inbox.Reader.TryRead(out var message))
                 {
@@ -129,19 +125,22 @@ public class AxonServerConnection : IAxonServerConnection
                             switch (CurrentState)
                             {
                                 case State.Disconnected:
-                                    var channel = await _channelFactory.Create(_context);
+                                    var channel = await _channelFactory.Create(_context).ConfigureAwait(false);
                                     if (channel != null)
                                     {
-                                        var callInvoker = channel.CreateCallInvoker().Intercept(metadata =>
-                                        {
-                                            _channelFactory.Authentication.WriteTo(metadata);
-                                            _context.WriteTo(metadata);
-                                            return metadata;
-                                        });
+                                        var callInvoker = channel
+                                            .CreateCallInvoker()
+                                            .Intercept(_interceptors.ToArray())
+                                            .Intercept(metadata =>
+                                            {
+                                                _channelFactory.Authentication.WriteTo(metadata);
+                                                _context.WriteTo(metadata);
+                                                return metadata;
+                                            });
                                         //State needs to be set for the control channel to pick up
                                         //the right call invoker
                                         CurrentState = new State.Connected(channel, callInvoker);
-                                        await _controlChannel.Connect();
+                                        await _controlChannel.Connect().ConfigureAwait(false);
                                     }
                                     else
                                     {
@@ -163,18 +162,19 @@ public class AxonServerConnection : IAxonServerConnection
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
-                                    await _controlChannel.Reconnect();
+                                    await _controlChannel.Reconnect().ConfigureAwait(false);
 
                                     _logger.LogInformation(
                                         "Reconnect for context {Context} requested. Closing current connection",
                                         _context);
-                                    await connected.Channel.ShutdownAsync();
+                                    await connected.Channel.ShutdownAsync().ConfigureAwait(false);
                                     connected.Channel.Dispose();
 
                                     CurrentState = new State.Disconnected();
 
                                     await _scheduler.ScheduleTask(
-                                        () => _inbox.Writer.WriteAsync(new Protocol.Connect(), ct), _scheduler.Clock());
+                                        () => _inbox.Writer.WriteAsync(new Protocol.Connect(), ct), _scheduler.Clock()
+                                    ).ConfigureAwait(false);
                                     break;
                             }
 
@@ -200,7 +200,7 @@ public class AxonServerConnection : IAxonServerConnection
     {
         await _inbox.Writer.WriteAsync(
             new Protocol.Connect()
-        );
+        ).ConfigureAwait(false);
     }
 
     public Task WaitUntilConnected()
@@ -297,11 +297,11 @@ public class AxonServerConnection : IAxonServerConnection
     {
         _inboxCancellation.Cancel();
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion;
-        await _protocol;
+        await _inbox.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
         _controlChannel.Connected -= _onConnectedHandler;
         _controlChannel.HeartbeatMissed -= _onHeartbeatMissedHandler;
-        await _controlChannel.DisposeAsync();
+        await _controlChannel.DisposeAsync().ConfigureAwait(false);
         _inboxCancellation.Dispose();
         _protocol.Dispose();
     }

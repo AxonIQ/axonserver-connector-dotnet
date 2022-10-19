@@ -28,12 +28,12 @@ public class FlowControlAwareAsyncEnumerator<TRequest, TResponse> : IAsyncEnumer
 
     public async ValueTask<bool> MoveNextAsync()
     {
-        var move = _enumerator.MoveNextAsync();
+        var move = _enumerator.MoveNextAsync().ConfigureAwait(false);
         if (_controller.Increment())
         {
             var request = _builder();
             _logger.LogDebug("Sending request for data {Request}", request);
-            await _writer.WriteAsync(request);
+            await _writer.WriteAsync(request).ConfigureAwait(false);
         }
         return await move;
     }

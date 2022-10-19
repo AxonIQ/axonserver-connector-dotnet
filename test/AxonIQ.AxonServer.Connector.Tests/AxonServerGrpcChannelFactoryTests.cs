@@ -2,6 +2,8 @@ using System.Net;
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using Grpc.Core.Interceptors;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
@@ -36,8 +38,9 @@ public class AxonServerGrpcChannelFactoryTests
                 clientIdentity, 
                 AxonServerAuthentication.None,
                 routingServers, 
-                _loggerFactory,
-                null);
+                _loggerFactory, 
+                Array.Empty<Interceptor>(),
+                new GrpcChannelOptions());
 
             var result = await sut.Create(context);
 
@@ -67,7 +70,7 @@ public class AxonServerGrpcChannelFactoryTests
         {
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory, null);
+                routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions());
         }
 
         [Fact]
@@ -123,14 +126,14 @@ public class AxonServerGrpcChannelFactoryTests
         {
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory, null);
+                routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions());
         }
         
         private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers, IAxonServerAuthentication authentication)
         {
             var clientIdentity = _fixture.Create<ClientIdentity>();
-            return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory,
-                null);
+            return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory, Array.Empty<Interceptor>(),
+                new GrpcChannelOptions());
         }
         
         [Fact]
@@ -218,7 +221,7 @@ public class AxonServerGrpcChannelFactoryTests
         {
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory, null);
+                routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions());
         }
 
         [Fact]
@@ -276,14 +279,14 @@ public class AxonServerGrpcChannelFactoryTests
         {
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
-                routingServers, _loggerFactory, null);
+                routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions());
         }
         
         private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers, IAxonServerAuthentication authentication)
         {
             var clientIdentity = _fixture.Create<ClientIdentity>();
-            return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory,
-                null);
+            return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory, Array.Empty<Interceptor>(),
+                new GrpcChannelOptions());
         }
 
         [Fact]
@@ -505,7 +508,7 @@ public class AxonServerGrpcChannelFactoryTests
                 var routingServers = cluster.GetGrpcEndpoints();
                 var sut = new AxonServerGrpcChannelFactory(clientIdentity,
                     AxonServerAuthentication.UsingToken(template.Applications![0].Token!),
-                    routingServers, _loggerFactory, null);
+                    routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions());
 
                 var result = await sut.Create(context);
 

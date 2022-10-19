@@ -60,7 +60,7 @@ public class HeartbeatChannel : IAsyncDisposable
         var all = new HashSet<SentHeartbeat>();
         try
         {
-            while (await _inbox.Reader.WaitToReadAsync(ct))
+            while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (_inbox.Reader.TryRead(out var message))
                 {
@@ -88,7 +88,7 @@ public class HeartbeatChannel : IAsyncDisposable
                             {
                                 InstructionId = id,
                                 Heartbeat = HeartbeatInstance
-                            });
+                            }).ConfigureAwait(false);
                             break;
                         case Protocol.Purge purge:
                             var overdue = all.RemoveWhere(candidate => candidate.Due < purge.Due);
@@ -121,7 +121,7 @@ public class HeartbeatChannel : IAsyncDisposable
                                     .ToArray();
                             foreach (var heartbeat in heartbeats)
                             {
-                                await heartbeat.Responder(receive.Message);
+                                await heartbeat.Responder(receive.Message).ConfigureAwait(false);
                             }
 
                             all.ExceptWith(heartbeats);
@@ -180,9 +180,9 @@ public class HeartbeatChannel : IAsyncDisposable
     {
         _inboxCancellation.Cancel();
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion;
-        await _protocol;
-        await _timer.DisposeAsync();
+        await _inbox.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
+        await _timer.DisposeAsync().ConfigureAwait(false);
         _inboxCancellation.Dispose();
         _protocol.Dispose();
     }

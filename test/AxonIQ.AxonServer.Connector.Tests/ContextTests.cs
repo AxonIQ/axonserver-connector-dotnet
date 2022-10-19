@@ -1,6 +1,8 @@
 using AutoFixture;
 using AutoFixture.Idioms;
 using Grpc.Core;
+using Grpc.Core.Interceptors;
+using Grpc.Net.Client;
 using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;

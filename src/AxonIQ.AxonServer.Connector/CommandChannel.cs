@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Command;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
+[SuppressMessage("ReSharper", "MethodSupportsCancellation")]
 public class CommandChannel : ICommandChannel, IAsyncDisposable
 {
     private readonly ILogger<CommandChannel> _logger;
@@ -54,9 +56,9 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     {
         try
         {
-            await foreach (var response in reader.ReadAllAsync(ct))
+            await foreach (var response in reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                await _channel.Writer.WriteAsync(new Protocol.ReceiveCommandProviderInbound(response), ct);
+                await _channel.Writer.WriteAsync(new Protocol.ReceiveCommandProviderInbound(response), ct).ConfigureAwait(false);
             }
         }
         catch (ObjectDisposedException exception)
@@ -118,7 +120,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                 }
                             };
 
-                            await stream.RequestStream.WriteAsync(request, ct);
+                            await stream.RequestStream.WriteAsync(request).ConfigureAwait(false);
                         }
 
                         await stream.RequestStream.WriteAsync(new CommandProviderOutbound
@@ -128,7 +130,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                 ClientId = ClientIdentity.ClientInstanceId.ToString(),
                                 Permits = disconnected.Flow.Initial.ToInt64()
                             }
-                        }, ct);
+                        }).ConfigureAwait(false);
 
                         disconnected.Flow.Reset();
                         
@@ -166,7 +168,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     {
         try
         {
-            while (await _channel.Reader.WaitToReadAsync(ct))
+            while (await _channel.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (_channel.Reader.TryRead(out var message))
                 {
@@ -174,11 +176,11 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                     switch (message)
                     {
                         case Protocol.Connect:
-                            await EnsureConnected(ct);
+                            await EnsureConnected(ct).ConfigureAwait(false);
 
                             break;
                         case Protocol.SubscribeCommandHandler subscribe:
-                            await EnsureConnected(ct);
+                            await EnsureConnected(ct).ConfigureAwait(false);
                             switch (_state)
                             {
                                 case State.Connected connected:
@@ -208,7 +210,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                 ComponentName = ClientIdentity.ComponentName.ToString()
                                             }
                                         };
-                                        await connected.Stream.RequestStream.WriteAsync(request, ct);
+                                        await connected.Stream.RequestStream.WriteAsync(request).ConfigureAwait(false);
                                     }
 
                                     break;
@@ -256,7 +258,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                     ComponentName = ClientIdentity.ComponentName.ToString()
                                                 }
                                             };
-                                            await connected.Stream.RequestStream.WriteAsync(request, ct);
+                                            await connected.Stream.RequestStream.WriteAsync(request).ConfigureAwait(false);
                                         }
                                     }
 
@@ -313,7 +315,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                         ClientId = ClientIdentity.ClientInstanceId.ToString(),
                                                         Permits = connected.Flow.Threshold.ToInt64()
                                                     }
-                                                }, ct);
+                                                }).ConfigureAwait(false);
                                             }
                                             break;
                                         case CommandProviderInbound.RequestOneofCase.Command:
@@ -330,7 +332,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                                 InstructionId = receive.Message.InstructionId,
                                                                 Success = true
                                                             }
-                                                        }, ct);
+                                                        }).ConfigureAwait(false);
                                                 }
 
                                                 connected.CommandTasks.Add(receive.Message.Command,
@@ -416,7 +418,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                                 Error = new ErrorMessage()
                                                             }
                                                         }
-                                                    );
+                                                    ).ConfigureAwait(false);
                                                 }
 
                                                 await connected.Stream.RequestStream.WriteAsync(
@@ -430,7 +432,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                             ErrorMessage = new ErrorMessage
                                                                 { Message = "No Handler for command" }
                                                         }
-                                                    }, ct);
+                                                    }).ConfigureAwait(false);
                                                 
                                                 if (connected.Flow.Increment())
                                                 {
@@ -441,7 +443,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                             ClientId = ClientIdentity.ClientInstanceId.ToString(),
                                                             Permits = connected.Flow.Threshold.ToInt64()
                                                         }
-                                                    }, ct);
+                                                    }).ConfigureAwait(false);
                                                 }
                                             }
                                             break;
@@ -462,7 +464,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                         await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
                                         {
                                             CommandResponse = send.CommandResponse
-                                        });
+                                        }).ConfigureAwait(false);
 
                                         if (connected.Flow.Increment())
                                         {
@@ -473,7 +475,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                     ClientId = ClientIdentity.ClientInstanceId.ToString(),
                                                     Permits = connected.Flow.Threshold.ToInt64()
                                                 }
-                                            });
+                                            }).ConfigureAwait(false);
                                         }
                                     }
 
@@ -576,7 +578,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             handler, 
             loadFactor,
             subscribedCommands, 
-            subscribeCompletionSource));
+            subscribeCompletionSource)).ConfigureAwait(false);
         return new CommandHandlerRegistration(subscribeCompletionSource.Completion, async () =>
         {
             var unsubscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
@@ -584,8 +586,8 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 new Protocol.UnsubscribeCommandHandler(
                     commandHandlerId,
                     subscribedCommands,
-                    unsubscribeCompletionSource));
-            await unsubscribeCompletionSource.Completion;
+                    unsubscribeCompletionSource)).ConfigureAwait(false);
+            await unsubscribeCompletionSource.Completion.ConfigureAwait(false);
         });
     }
 
@@ -622,7 +624,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
         try
         {
-            return await Service.DispatchAsync(request, cancellationToken: ct);
+            return await Service.DispatchAsync(request, cancellationToken: ct).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -638,8 +640,8 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     {
         _channelCancellation.Cancel();
         _channel.Writer.Complete();
-        await _channel.Reader.Completion;
-        await _protocol;
+        await _channel.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
         _channelCancellation.Dispose();
         _protocol.Dispose();
     }

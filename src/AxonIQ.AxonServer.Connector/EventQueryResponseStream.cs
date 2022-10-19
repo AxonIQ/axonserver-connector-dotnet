@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc.Event;
@@ -5,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
+[SuppressMessage("ReSharper", "MethodSupportsCancellation")]
 public class EventQueryResponseStream : IAsyncEnumerable<IEventQueryResultEntry>
 {
     private static readonly PermitCount Initial = new(100);
@@ -39,7 +41,7 @@ public class EventQueryResponseStream : IAsyncEnumerable<IEventQueryResultEntry>
             LiveEvents = _liveStream,
             NumberOfPermits = Initial.ToInt64(),
             QuerySnapshots = _querySnapshots
-        }, cancellationToken);
+        }).ConfigureAwait(false);
         var moved = _call.ResponseStream.MoveNext(cancellationToken).ConfigureAwait(false);
         // Flow Control message
         if (controller.Increment())
@@ -47,7 +49,7 @@ public class EventQueryResponseStream : IAsyncEnumerable<IEventQueryResultEntry>
             await _call.RequestStream.WriteAsync(new QueryEventsRequest
             {
                 NumberOfPermits = Threshold.ToInt64()
-            }, cancellationToken);
+            }).ConfigureAwait(false);
         }
         var columns = new List<string>();
         while (await moved)
@@ -70,7 +72,7 @@ public class EventQueryResponseStream : IAsyncEnumerable<IEventQueryResultEntry>
                 await _call.RequestStream.WriteAsync(new QueryEventsRequest
                 {
                     NumberOfPermits = Threshold.ToInt64()
-                }, cancellationToken);
+                }).ConfigureAwait(false);
             }
         }
     }

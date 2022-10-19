@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
+using Grpc.Core.Interceptors;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
@@ -11,6 +13,7 @@ public class AxonServerConnectionFactory
     private readonly ConcurrentDictionary<Context, Lazy<AxonServerConnection>> _connections;
     private readonly PermitCount _commandPermits;
     private readonly PermitCount _queryPermits;
+    private readonly IReadOnlyList<Interceptor> _interceptors;
 
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
@@ -33,9 +36,11 @@ public class AxonServerConnectionFactory
                 ClientIdentity, 
                 Authentication, 
                 RoutingServers, 
-                options.LoggerFactory,
-                options.GrpcChannelOptions);
+                options.LoggerFactory, 
+                options.Interceptors,
+                options.GrpcChannelOptions ?? new GrpcChannelOptions());
 
+        _interceptors = options.Interceptors;
         _commandPermits = options.CommandPermits;
         _queryPermits = options.QueryPermits;
 
@@ -50,9 +55,9 @@ public class AxonServerConnectionFactory
     public async Task<IAxonServerConnection> Connect(Context context)
     {
         var connection = _connections.GetOrAdd(context,
-            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _scheduler, _commandPermits, _queryPermits, LoggerFactory)))
+            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _interceptors, _scheduler, _commandPermits, _queryPermits, LoggerFactory)))
             .Value;
-        await connection.Connect();
+        await connection.Connect().ConfigureAwait(false);
         return connection;
     }
 }

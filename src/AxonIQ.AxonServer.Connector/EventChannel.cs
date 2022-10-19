@@ -51,7 +51,7 @@ public class EventChannel : IEventChannel
             Event = @event
         };
         using var call = EventScheduler.ScheduleEventAsync(request);
-        var response = await call.ResponseAsync;
+        var response = await call.ResponseAsync.ConfigureAwait(false);
         return new ScheduledEventCancellationToken(response.Token);
     }
 
@@ -62,7 +62,7 @@ public class EventChannel : IEventChannel
             Token = token.ToString()
         };
         using var call = EventScheduler.CancelScheduledEventAsync(request);
-        return await call.ResponseAsync;
+        return await call.ResponseAsync.ConfigureAwait(false);
     }
 
     public Task<ScheduledEventCancellationToken> Reschedule(ScheduledEventCancellationToken token, Duration duration, Event @event)
@@ -79,7 +79,7 @@ public class EventChannel : IEventChannel
             Token = token.ToString()
         };
         using var call = EventScheduler.RescheduleEventAsync(request);
-        var response = await call.ResponseAsync;
+        var response = await call.ResponseAsync.ConfigureAwait(false);
         return new ScheduledEventCancellationToken(response.Token);
     }
 
@@ -87,7 +87,7 @@ public class EventChannel : IEventChannel
     {
         var request = new ReadHighestSequenceNrRequest{ AggregateId = id.ToString() };
         using var call = EventStore.ReadHighestSequenceNrAsync(request);
-        var response = await call.ResponseAsync;
+        var response = await call.ResponseAsync.ConfigureAwait(false);
         return new EventSequenceNumber(response.ToSequenceNr);
     }
 
@@ -101,7 +101,7 @@ public class EventChannel : IEventChannel
             ForceReadFromLeader = forceReadFromLeader,
             TrackingToken = token.ToInt64() + 1L,
             NumberOfPermits = initial.ToInt64()
-        });
+        }).ConfigureAwait(false);
         return new EventStream(initial, threshold, call, _loggerFactory);
     }
 
@@ -132,7 +132,7 @@ public class EventChannel : IEventChannel
     {
         if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
         using var call = EventStore.AppendSnapshotAsync(snapshot);
-        return await call.ResponseAsync;
+        return await call.ResponseAsync.ConfigureAwait(false);
     }
 
     public IAggregateEventStream LoadSnapshots(AggregateId id, EventSequenceNumber? from = default, EventSequenceNumber? to = default,
@@ -153,7 +153,7 @@ public class EventChannel : IEventChannel
     {
         var request = new GetLastTokenRequest();
         using var call = EventStore.GetLastTokenAsync(request);
-        var token = await call.ResponseAsync;
+        var token = await call.ResponseAsync.ConfigureAwait(false);
         return new EventStreamToken(Math.Max(token.Token, 0L) - 1L);
     }
 
@@ -161,7 +161,7 @@ public class EventChannel : IEventChannel
     {
         var request = new GetFirstTokenRequest();
         using var call = EventStore.GetFirstTokenAsync(request);
-        var token = await call.ResponseAsync;
+        var token = await call.ResponseAsync.ConfigureAwait(false);
         return new EventStreamToken(Math.Max(token.Token, 0L) - 1L);
     }
 
@@ -172,7 +172,7 @@ public class EventChannel : IEventChannel
             Instant = instant
         };
         using var call = EventStore.GetTokenAtAsync(request);
-        var response = await call.ResponseAsync;
+        var response = await call.ResponseAsync.ConfigureAwait(false);
         return new EventStreamToken(Math.Max(response.Token, 0L) - 1L);
     }
 

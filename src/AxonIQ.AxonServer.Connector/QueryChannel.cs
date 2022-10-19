@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Query;
@@ -6,6 +7,8 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
+[SuppressMessage("ReSharper", "MethodSupportsCancellation")]
+[SuppressMessage("Reliability", "CA2016:Forward the \'CancellationToken\' parameter to methods")]
 public class QueryChannel : IQueryChannel, IAsyncDisposable
 {
     private readonly ILoggerFactory _loggerFactory;
@@ -56,9 +59,9 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
     {
         try
         {
-            await foreach (var response in reader.ReadAllAsync(ct))
+            await foreach (var response in reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                await _channel.Writer.WriteAsync(new Protocol.ReceiveQueryProviderInbound(response), ct);
+                await _channel.Writer.WriteAsync(new Protocol.ReceiveQueryProviderInbound(response), ct).ConfigureAwait(false);
             }
         }
         catch (ObjectDisposedException exception)
@@ -105,7 +108,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                 ClientId = ClientIdentity.ClientInstanceId.ToString(),
                                 Permits = disconnected.Flow.Initial.ToInt64()
                             }
-                        }, ct);
+                        }).ConfigureAwait(false);
 
                         disconnected.Flow.Reset();
                         
@@ -143,7 +146,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
     {
         try
         {
-            while (await _channel.Reader.WaitToReadAsync(ct))
+            while (await _channel.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (_channel.Reader.TryRead(out var message))
                 {
@@ -151,11 +154,11 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                     switch (message)
                     {
                         case Protocol.Connect:
-                            await EnsureConnected(ct);
+                            await EnsureConnected(ct).ConfigureAwait(false);
 
                             break;
                         case Protocol.SubscribeQueryHandler subscribe:
-                            await EnsureConnected(ct);
+                            await EnsureConnected(ct).ConfigureAwait(false);
                             switch (_state)
                             {
                                 case State.Connected connected:
@@ -186,7 +189,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                 ComponentName = ClientIdentity.ComponentName.ToString()
                                             }
                                         };
-                                        await connected.Stream.RequestStream.WriteAsync(request, ct);
+                                        await connected.Stream.RequestStream.WriteAsync(request).ConfigureAwait(false);
                                     }
 
                                     break;
@@ -234,7 +237,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                     ComponentName = ClientIdentity.ComponentName.ToString()
                                                 }
                                             };
-                                            await connected.Stream.RequestStream.WriteAsync(request, ct);
+                                            await connected.Stream.RequestStream.WriteAsync(request).ConfigureAwait(false);
                                         }
                                     }
                                     // subscriptions.UnregisterCommandHandler(
@@ -318,7 +321,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                         ClientId = ClientIdentity.ClientInstanceId.ToString(),
                                                         Permits = connected.Flow.Threshold.ToInt64()
                                                     }
-                                                }, ct);
+                                                }).ConfigureAwait(false);
                                             }
                                             break;
                                         case QueryProviderInbound.RequestOneofCase.Query:
@@ -351,7 +354,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                             ErrorMessage = new ErrorMessage
                                                                 { Message = "No handler for query" }
                                                         }
-                                                    }, ct);
+                                                    }).ConfigureAwait(false);
                                                 }
                                             }
                                             break;
@@ -394,7 +397,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                                 InstructionId = receive.Message.InstructionId,
                                                                 Success = true
                                                             }
-                                                        }, ct);
+                                                        }).ConfigureAwait(false);
                                                 }
                                                     break;
                                                 case SubscriptionQueryRequest.RequestOneofCase.Unsubscribe:
@@ -438,7 +441,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                                 ErrorMessage = new ErrorMessage
                                                                     { Message = "No handler for query" }
                                                             }
-                                                        }, ct);
+                                                        }).ConfigureAwait(false);
                                                     }
                                                 }
                                                     break;
@@ -463,7 +466,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    await connected.Stream.RequestStream.WriteAsync(send.Instruction, ct);
+                                    await connected.Stream.RequestStream.WriteAsync(send.Instruction).ConfigureAwait(false);
                                     break;
                                 case State.Disconnected disconnected:
                                     break;
@@ -571,8 +574,8 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                 new Protocol.UnsubscribeQueryHandler(
                     queryHandlerId,
                     subscribedQueries,
-                    unsubscribeCompletionSource));
-            await unsubscribeCompletionSource.Completion;
+                    unsubscribeCompletionSource)).ConfigureAwait(false);
+            await unsubscribeCompletionSource.Completion.ConfigureAwait(false);
         });
     }
 
@@ -620,14 +623,14 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                     SubscriptionIdentifier = request.MessageIdentifier,
                     UpdateResponseType = updateType
                 }
-            }, ct);
+            }).ConfigureAwait(false);
             await call.RequestStream.WriteAsync(new SubscriptionQueryRequest
             {
                 FlowControl = new SubscriptionQuery
                 {
                     NumberOfPermits = bufferSize.ToInt64()
                 }
-            }, ct);
+            }).ConfigureAwait(false);
 
             return new QuerySubscriptionResult(
                 ClientIdentity, 
@@ -651,8 +654,8 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
     {
         _channelCancellation.Cancel();
         _channel.Writer.Complete();
-        await _channel.Reader.Completion;
-        await _protocol;
+        await _channel.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
         _channelCancellation.Dispose();
         _protocol.Dispose();
     }

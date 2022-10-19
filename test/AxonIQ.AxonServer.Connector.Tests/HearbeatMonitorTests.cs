@@ -390,7 +390,59 @@ public class HearbeatMonitorTests
     
     public class WhenHeartbeatIsNotAcknowledgedInTime
     {
+        private TestOutputHelperLogger<HeartbeatMonitor> _logger;
+
+        public WhenHeartbeatIsNotAcknowledgedInTime(ITestOutputHelper output)
+        {
+            _logger = new TestOutputHelperLogger<HeartbeatMonitor>(output);
+        }
         
+        private async Task<HeartbeatMonitor> CreateSystemUnderTest(SendHeartbeat sender)
+        {
+            var sut = new HeartbeatMonitor(sender, () => DateTimeOffset.UtcNow, TimeSpan.Zero, _logger);
+            await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+            return sut;
+        }
+        
+        [Fact]
+        public async Task NeverRespondingHasExpectedResult()
+        {
+            var sender = new CaptureResponderHeartbeatSender();
+            await using var sut = await CreateSystemUnderTest(sender.SendHeartbeat);
+
+            var missed = new TaskCompletionSource();
+            sut.HeartbeatMissed += (_, _) =>
+            {
+                missed.TrySetResult();
+            };
+            await missed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        
+        [Fact]
+        public async Task RespondingTooLateHasExpectedResult()
+        {
+            var sender = new CaptureResponderHeartbeatSender();
+            await using var sut = await CreateSystemUnderTest(sender.SendHeartbeat);
+
+            var missed = new TaskCompletionSource();
+            sut.HeartbeatMissed += (_, _) =>
+            {
+                missed.TrySetResult();
+            };
+            
+            //Allow the heartbeat to be missed 
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            
+            Assert.NotNull(sender.Responder);
+            
+            //Respond after the above delay
+            await sender.Responder(new InstructionAck
+            {
+                Success = true
+            });
+            
+            await missed.Task;
+        }
     }
     
     public class SentHeartbeatCountdown
@@ -415,5 +467,16 @@ public class HearbeatMonitorTests
         }
 
         public Task Completed => _source.Task;
+    }
+    
+    public class CaptureResponderHeartbeatSender
+    {
+        public ReceiveHeartbeatAcknowledgement? Responder { get; private set; }
+
+        public ValueTask SendHeartbeat(ReceiveHeartbeatAcknowledgement responder, TimeSpan timeout)
+        {
+            Responder ??= responder;
+            return ValueTask.CompletedTask;
+        }
     }
 }

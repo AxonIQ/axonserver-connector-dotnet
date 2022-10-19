@@ -1,4 +1,5 @@
 using System.Net;
+using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -43,6 +44,7 @@ public class AxonServerConnectionFactoryOptions
         ILoggerFactory loggerFactory,
         Func<DateTimeOffset>? clock,
         GrpcChannelOptions? grpcChannelOptions,
+        IReadOnlyList<Interceptor> interceptors,
         PermitCount commandPermits,
         PermitCount queryPermits)
     {
@@ -54,6 +56,7 @@ public class AxonServerConnectionFactoryOptions
         LoggerFactory = loggerFactory;
         Clock = clock ?? (() => DateTimeOffset.UtcNow);
         GrpcChannelOptions = grpcChannelOptions;
+        Interceptors = interceptors;
         CommandPermits = commandPermits;
         QueryPermits = queryPermits;
     }
@@ -66,6 +69,7 @@ public class AxonServerConnectionFactoryOptions
     public ILoggerFactory LoggerFactory { get; }
     public Func<DateTimeOffset> Clock { get; }
     public GrpcChannelOptions? GrpcChannelOptions { get; }
+    public IReadOnlyList<Interceptor> Interceptors { get; }
     public PermitCount CommandPermits { get; }
     public PermitCount QueryPermits { get; }
 
@@ -81,6 +85,7 @@ public class AxonServerConnectionFactoryOptions
         private ILoggerFactory _loggerFactory;
         private Func<DateTimeOffset>? _clock;
         private GrpcChannelOptions? _grpcChannelOptions;
+        private readonly List<Interceptor> _interceptors;
         private PermitCount _commandPermits;
         private PermitCount _queryPermits;
 
@@ -99,6 +104,7 @@ public class AxonServerConnectionFactoryOptions
             _loggerFactory = new NullLoggerFactory();
             _clock = null;
             _grpcChannelOptions = null;
+            _interceptors = new List<Interceptor>();
             _commandPermits = AxonServerConnectionFactoryDefaults.DefaultCommandPermits;
             _queryPermits = AxonServerConnectionFactoryDefaults.DefaultQueryPermits;
         }
@@ -215,6 +221,15 @@ public class AxonServerConnectionFactoryOptions
 
             return this;
         }
+        
+        public IAxonServerConnectionFactoryOptionsBuilder WithInterceptors(params Interceptor[] interceptors)
+        {
+            if (interceptors == null) throw new ArgumentNullException(nameof(interceptors));
+
+            _interceptors.AddRange(interceptors);
+
+            return this;
+        }
 
         public IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(PermitCount count)
         {
@@ -246,6 +261,7 @@ public class AxonServerConnectionFactoryOptions
                 _loggerFactory,
                 _clock,
                 _grpcChannelOptions,
+                _interceptors,
                 _commandPermits,
                 _queryPermits);
         }
