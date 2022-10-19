@@ -39,7 +39,7 @@ internal class QueryResponseConsumerStream : IAsyncEnumerable<QueryResponse>
 
         public async ValueTask DisposeAsync()
         {
-            await _enumerator.DisposeAsync();
+            await _enumerator.DisposeAsync().ConfigureAwait(false);
             _disposable.Dispose();
         }
     }

@@ -29,9 +29,9 @@ public class AppendEventsTransaction : IAppendEventsTransaction
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
         {
             _logger.LogDebug("Committing transaction {TransactionId}", _transactionId.ToString("N"));
-            await _call.RequestStream.CompleteAsync();
+            await _call.RequestStream.CompleteAsync().ConfigureAwait(false);
         }
-        return await _call.ResponseAsync;
+        return await _call.ResponseAsync.ConfigureAwait(false);
     }
 
     public Task Rollback()

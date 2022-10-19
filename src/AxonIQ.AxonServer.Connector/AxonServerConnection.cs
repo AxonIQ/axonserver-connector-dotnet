@@ -114,7 +114,7 @@ public class AxonServerConnection : IAxonServerConnection
     {
         try
         {
-            while (await _inbox.Reader.WaitToReadAsync(ct))
+            while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (_inbox.Reader.TryRead(out var message))
                 {
@@ -125,7 +125,7 @@ public class AxonServerConnection : IAxonServerConnection
                             switch (CurrentState)
                             {
                                 case State.Disconnected:
-                                    var channel = await _channelFactory.Create(_context);
+                                    var channel = await _channelFactory.Create(_context).ConfigureAwait(false);
                                     if (channel != null)
                                     {
                                         var callInvoker = channel
@@ -140,7 +140,7 @@ public class AxonServerConnection : IAxonServerConnection
                                         //State needs to be set for the control channel to pick up
                                         //the right call invoker
                                         CurrentState = new State.Connected(channel, callInvoker);
-                                        await _controlChannel.Connect();
+                                        await _controlChannel.Connect().ConfigureAwait(false);
                                     }
                                     else
                                     {
@@ -162,18 +162,19 @@ public class AxonServerConnection : IAxonServerConnection
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
-                                    await _controlChannel.Reconnect();
+                                    await _controlChannel.Reconnect().ConfigureAwait(false);
 
                                     _logger.LogInformation(
                                         "Reconnect for context {Context} requested. Closing current connection",
                                         _context);
-                                    await connected.Channel.ShutdownAsync();
+                                    await connected.Channel.ShutdownAsync().ConfigureAwait(false);
                                     connected.Channel.Dispose();
 
                                     CurrentState = new State.Disconnected();
 
                                     await _scheduler.ScheduleTask(
-                                        () => _inbox.Writer.WriteAsync(new Protocol.Connect(), ct), _scheduler.Clock());
+                                        () => _inbox.Writer.WriteAsync(new Protocol.Connect(), ct), _scheduler.Clock()
+                                    ).ConfigureAwait(false);
                                     break;
                             }
 
@@ -199,7 +200,7 @@ public class AxonServerConnection : IAxonServerConnection
     {
         await _inbox.Writer.WriteAsync(
             new Protocol.Connect()
-        );
+        ).ConfigureAwait(false);
     }
 
     public Task WaitUntilConnected()
@@ -296,11 +297,11 @@ public class AxonServerConnection : IAxonServerConnection
     {
         _inboxCancellation.Cancel();
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion;
-        await _protocol;
+        await _inbox.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
         _controlChannel.Connected -= _onConnectedHandler;
         _controlChannel.HeartbeatMissed -= _onHeartbeatMissedHandler;
-        await _controlChannel.DisposeAsync();
+        await _controlChannel.DisposeAsync().ConfigureAwait(false);
         _inboxCancellation.Dispose();
         _protocol.Dispose();
     }

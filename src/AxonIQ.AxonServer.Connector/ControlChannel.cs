@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core;
@@ -5,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
+[SuppressMessage("ReSharper", "MethodSupportsCancellation")]
 public class ControlChannel : IControlChannel, IAsyncDisposable
 {
     private State _state;
@@ -97,9 +99,9 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
     {
         try
         {
-            await foreach (var response in reader.ReadAllAsync(ct))
+            await foreach (var response in reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                await _inbox.Writer.WriteAsync(new Protocol.ReceivePlatformOutboundInstruction(response), ct);
+                await _inbox.Writer.WriteAsync(new Protocol.ReceivePlatformOutboundInstruction(response), ct).ConfigureAwait(false);
             }
         }
         catch (ObjectDisposedException exception)
@@ -120,7 +122,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
     {
         try
         {
-            while (await _inbox.Reader.WaitToReadAsync(ct))
+            while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (_inbox.Reader.TryRead(out var message))
                 {
@@ -141,9 +143,9 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                         await instructionStream.RequestStream.WriteAsync(new PlatformInboundInstruction
                                         {
                                             Register = ClientIdentity.ToClientIdentification()
-                                        }, ct);
+                                        }).ConfigureAwait(false);
                                         //TODO: Handle Exceptions
-                                        await HeartbeatMonitor.Resume();
+                                        await HeartbeatMonitor.Resume().ConfigureAwait(false);
 
                                         CurrentState = new State.Connected(instructionStream,
                                             ConsumeResponseStream(instructionStream.ResponseStream, ct));
@@ -169,10 +171,10 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
-                                    await HeartbeatMonitor.Pause();
+                                    await HeartbeatMonitor.Pause().ConfigureAwait(false);
 
                                     connected.InstructionStream?.Dispose();
-                                    await connected.ConsumeResponseStreamLoop;
+                                    await connected.ConsumeResponseStreamLoop.ConfigureAwait(false);
 
                                     CurrentState = new State.Disconnected();
                                     break;
@@ -183,10 +185,10 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
-                                    await HeartbeatMonitor.Pause();
+                                    await HeartbeatMonitor.Pause().ConfigureAwait(false);
 
                                     connected.InstructionStream?.Dispose();
-                                    await connected.ConsumeResponseStreamLoop;
+                                    await connected.ConsumeResponseStreamLoop.ConfigureAwait(false);
 
                                     CurrentState = new State.Paused();
                                     break;
@@ -197,8 +199,19 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
-                                    await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction, ct);
-                                    send.CompletionSource.SetResult();
+                                    try
+                                    {
+                                        await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction)
+                                            .ConfigureAwait(false);
+                                        send.CompletionSource.SetResult();
+                                    }
+                                    catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
+                                    {
+                                        send.CompletionSource.SetException(new AxonServerException(ClientIdentity,
+                                            ErrorCategory.InstructionAckError,
+                                            "Unable to send instruction: AxonServer unavailable"));
+                                    }
+
                                     break;
                                 case State.Disconnected:
                                     send.CompletionSource.SetException(new AxonServerException(ClientIdentity,
@@ -212,7 +225,19 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             switch (CurrentState)
                             {
                                 case State.Connected connected:
-                                    await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction);
+                                    try
+                                    {
+                                        await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction)
+                                            .ConfigureAwait(false);
+                                    }
+                                    catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
+                                    {
+                                        _logger.LogWarning(
+                                            exception,
+                                            "Unable to send instruction {Instruction}: AxonServer unavailable",
+                                            send.Instruction);    
+                                    }
+
                                     break;
                                 case State.Disconnected:
                                     _logger.LogWarning(
@@ -233,7 +258,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                         // case PlatformOutboundInstruction.RequestOneofCase.NodeNotification:
                                         //     break;
                                         case PlatformOutboundInstruction.RequestOneofCase.RequestReconnect:
-                                            await RequestReconnect();
+                                            await RequestReconnect().ConfigureAwait(false);
                                             break;
                                         // case PlatformOutboundInstruction.RequestOneofCase.PauseEventProcessor:
                                         //     break;
@@ -248,16 +273,16 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                         // case PlatformOutboundInstruction.RequestOneofCase.MergeEventProcessorSegment:
                                         //     break;
                                         case PlatformOutboundInstruction.RequestOneofCase.Heartbeat:
-                                            await HeartbeatMonitor.ReceiveServerHeartbeat();
+                                            await HeartbeatMonitor.ReceiveServerHeartbeat().ConfigureAwait(false);
                                             await _inbox.Writer.WriteAsync(new Protocol.SendPlatformInboundInstruction(
                                                 new PlatformInboundInstruction
                                                 {
                                                     Heartbeat = new Heartbeat()
-                                                }), ct);
+                                                })).ConfigureAwait(false);
                                             break;
                                         case PlatformOutboundInstruction.RequestOneofCase.Ack:
                                             //NOTE: This COULD be an ack for a heartbeat but is not required to be one.
-                                            await HeartbeatChannel.Receive(received.Instruction.Ack);
+                                            await HeartbeatChannel.Receive(received.Instruction.Ack).ConfigureAwait(false);
                                             break;
                                     }
 
@@ -328,21 +353,21 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
     {
         await _inbox.Writer.WriteAsync(
             new Protocol.Connect()
-        );
+        ).ConfigureAwait(false);
     }
 
     internal async ValueTask Reconnect()
     {
         await _inbox.Writer.WriteAsync(
             new Protocol.Reconnect()
-        );
+        ).ConfigureAwait(false);
     }
     
     internal async ValueTask Disconnect()
     {
         await _inbox.Writer.WriteAsync(
             new Protocol.Disconnect()
-        );
+        ).ConfigureAwait(false);
     }
     
     public Task SendInstruction(PlatformInboundInstruction instruction)
@@ -401,10 +426,10 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
     {
         _inboxCancellation.Cancel();
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion;
-        await _protocol;
+        await _inbox.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
         HeartbeatMonitor.HeartbeatMissed -= _onHeartbeatMissedHandler;
-        await HeartbeatMonitor.DisposeAsync();
+        await HeartbeatMonitor.DisposeAsync().ConfigureAwait(false);
         _inboxCancellation.Dispose();
         _protocol.Dispose();
     }

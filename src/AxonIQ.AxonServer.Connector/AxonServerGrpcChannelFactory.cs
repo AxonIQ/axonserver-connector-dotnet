@@ -43,19 +43,21 @@ public class AxonServerGrpcChannelFactory
             var server = RoutingServers[index];
             _logger.LogInformation("Requesting connection details from {Host}:{Port}", server.Host, server.Port);
             var candidate = GrpcChannel.ForAddress(server.ToUri(), GrpcChannelOptions);
-            var callInvoker = candidate.Intercept(metadata =>
-            {
-                Authentication.WriteTo(metadata);
-                context.WriteTo(metadata);
-                return metadata;
-            }).Intercept(Interceptors.ToArray());
+            var callInvoker = candidate
+                .Intercept(Interceptors.ToArray())
+                .Intercept(metadata =>
+                {
+                    Authentication.WriteTo(metadata);
+                    context.WriteTo(metadata);
+                    return metadata;
+                });
             try
             {
                 var service = new PlatformService.PlatformServiceClient(callInvoker);
                 var info = await service.GetPlatformServerAsync(
                     ClientIdentity.ToClientIdentification()
                     //, new CallOptions(deadline: DateTime.Now)
-                );
+                ).ConfigureAwait(false);
                 _logger.LogDebug("Received PlatformInfo suggesting [{NodeName}] ({Host}:{Port}), {SameConnection}",
                     info.Primary.NodeName,
                     info.Primary.HostName,
@@ -70,7 +72,7 @@ public class AxonServerGrpcChannelFactory
                 }
                 else
                 {
-                    await candidate.ShutdownAsync();
+                    await candidate.ShutdownAsync().ConfigureAwait(false);
                     _logger.LogInformation("Connecting to [{NodeName}] ({Host}:{Port})",
                         info.Primary.NodeName,
                         info.Primary.HostName,
@@ -81,7 +83,7 @@ public class AxonServerGrpcChannelFactory
             }
             catch (Exception exception)
             {
-                await candidate.ShutdownAsync();
+                await candidate.ShutdownAsync().ConfigureAwait(false);
                 _logger.LogWarning(exception, "Connecting to AxonServer node [{Host}:{Port}] failed", server.Host,
                     server.Port);
             }

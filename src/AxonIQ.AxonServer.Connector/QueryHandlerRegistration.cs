@@ -19,7 +19,7 @@ public class QueryHandlerRegistration : IQueryHandlerRegistration
     {
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
         {
-            await _unsubscribe();
+            await _unsubscribe().ConfigureAwait(false);
         }    
     }
 }

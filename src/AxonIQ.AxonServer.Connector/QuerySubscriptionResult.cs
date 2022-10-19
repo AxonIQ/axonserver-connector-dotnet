@@ -57,7 +57,7 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
     {
         try
         {
-            await foreach (var response in reader.ReadAllAsync(cancellationToken: ct))
+            await foreach (var response in reader.ReadAllAsync(cancellationToken: ct).ConfigureAwait(false))
             {
                 switch (response.ResponseCase)
                 {
@@ -71,7 +71,7 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
                         _logger.LogDebug("Received subscription query update. Subscription Id: {SubscriptionId}. Message Id: {MessageId}",
                             response.SubscriptionIdentifier,
                             response.MessageIdentifier);
-                        await _updateChannel.Writer.WriteAsync(response.Update, ct);
+                        await _updateChannel.Writer.WriteAsync(response.Update, ct).ConfigureAwait(false);
                         break;
                     case SubscriptionQueryResponse.ResponseOneofCase.Complete:
                         _logger.LogDebug("Received subscription query complete. Subscription Id: {SubscriptionId}",
@@ -129,7 +129,7 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
                     QueryRequest = _request,
                     SubscriptionIdentifier = _request.MessageIdentifier
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         return await _initialResult;
@@ -142,7 +142,7 @@ public class QuerySubscriptionResult : IQuerySubscriptionResult
     public async ValueTask DisposeAsync()
     {
         _call.Dispose();
-        await _consumer;
+        await _consumer.ConfigureAwait(false);
         _initialResultSource.TrySetCanceled();
     }
 }

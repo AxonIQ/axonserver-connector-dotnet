@@ -1,7 +1,9 @@
 using System.Globalization;
 using AutoFixture;
 using AutoFixture.Idioms;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Xunit;
+using YamlDotNet.Core.Tokens;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 

@@ -10,11 +10,11 @@ public interface IQueryResponseChannel
     {
         try
         {
-            await SendAsync(response);
+            await SendAsync(response).ConfigureAwait(false);
         }
         finally
         {
-            await CompleteAsync();
+            await CompleteAsync().ConfigureAwait(false);
         }
     }
     ValueTask CompleteAsync();

@@ -57,7 +57,7 @@ public class AxonServerConnectionFactory
         var connection = _connections.GetOrAdd(context,
             _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _interceptors, _scheduler, _commandPermits, _queryPermits, LoggerFactory)))
             .Value;
-        await connection.Connect();
+        await connection.Connect().ConfigureAwait(false);
         return connection;
     }
 }

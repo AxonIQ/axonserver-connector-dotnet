@@ -44,7 +44,7 @@ public class Scheduler : IScheduler
     private async Task RunChannelProtocol(CancellationToken ct)
     {
         var all = new HashSet<ScheduledTask>();
-        while (await _inbox.Reader.WaitToReadAsync(ct))
+        while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
         {
             while (_inbox.Reader.TryRead(out var message))
             {
@@ -56,7 +56,7 @@ public class Scheduler : IScheduler
                         _logger.LogDebug("Scheduler has {Count} tasks due", due.Length);
                         foreach (var scheduled in due)
                         {
-                            await scheduled.Task();
+                            await scheduled.Task().ConfigureAwait(false);
                         }
                         all.ExceptWith(due);
                         if (all.Count == 0)
@@ -68,7 +68,7 @@ public class Scheduler : IScheduler
                     case Protocol.ScheduleTask schedule:
                         if (schedule.Due < _clock())
                         {
-                            await schedule.Task();
+                            await schedule.Task().ConfigureAwait(false);
                         }
                         else
                         {
@@ -105,9 +105,9 @@ public class Scheduler : IScheduler
     {
         _inboxCancellation.Cancel();
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion;
-        await _protocol;
-        await _timer.DisposeAsync();
+        await _inbox.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
+        await _timer.DisposeAsync().ConfigureAwait(false);
         _inboxCancellation.Dispose();
         _protocol.Dispose();
     }

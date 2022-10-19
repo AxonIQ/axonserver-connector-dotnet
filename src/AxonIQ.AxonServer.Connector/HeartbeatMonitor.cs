@@ -66,7 +66,7 @@ public class HeartbeatMonitor : IAsyncDisposable
         try
         {
             State state = new State.Disabled(_leaderClock.LogicalTime);
-            while (!ct.IsCancellationRequested && await _inbox.Reader.WaitToReadAsync(ct))
+            while (!ct.IsCancellationRequested && await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (_inbox.Reader.TryRead(out var message))
                 {
@@ -116,7 +116,7 @@ public class HeartbeatMonitor : IAsyncDisposable
                                                     new Protocol.CheckSucceeded(enabled.LogicalTime), ct)
                                                 : _inbox.Writer.WriteAsync(
                                                     new Protocol.CheckFailed(ack.Error, enabled.LogicalTime), ct),
-                                            enabled.Timeout);
+                                            enabled.Timeout).ConfigureAwait(false);
                                         enabled = enabled with
                                         {
                                             NextHeartbeatCheckAt = wallTime.Add(enabled.Interval)
@@ -389,7 +389,7 @@ public class HeartbeatMonitor : IAsyncDisposable
                 timeout,
                 _leaderClock.Next()
             )
-        );
+        ).ConfigureAwait(false);
     }
     
     public async Task Disable()
@@ -398,7 +398,7 @@ public class HeartbeatMonitor : IAsyncDisposable
             new Protocol.Disable(
                 _leaderClock.Next()
             )
-        );
+        ).ConfigureAwait(false);
     }
     
     public async Task Pause()
@@ -407,7 +407,7 @@ public class HeartbeatMonitor : IAsyncDisposable
             new Protocol.Pause(
                 _leaderClock.Next()
             )
-        );
+        ).ConfigureAwait(false);
     }
     
     public async Task Resume()
@@ -416,7 +416,7 @@ public class HeartbeatMonitor : IAsyncDisposable
             new Protocol.Resume(
                 _leaderClock.Next()
             )
-        );
+        ).ConfigureAwait(false);
     }
 
     public async Task ReceiveServerHeartbeat()
@@ -425,7 +425,7 @@ public class HeartbeatMonitor : IAsyncDisposable
             new Protocol.ReceiveServerHeartbeat(
                 _leaderClock.LogicalTime
             )
-        );
+        ).ConfigureAwait(false);
     }
     
     public event EventHandler? HeartbeatMissed;
@@ -439,9 +439,9 @@ public class HeartbeatMonitor : IAsyncDisposable
     {
         _inboxCancellation.Cancel();
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion;
-        await _protocol;
-        await _timer.DisposeAsync();
+        await _inbox.Reader.Completion.ConfigureAwait(false);
+        await _protocol.ConfigureAwait(false);
+        await _timer.DisposeAsync().ConfigureAwait(false);
         _inboxCancellation.Dispose();
         _protocol.Dispose();
     }
