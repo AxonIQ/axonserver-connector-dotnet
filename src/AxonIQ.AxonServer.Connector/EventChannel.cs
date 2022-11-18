@@ -32,6 +32,12 @@ public class EventChannel : IEventChannel
     public EventStore.EventStoreClient EventStore { get; }
     public EventScheduler.EventSchedulerClient EventScheduler { get; }
     
+    public ValueTask Reconnect()
+    {
+        //TODO
+        return ValueTask.CompletedTask;
+    }
+    
     public IAppendEventsTransaction StartAppendEventsTransaction()
     {
         return new AppendEventsTransaction(EventStore.AppendEvent(),

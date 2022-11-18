@@ -550,6 +550,13 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
             Dictionary<string, QueryTask> QueryTasks,
             Dictionary<SubscriptionIdentifier, ISubscriptionQueryRegistration?> SubscriptionQueryRegistrations) : State;
     }
+
+    public bool IsConnected => _state is State.Connected;
+    
+    public async ValueTask Reconnect()
+    {
+        await _channel.Writer.WriteAsync(new Protocol.Reconnect()).ConfigureAwait(false);
+    }
     
     public async Task<IQueryHandlerRegistration> RegisterQueryHandler(IQueryHandler handler, params QueryDefinition[] queries)
     {
