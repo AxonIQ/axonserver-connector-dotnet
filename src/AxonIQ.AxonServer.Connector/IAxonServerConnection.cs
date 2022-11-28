@@ -3,6 +3,10 @@ namespace AxonIQ.AxonServer.Connector;
 public interface IAxonServerConnection : IAsyncDisposable
 {
     /// <summary>
+    /// Provides access to the admin channel set up with Axon Server.
+    /// </summary>
+    IAdminChannel AdminChannel { get; }
+    /// <summary>
     /// Provides access to the control channel set up with Axon Server.
     /// </summary>
     IControlChannel ControlChannel { get; }

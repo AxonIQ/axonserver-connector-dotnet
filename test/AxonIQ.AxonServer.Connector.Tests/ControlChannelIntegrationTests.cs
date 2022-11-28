@@ -4,7 +4,6 @@ using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Connector.Tests.Interceptors;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
 

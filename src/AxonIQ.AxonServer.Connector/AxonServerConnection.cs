@@ -22,6 +22,7 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly CancellationTokenSource _inboxCancellation;
     private readonly Task _protocol;
     private readonly ControlChannel _controlChannel;
+    private readonly Lazy<AdminChannel> _adminChannel;
     private readonly Lazy<CommandChannel> _commandChannel;
     private readonly Lazy<QueryChannel> _queryChannel;
     private readonly Lazy<EventChannel> _eventChannel;
@@ -58,7 +59,10 @@ public class AxonServerConnection : IAxonServerConnection
             Reconnect,
             _scheduler.Clock,
             _loggerFactory);
-        _commandChannel = new Lazy<CommandChannel>(() =>new CommandChannel(
+        _adminChannel = new Lazy<AdminChannel>(() => new AdminChannel(
+            channelFactory.ClientIdentity,
+            _callInvokerProxy));
+        _commandChannel = new Lazy<CommandChannel>(() => new CommandChannel(
             channelFactory.ClientIdentity,
             _context,
             scheduler.Clock,
@@ -312,8 +316,10 @@ public class AxonServerConnection : IAxonServerConnection
 
         public record Connected(GrpcChannel Channel, CallInvoker CallInvoker) : State(CallInvoker);
     }
-
+    
     public IControlChannel ControlChannel => _controlChannel;
+    
+    public IAdminChannel AdminChannel => _adminChannel.Value;
 
     public ICommandChannel CommandChannel => _commandChannel.Value;
 
