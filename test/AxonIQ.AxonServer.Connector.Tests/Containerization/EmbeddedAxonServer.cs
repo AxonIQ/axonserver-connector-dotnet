@@ -42,7 +42,7 @@ public class EmbeddedAxonServer : IAxonServer
         var builder = new Builder()
             .UseContainer()
             .ReuseIfExists()
-            .UseImage("axoniq/axonserver")
+            .UseImage("axoniq/axonserver:latest")
             .RemoveVolumesOnDispose()
             .ExposePort(8024)
             .ExposePort(8124)

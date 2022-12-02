@@ -10,6 +10,10 @@ public interface IAxonCluster : IAsyncLifetime
     IReadOnlyList<Context> Contexts { get; }
 
     IReadOnlyList<DnsEndPoint> GetHttpEndpoints();
+    
+    DnsEndPoint GetRandomHttpEndpoint();
 
     IReadOnlyList<DnsEndPoint> GetGrpcEndpoints();
+    
+    DnsEndPoint GetRandomGrpcEndpoint();
 }

@@ -83,9 +83,8 @@ public class AdminChannel : IAdminChannel
         return result.Result;
     }
 
-    public Task LoadBalanceEventProcessor(EventProcessorName name, TokenStoreIdentifier identifier, string strategy)
+    public async Task LoadBalanceEventProcessor(EventProcessorName name, TokenStoreIdentifier identifier, string strategy)
     {
-        //TODO: Why was this designed this way and are we supposed to read any results or somehow wait for it to complete?
         using var result = EventProcessorAdminService.LoadBalanceProcessor(new LoadBalanceRequest
         {
             Processor = new EventProcessorIdentifier
@@ -95,12 +94,11 @@ public class AdminChannel : IAdminChannel
             },
             Strategy = strategy
         });
-        return Task.CompletedTask;
+        await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
     public async Task SetAutoLoadBalanceStrategy(EventProcessorName name, TokenStoreIdentifier identifier, string strategy)
     {
-        //TODO: Why was this designed this way and are we supposed to read any results or somehow wait for it to complete?
         using var result = EventProcessorAdminService.SetAutoLoadBalanceStrategy(new LoadBalanceRequest
         {
             Processor = new EventProcessorIdentifier
@@ -137,6 +135,7 @@ public class AdminChannel : IAdminChannel
 
     public async Task CreateOrUpdateUser(CreateOrUpdateUserRequest request)
     {
+        if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = UserAdminService.CreateOrUpdateUser(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
@@ -158,11 +157,13 @@ public class AdminChannel : IAdminChannel
 
     public async Task CreateOrUpdateApplication(ApplicationRequest request)
     {
+        if (request == null) throw new ArgumentNullException(nameof(request));
         await ApplicationAdminService.CreateOrUpdateApplicationAsync(request).ConfigureAwait(false);
     }
 
     public async Task<ApplicationOverview> GetApplication(string applicationName)
     {
+        if (applicationName == null) throw new ArgumentNullException(nameof(applicationName));
         return await ApplicationAdminService.GetApplicationAsync(new ApplicationId
         {
             ApplicationName = applicationName
@@ -183,6 +184,7 @@ public class AdminChannel : IAdminChannel
 
     public async Task DeleteApplication(string applicationName)
     {
+        if (applicationName == null) throw new ArgumentNullException(nameof(applicationName));
         using var result =
             ApplicationAdminService.DeleteApplication(new ApplicationId { ApplicationName = applicationName });
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
@@ -190,67 +192,92 @@ public class AdminChannel : IAdminChannel
 
     public async Task CreateContext(CreateContextRequest request)
     {
+        if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ContextAdminService.CreateContext(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task UpdateContextProperties(UpdateContextPropertiesRequest request)
+    public async Task UpdateContextProperties(UpdateContextPropertiesRequest request)
     {
-        throw new NotImplementedException();
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        using var result = ContextAdminService.UpdateContextProperties(request);
+        await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task DeleteContext(DeleteContextRequest request)
+    public async Task DeleteContext(DeleteContextRequest request)
     {
-        throw new NotImplementedException();
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        using var result = ContextAdminService.DeleteContext(request);
+        await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task<ContextOverview> GetContextOverview(string context)
+    public async Task<ContextOverview> GetContextOverview(string context)
     {
-        throw new NotImplementedException();
+        if (context == null) throw new ArgumentNullException(nameof(context));
+        return await ContextAdminService.GetContextAsync(new GetContextRequest
+        {
+            Name = context
+        }).ConfigureAwait(false);
     }
 
-    public Task<IReadOnlyCollection<ContextOverview>> GetAllContexts()
+    public async Task<IReadOnlyCollection<ContextOverview>> GetAllContexts()
     {
-        throw new NotImplementedException();
+        using var result = ContextAdminService.GetContexts(new Empty());
+        return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
     public IAsyncEnumerable<ContextUpdate> SubscribeToContextUpdates()
     {
-        throw new NotImplementedException();
+        var result = ContextAdminService.SubscribeContextUpdates(new Empty());
+        return result.ResponseStream.ReadAllAsync();
     }
 
-    public Task CreateReplicationGroup(CreateReplicationGroupRequest request)
+    public async Task CreateReplicationGroup(CreateReplicationGroupRequest request)
     {
-        throw new NotImplementedException();
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        using var result = ReplicationGroupAdminService.CreateReplicationGroup(request);
+        await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task DeleteReplicationGroup(DeleteReplicationGroupRequest request)
+    public async Task DeleteReplicationGroup(DeleteReplicationGroupRequest request)
     {
-        throw new NotImplementedException();
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        using var result = ReplicationGroupAdminService.DeleteReplicationGroup(request);
+        await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task<ReplicationGroupOverview> GetReplicationGroup(string replicationGroup)
+    public async Task<ReplicationGroupOverview> GetReplicationGroup(string replicationGroup)
     {
-        throw new NotImplementedException();
+        if (replicationGroup == null) throw new ArgumentNullException(nameof(replicationGroup));
+        return await ReplicationGroupAdminService.GetReplicationGroupAsync(new GetReplicationGroupRequest
+        {
+            Name = replicationGroup
+        }).ConfigureAwait(false);
     }
 
-    public Task<IReadOnlyCollection<ReplicationGroupOverview>> GetAllReplicationGroups()
+    public async Task<IReadOnlyCollection<ReplicationGroupOverview>> GetAllReplicationGroups()
     {
-        throw new NotImplementedException();
+        var result = ReplicationGroupAdminService.GetReplicationGroups(new Empty());
+        return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task<IReadOnlyCollection<NodeOverview>> GetAllNodes()
+    public async Task<IReadOnlyCollection<NodeOverview>> GetAllNodes()
     {
-        throw new NotImplementedException();
+        var result = ReplicationGroupAdminService.GetNodes(new Empty());
+        return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task AddNodeToReplicationGroup(JoinReplicationGroup request)
+    public async Task AddNodeToReplicationGroup(JoinReplicationGroup request)
     {
-        throw new NotImplementedException();
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        using var result = ReplicationGroupAdminService.AddNodeToReplicationGroup(request);
+        await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public Task RemoveNodeFromReplicationGroup(LeaveReplicationGroup request)
+    public async Task RemoveNodeFromReplicationGroup(LeaveReplicationGroup request)
     {
-        throw new NotImplementedException();
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        using var result = ReplicationGroupAdminService.RemoveNodeFromReplicationGroup(request);
+        await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 }

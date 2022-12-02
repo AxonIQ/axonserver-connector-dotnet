@@ -19,10 +19,22 @@ public abstract class AxonCluster : IAxonCluster
     {
         return Cluster.GetHttpEndpoints();
     }
+    
+    public DnsEndPoint GetRandomHttpEndpoint()
+    {
+        var endpoints = Cluster.GetHttpEndpoints();
+        return endpoints[Random.Shared.Next(0, endpoints.Count)];
+    }
 
     public IReadOnlyList<DnsEndPoint> GetGrpcEndpoints()
     {
         return Cluster.GetGrpcEndpoints();
+    }
+    
+    public DnsEndPoint GetRandomGrpcEndpoint()
+    {
+        var endpoints = Cluster.GetGrpcEndpoints();
+        return endpoints[Random.Shared.Next(0, endpoints.Count)];
     }
 
     public Task DisposeAsync()

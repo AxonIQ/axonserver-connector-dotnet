@@ -17,7 +17,7 @@ public static class FixtureExtensions
     {
         fixture.Customize<Context>(composer =>
             composer
-                .FromFactory((string value) => new Context(value))
+                .FromFactory((int value) => new Context($"c{value}"))
                 .OmitAutoProperties());
     }
 
