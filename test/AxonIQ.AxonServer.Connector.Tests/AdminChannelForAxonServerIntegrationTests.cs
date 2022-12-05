@@ -40,7 +40,7 @@ public class AdminChannelForAxonServerIntegrationTests
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
         var connection = await factory.Connect(Context.Default);
-        
+        await connection.WaitUntilReady();
         return connection;
     }
     
