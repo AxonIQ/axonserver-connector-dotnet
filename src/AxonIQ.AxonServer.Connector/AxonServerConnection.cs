@@ -277,8 +277,9 @@ public class AxonServerConnection : IAxonServerConnection
     public bool IsReady => 
         IsConnected 
         && _controlChannel.IsConnected
+        // _adminChannel does not have this notion
         && (!_commandChannel.IsValueCreated || _commandChannel.Value.IsConnected)
-        // EventChannel does not have this notion
+        // _eventChannel does not have this notion
         && (!_queryChannel.IsValueCreated || _queryChannel.Value.IsConnected);
     
     public Task WaitUntilReady()
