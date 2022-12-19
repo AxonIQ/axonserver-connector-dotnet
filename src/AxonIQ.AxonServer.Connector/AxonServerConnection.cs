@@ -22,9 +22,10 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly CancellationTokenSource _inboxCancellation;
     private readonly Task _protocol;
     private readonly ControlChannel _controlChannel;
-    private readonly CommandChannel _commandChannel;
-    private readonly QueryChannel _queryChannel;
-    private readonly EventChannel _eventChannel;
+    private readonly Lazy<AdminChannel> _adminChannel;
+    private readonly Lazy<CommandChannel> _commandChannel;
+    private readonly Lazy<QueryChannel> _queryChannel;
+    private readonly Lazy<EventChannel> _eventChannel;
     private readonly EventHandler _onConnectedHandler;
     private readonly EventHandler _onHeartbeatMissedHandler;
 
@@ -34,6 +35,7 @@ public class AxonServerConnection : IAxonServerConnection
         IScheduler scheduler,
         PermitCount commandPermits,
         PermitCount queryPermits,
+        TimeSpan eventProcessorUpdateFrequency,
         ILoggerFactory loggerFactory)
     {
         _context = context;
@@ -55,31 +57,35 @@ public class AxonServerConnection : IAxonServerConnection
             channelFactory.ClientIdentity,
             _context,
             _callInvokerProxy,
-            () => _inbox.Writer.WriteAsync(new Protocol.Reconnect(), _inboxCancellation.Token),
-            _scheduler.Clock,
+            Reconnect,
+            _scheduler,
+            eventProcessorUpdateFrequency,
             _loggerFactory);
-        _commandChannel = new CommandChannel(
+        _adminChannel = new Lazy<AdminChannel>(() => new AdminChannel(
+            channelFactory.ClientIdentity,
+            _callInvokerProxy));
+        _commandChannel = new Lazy<CommandChannel>(() => new CommandChannel(
             channelFactory.ClientIdentity,
             _context,
             scheduler.Clock,
             _callInvokerProxy,
             commandPermits,
             new PermitCount(commandPermits.ToInt64() / 4L),
-            _loggerFactory);
-        _queryChannel = new QueryChannel(
+            _loggerFactory));
+        _queryChannel = new Lazy<QueryChannel>(() => new QueryChannel(
             channelFactory.ClientIdentity,
             _context,
             scheduler.Clock,
             _callInvokerProxy,
             queryPermits,
             new PermitCount(queryPermits.ToInt64() / 4L),
-            _loggerFactory);
-        _eventChannel = new EventChannel(
+            _loggerFactory));
+        _eventChannel = new Lazy<EventChannel>(() => new EventChannel(
             channelFactory.ClientIdentity,
             _context,
             scheduler.Clock,
             _callInvokerProxy,
-            _loggerFactory);
+            _loggerFactory));
         _onConnectedHandler = (_, _) =>
         {
             OnReady();
@@ -203,6 +209,28 @@ public class AxonServerConnection : IAxonServerConnection
         ).ConfigureAwait(false);
     }
 
+    private async ValueTask Reconnect()
+    {
+        await _inbox.Writer.WriteAsync(
+            new Protocol.Reconnect()
+        ).ConfigureAwait(false);
+        
+        if (_commandChannel.IsValueCreated)
+        {
+            await _commandChannel.Value.Reconnect().ConfigureAwait(false);
+        }
+        
+        if (_queryChannel.IsValueCreated)
+        {
+            await _queryChannel.Value.Reconnect().ConfigureAwait(false);
+        }
+        
+        if (_eventChannel.IsValueCreated)
+        {
+            await _eventChannel.Value.Reconnect().ConfigureAwait(false);
+        }
+    }
+
     public Task WaitUntilConnected()
     {
         if (IsConnected)
@@ -248,7 +276,14 @@ public class AxonServerConnection : IAxonServerConnection
         Ready?.Invoke(this, EventArgs.Empty);
     }
 
-    public bool IsReady => IsConnected && _controlChannel.IsConnected;
+    public bool IsReady => 
+        IsConnected 
+        && _controlChannel.IsConnected
+        // _adminChannel does not have this notion
+        && (!_commandChannel.IsValueCreated || _commandChannel.Value.IsConnected)
+        // _eventChannel does not have this notion
+        && (!_queryChannel.IsValueCreated || _queryChannel.Value.IsConnected);
+    
     public Task WaitUntilReady()
     {
         if (IsReady)
@@ -284,14 +319,16 @@ public class AxonServerConnection : IAxonServerConnection
 
         public record Connected(GrpcChannel Channel, CallInvoker CallInvoker) : State(CallInvoker);
     }
-
+    
     public IControlChannel ControlChannel => _controlChannel;
+    
+    public IAdminChannel AdminChannel => _adminChannel.Value;
 
-    public ICommandChannel CommandChannel => _commandChannel;
+    public ICommandChannel CommandChannel => _commandChannel.Value;
 
-    public IQueryChannel QueryChannel => _queryChannel;
+    public IQueryChannel QueryChannel => _queryChannel.Value;
 
-    public IEventChannel EventChannel => _eventChannel;
+    public IEventChannel EventChannel => _eventChannel.Value;
 
     public async ValueTask DisposeAsync()
     {

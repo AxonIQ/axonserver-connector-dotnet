@@ -42,7 +42,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         _state = new State.Disconnected(
             new CommandSubscriptions(clientIdentity, clock),
             new FlowController(permits, permitsBatch),
-            new Dictionary<Command, CommandTask>());
+            new TaskRunCache());
         _channel = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -335,74 +335,50 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                         }).ConfigureAwait(false);
                                                 }
 
-                                                connected.CommandTasks.Add(receive.Message.Command,
-                                                    new CommandTask(
-                                                        handler(receive.Message.Command, ct)
-                                                            .ContinueWith(
-                                                                continuation =>
+                                                var token = connected.CommandTasks.NextToken();
+                                                connected.CommandTasks.Add(token,
+                                                    Task.Run(async () =>
+                                                    {
+                                                        try
+                                                        {
+                                                            var result = await handler(receive.Message.Command, ct).ConfigureAwait(false);
+                                                            var response =
+                                                                new CommandResponse(result)
                                                                 {
-                                                                    if (!continuation.IsCanceled)
+                                                                    RequestIdentifier =
+                                                                        receive.Message.Command
+                                                                            .MessageIdentifier
+                                                                };
+                                                            await _channel.Writer.WriteAsync(
+                                                                new Protocol.SendCommandResponse(
+                                                                    token,
+                                                                    response));
+                                                        }
+                                                        catch (Exception exception)
+                                                        {
+                                                            var response = new CommandResponse
+                                                            {
+                                                                ErrorCode = ErrorCategory
+                                                                    .CommandExecutionError.ToString(),
+                                                                ErrorMessage = new ErrorMessage
+                                                                {
+                                                                    Details =
                                                                     {
-                                                                        if (continuation.IsFaulted)
-                                                                        {
-                                                                            var response = new CommandResponse
-                                                                            {
-                                                                                ErrorCode = ErrorCategory
-                                                                                    .CommandExecutionError.ToString(),
-                                                                                ErrorMessage = new ErrorMessage
-                                                                                {
-                                                                                    Details =
-                                                                                    {
-                                                                                        continuation.Exception
-                                                                                            ?.ToString() ?? ""
-                                                                                    },
-                                                                                    Location = "Client",
-                                                                                    Message = continuation.Exception
-                                                                                        ?.Message ?? ""
-                                                                                },
-                                                                                RequestIdentifier =
-                                                                                    receive.Message.Command
-                                                                                        .MessageIdentifier
-                                                                            };
-                                                                            if (!_channel.Writer.TryWrite(
-                                                                                    new Protocol.SendCommandResponse(
-                                                                                        receive.Message.Command,
-                                                                                        response)))
-                                                                            {
-                                                                                _logger.LogWarning(
-                                                                                    "Could not tell the command channel to send the command response after handling a command was completed faulty because the channel refused to accept the message");
-                                                                            }
-                                                                        }
-                                                                        else if (continuation.IsCompletedSuccessfully)
-                                                                        {
-                                                                            var response =
-                                                                                new CommandResponse(continuation.Result)
-                                                                                {
-                                                                                    RequestIdentifier =
-                                                                                        receive.Message.Command
-                                                                                            .MessageIdentifier
-                                                                                };
-                                                                            if (!_channel.Writer.TryWrite(
-                                                                                    new Protocol.SendCommandResponse(
-                                                                                        receive.Message.Command,
-                                                                                        response)))
-                                                                            {
-                                                                                _logger.LogWarning(
-                                                                                    "Could not tell the command channel to send the command response after handling a command was completed successfully because the channel refused to accept the message");
-                                                                            }
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            _logger.LogWarning(
-                                                                                "Handling a command completed in an unexpected way and a response will not be sent");
-                                                                        }
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        _logger.LogDebug(
-                                                                            "Handling a command was cancelled and a response will not be sent");
-                                                                    }
-                                                                }, ct)));
+                                                                        exception.ToString() ?? ""
+                                                                    },
+                                                                    Location = "Client",
+                                                                    Message = exception.Message ?? ""
+                                                                },
+                                                                RequestIdentifier =
+                                                                    receive.Message.Command
+                                                                        .MessageIdentifier
+                                                            };
+                                                            await _channel.Writer.WriteAsync(
+                                                                new Protocol.SendCommandResponse(
+                                                                    token,
+                                                                    response));
+                                                        }
+                                                    }, ct));
                                             }
                                             else
                                             {
@@ -459,8 +435,10 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    if (connected.CommandTasks.Remove(send.Command))
+                                    if (connected.CommandTasks.TryRemove(send.Token, out var commandTask))
                                     {
+                                        await commandTask.ConfigureAwait(false);
+                                        
                                         await connected.Stream.RequestStream.WriteAsync(new CommandProviderOutbound
                                         {
                                             CommandResponse = send.CommandResponse
@@ -525,7 +503,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
         public record ReceiveCommandProviderInbound(CommandProviderInbound Message) : Protocol;
 
-        public record SendCommandResponse(Command Command, CommandResponse CommandResponse) : Protocol;
+        public record SendCommandResponse(long Token, CommandResponse CommandResponse) : Protocol;
 
         public record SubscribeCommandHandler(
             CommandHandlerId CommandHandlerId,
@@ -549,16 +527,23 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         public record Disconnected(
             CommandSubscriptions CommandSubscriptions,
             FlowController Flow,
-            Dictionary<Command, CommandTask> CommandTasks) : State;
+            TaskRunCache CommandTasks) : State;
 
         public record Connected(
             AsyncDuplexStreamingCall<CommandProviderOutbound, CommandProviderInbound> Stream,
             Task ConsumeResponseStreamLoop,
             CommandSubscriptions CommandSubscriptions,
             FlowController Flow,
-            Dictionary<Command, CommandTask> CommandTasks) : State;
+            TaskRunCache CommandTasks) : State;
     }
 
+    public bool IsConnected => _state is State.Connected;
+
+    public async ValueTask Reconnect()
+    {
+        await _channel.Writer.WriteAsync(new Protocol.Reconnect()).ConfigureAwait(false);
+    }
+    
     public async Task<ICommandHandlerRegistration> RegisterCommandHandler(
         Func<Command, CancellationToken, Task<CommandResponse>> handler,
         LoadFactor loadFactor,
@@ -644,20 +629,5 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         await _protocol.ConfigureAwait(false);
         _channelCancellation.Dispose();
         _protocol.Dispose();
-    }
-}
-
-public class CommandTask : IDisposable
-{
-    private readonly Task _task;
-
-    public CommandTask(Task task)
-    {
-        _task = task ?? throw new ArgumentNullException(nameof(task));
-    }
-
-    public void Dispose()
-    {
-        _task.Dispose();
     }
 }

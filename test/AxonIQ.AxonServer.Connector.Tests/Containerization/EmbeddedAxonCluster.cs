@@ -74,10 +74,22 @@ public class EmbeddedAxonCluster : IAxonCluster
     {
         return Array.ConvertAll(_nodes, node => node.GetHttpEndpoint());
     }
+    
+    public DnsEndPoint GetRandomHttpEndpoint()
+    {
+        var endpoints = GetHttpEndpoints();
+        return endpoints[Random.Shared.Next(0, endpoints.Count)];
+    }
 
     public IReadOnlyList<DnsEndPoint> GetGrpcEndpoints()
     {
         return Array.ConvertAll(_nodes, node => node.GetGrpcEndpoint());
+    }
+    
+    public DnsEndPoint GetRandomGrpcEndpoint()
+    {
+        var endpoints = GetGrpcEndpoints();
+        return endpoints[Random.Shared.Next(0, endpoints.Count)];
     }
 
     public Task DisposeAsync()

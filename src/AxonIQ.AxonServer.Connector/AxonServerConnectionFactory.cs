@@ -14,6 +14,7 @@ public class AxonServerConnectionFactory
     private readonly PermitCount _commandPermits;
     private readonly PermitCount _queryPermits;
     private readonly IReadOnlyList<Interceptor> _interceptors;
+    private readonly TimeSpan _eventProcessorUpdateFrequency;
 
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
@@ -43,6 +44,7 @@ public class AxonServerConnectionFactory
         _interceptors = options.Interceptors;
         _commandPermits = options.CommandPermits;
         _queryPermits = options.QueryPermits;
+        _eventProcessorUpdateFrequency = options.EventProcessorUpdateFrequency;
 
         _connections = new ConcurrentDictionary<Context, Lazy<AxonServerConnection>>();
     }
@@ -55,7 +57,7 @@ public class AxonServerConnectionFactory
     public async Task<IAxonServerConnection> Connect(Context context)
     {
         var connection = _connections.GetOrAdd(context,
-            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _interceptors, _scheduler, _commandPermits, _queryPermits, LoggerFactory)))
+            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _interceptors, _scheduler, _commandPermits, _queryPermits, _eventProcessorUpdateFrequency, LoggerFactory)))
             .Value;
         await connection.Connect().ConfigureAwait(false);
         return connection;

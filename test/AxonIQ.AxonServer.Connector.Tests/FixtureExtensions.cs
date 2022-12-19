@@ -17,7 +17,7 @@ public static class FixtureExtensions
     {
         fixture.Customize<Context>(composer =>
             composer
-                .FromFactory((string value) => new Context(value))
+                .FromFactory((int value) => new Context($"c{value}"))
                 .OmitAutoProperties());
     }
 
@@ -77,6 +77,22 @@ public static class FixtureExtensions
         fixture.Customize<DnsEndPoint>(composer =>
             composer
                 .FromFactory((int port) => new DnsEndPoint("127.0.0.0", port % 1024))
+                .OmitAutoProperties());
+    }
+    
+    public static void CustomizeEventProcessorName(this IFixture fixture)
+    {
+        fixture.Customize<EventProcessorName>(composer =>
+            composer
+                .FromFactory<int>(value => new EventProcessorName($"P{value}"))
+                .OmitAutoProperties());
+    }
+    
+    public static void CustomizeSegmentId(this IFixture fixture)
+    {
+        fixture.Customize<SegmentId>(composer =>
+            composer
+                .FromFactory<int>(value => new SegmentId(Math.Abs(value)))
                 .OmitAutoProperties());
     }
 }

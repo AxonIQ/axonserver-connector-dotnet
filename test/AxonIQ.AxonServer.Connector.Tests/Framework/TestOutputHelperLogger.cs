@@ -22,9 +22,18 @@ public class TestOutputHelperLogger : ILogger
     
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        _output.WriteLine(_categoryName != null
-            ? $"[{logLevel.ToString()}]:{_categoryName}:{formatter(state, exception)}"
-            : $"[{logLevel.ToString()}]:{formatter(state, exception)}");
+        if (exception == null)
+        {
+            _output.WriteLine(_categoryName != null
+                ? $"[{logLevel.ToString()}]:{_categoryName}:{formatter(state, exception)}"
+                : $"[{logLevel.ToString()}]:{formatter(state, exception)}");
+        }
+        else
+        {
+            _output.WriteLine(_categoryName != null
+                ? $"[{logLevel.ToString()}]:{_categoryName}:{formatter(state, exception)}:{exception.ToString()}"
+                : $"[{logLevel.ToString()}]:{formatter(state, exception)}:{exception.ToString()}");
+        }
     }
 
     public bool IsEnabled(LogLevel logLevel)
