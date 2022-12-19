@@ -35,6 +35,7 @@ public class AxonServerConnection : IAxonServerConnection
         IScheduler scheduler,
         PermitCount commandPermits,
         PermitCount queryPermits,
+        TimeSpan eventProcessorUpdateFrequency,
         ILoggerFactory loggerFactory)
     {
         _context = context;
@@ -57,7 +58,8 @@ public class AxonServerConnection : IAxonServerConnection
             _context,
             _callInvokerProxy,
             Reconnect,
-            _scheduler.Clock,
+            _scheduler,
+            eventProcessorUpdateFrequency,
             _loggerFactory);
         _adminChannel = new Lazy<AdminChannel>(() => new AdminChannel(
             channelFactory.ClientIdentity,

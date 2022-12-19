@@ -46,7 +46,8 @@ public class AxonServerConnectionFactoryOptions
         GrpcChannelOptions? grpcChannelOptions,
         IReadOnlyList<Interceptor> interceptors,
         PermitCount commandPermits,
-        PermitCount queryPermits)
+        PermitCount queryPermits,
+        TimeSpan eventProcessorUpdateFrequency)
     {
         ComponentName = componentName;
         ClientInstanceId = clientInstanceId;
@@ -59,6 +60,7 @@ public class AxonServerConnectionFactoryOptions
         Interceptors = interceptors;
         CommandPermits = commandPermits;
         QueryPermits = queryPermits;
+        EventProcessorUpdateFrequency = eventProcessorUpdateFrequency;
     }
 
     public ComponentName ComponentName { get; }
@@ -72,6 +74,7 @@ public class AxonServerConnectionFactoryOptions
     public IReadOnlyList<Interceptor> Interceptors { get; }
     public PermitCount CommandPermits { get; }
     public PermitCount QueryPermits { get; }
+    public TimeSpan EventProcessorUpdateFrequency { get; }
 
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
@@ -88,6 +91,7 @@ public class AxonServerConnectionFactoryOptions
         private readonly List<Interceptor> _interceptors;
         private PermitCount _commandPermits;
         private PermitCount _queryPermits;
+        private TimeSpan _eventProcessorUpdateFrequency;
 
         internal Builder(ComponentName componentName, ClientInstanceId clientInstanceId)
         {
@@ -107,6 +111,7 @@ public class AxonServerConnectionFactoryOptions
             _interceptors = new List<Interceptor>();
             _commandPermits = AxonServerConnectionFactoryDefaults.DefaultCommandPermits;
             _queryPermits = AxonServerConnectionFactoryDefaults.DefaultQueryPermits;
+            _eventProcessorUpdateFrequency = AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency;
         }
 
         public IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name)
@@ -244,6 +249,13 @@ public class AxonServerConnectionFactoryOptions
 
             return this;
         }
+        
+        public IAxonServerConnectionFactoryOptionsBuilder WithEventProcessorUpdateFrequency(TimeSpan frequency)
+        {
+            _eventProcessorUpdateFrequency = TimeSpanMath.Max(AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency, frequency);
+
+            return this;
+        }
 
         public AxonServerConnectionFactoryOptions Build()
         {
@@ -263,7 +275,8 @@ public class AxonServerConnectionFactoryOptions
                 _grpcChannelOptions,
                 _interceptors,
                 _commandPermits,
-                _queryPermits);
+                _queryPermits,
+                _eventProcessorUpdateFrequency);
         }
     }
 }
