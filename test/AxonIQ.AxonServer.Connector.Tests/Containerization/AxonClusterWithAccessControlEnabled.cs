@@ -1,10 +1,12 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Embedded;
 using Microsoft.Extensions.Logging;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
-public class AxonClusterWithAccessControlEnabled : AxonCluster
+public class AxonClusterWithAccessControlEnabled : AxonCluster, IAsyncLifetime
 {
     public AxonClusterWithAccessControlEnabled(IMessageSink sink)
     {

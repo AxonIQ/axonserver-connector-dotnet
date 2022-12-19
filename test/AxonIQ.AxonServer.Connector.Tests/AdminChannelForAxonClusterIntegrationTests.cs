@@ -1,6 +1,7 @@
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Embedded;
 using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc.Admin;
 using Microsoft.Extensions.Logging;

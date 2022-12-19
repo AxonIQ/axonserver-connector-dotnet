@@ -2,6 +2,7 @@ using System.Net;
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Embedded;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Command;
 using Google.Protobuf;

@@ -1,6 +1,7 @@
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Embedded;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Io.Axoniq.Axonserver.Grpc;

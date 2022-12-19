@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Embedded;
 using Ductus.FluentDocker.Common;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
@@ -52,10 +53,10 @@ public class EventProcessorIntegrationTests
         //var admin = sut.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
         var completion = new TaskCompletionSource();
-        Func<Task<EventProcessorInfo>> supplier = async () =>
+        Func<Task<EventProcessorInfo>> supplier = () =>
         {
             completion.SetResult();
-            return new EventProcessorInfo
+            return Task.FromResult(new EventProcessorInfo
             {
                 Running = true,
                 AvailableThreads = 1,
@@ -64,7 +65,7 @@ public class EventProcessorIntegrationTests
                 IsStreamingProcessor = false,
                 Mode = "Tracking",
                 ProcessorName = name.ToString()
-            };
+            });
         };
         
         await using var registration = await control.RegisterEventProcessor(name, supplier, new EmptyEventProcessor());
@@ -84,7 +85,7 @@ public class EventProcessorIntegrationTests
         var admin = sut.AdminChannel;
         
         var name = _fixture.Create<EventProcessorName>();
-        Func<Task<EventProcessorInfo>> supplier = async () => new EventProcessorInfo
+        Func<Task<EventProcessorInfo>> supplier = () => Task.FromResult(new EventProcessorInfo
         {
             Running = true,
             AvailableThreads = 1,
@@ -93,7 +94,7 @@ public class EventProcessorIntegrationTests
             IsStreamingProcessor = false,
             Mode = "Tracking",
             ProcessorName = name.ToString()
-        };
+        });
 
         var processor = new AwaitableEventProcessor();
         await using var registration = await control.RegisterEventProcessor(name, supplier, processor);
@@ -118,7 +119,7 @@ public class EventProcessorIntegrationTests
         var admin = sut.AdminChannel;
         
         var name = _fixture.Create<EventProcessorName>();
-        Func<Task<EventProcessorInfo>> supplier = async () => new EventProcessorInfo
+        Func<Task<EventProcessorInfo>> supplier = () => Task.FromResult(new EventProcessorInfo
         {
             Running = true,
             AvailableThreads = 1,
@@ -127,7 +128,7 @@ public class EventProcessorIntegrationTests
             IsStreamingProcessor = false,
             Mode = "Tracking",
             ProcessorName = name.ToString()
-        };
+        });
 
         var processor = new AwaitableEventProcessor();
         await using var registration = await control.RegisterEventProcessor(name, supplier, processor);

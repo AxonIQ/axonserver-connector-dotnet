@@ -2,6 +2,7 @@ using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Connector.Tests.Interceptors;
+using AxonIQ.AxonServer.Embedded;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
 using Xunit;

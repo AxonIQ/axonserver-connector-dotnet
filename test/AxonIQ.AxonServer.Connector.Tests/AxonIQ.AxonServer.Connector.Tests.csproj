@@ -10,6 +10,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\AxonIQ.AxonServer.Connector\AxonIQ.AxonServer.Connector.csproj" />
+        <ProjectReference Include="..\..\src\AxonIQ.AxonServer.Embedded\AxonIQ.AxonServer.Embedded.csproj" />
     </ItemGroup>
 
     <ItemGroup>
