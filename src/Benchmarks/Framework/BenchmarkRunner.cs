@@ -4,22 +4,27 @@ namespace Benchmarks.Framework;
 
 public class BenchmarkRunner : IBenchmarkRunner
 {
-    public async Task<IReadOnlyCollection<Trace>> RunAsync(IBenchmark benchmark)
+    public async Task RunAsync(IBenchmark benchmark)
     {
-        var traces = new List<Trace>();
-        
-        var watch = Stopwatch.StartNew();
-        await benchmark.InitializeAsync();
-        traces.Add(new Trace($"{benchmark.Name}.Initialize", watch.Elapsed));
-        
-        watch.Restart();
-        await benchmark.RunAsync();
-        traces.Add(new Trace($"{benchmark.Name}.Run", watch.Elapsed));
-        
-        watch.Restart();
-        await benchmark.DisposeAsync();
-        traces.Add(new Trace($"{benchmark.Name}.Dispose", watch.Elapsed));
+        using var activity = Telemetry.Source.StartActivity(benchmark.Name);
 
-        return traces;
+        using (Telemetry.Source.StartActivity("setup"))
+        {
+            await benchmark.SetupAsync();    
+        }
+        try
+        {
+            using (Telemetry.Source.StartActivity("run"))
+            {
+                await benchmark.RunAsync();
+            }
+        }
+        finally
+        {
+            using (Telemetry.Source.StartActivity("teardown"))
+            {
+                await benchmark.TeardownAsync();
+            }    
+        }
     }
 }

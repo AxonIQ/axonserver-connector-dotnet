@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Io.Axoniq.Axonserver.Grpc;
@@ -579,6 +578,12 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     public async Task<CommandResponse> SendCommand(Command command, CancellationToken ct)
     {
         if (command == null) throw new ArgumentNullException(nameof(command));
+        
+        using var activity = Telemetry.Source.StartActivity("CommandChannel.SendCommand");
+        activity?.SetTag("axoniq.client_id", ClientIdentity.ClientInstanceId.ToString());
+        activity?.SetTag("axoniq.component_name", ClientIdentity.ComponentName.ToString());
+        activity?.SetTag("axoniq.context", Context.ToString());
+        
         var request = new Command(command)
         {
             ClientId = ClientIdentity.ClientInstanceId.ToString(),
@@ -600,6 +605,9 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 }
             });
         }
+        
+        activity?.SetTag("axoniq.message_id", request.MessageIdentifier);
+        activity?.SetTag("axoniq.command_name", request.Name);
 
         if (_logger.IsEnabled(LogLevel.Debug))
         {

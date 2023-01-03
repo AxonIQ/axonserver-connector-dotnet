@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Benchmarks;
 
-public class PingPongBenchmark : IBenchmark
+public class PingPongCommandBenchmark : IBenchmark
 {
     private readonly int _commandCount;
     
@@ -21,12 +21,12 @@ public class PingPongBenchmark : IBenchmark
     private IAxonServerConnection _pong;
     private ICommandHandlerRegistration _handler;
 
-    public PingPongBenchmark(int commandCount)
+    public PingPongCommandBenchmark(int commandCount)
     {
         _commandCount = commandCount;
     }
 
-    public string Name => $"{nameof(PingPongBenchmark)}({_commandCount})";
+    public string Name => $"{nameof(PingPongCommandBenchmark)}(CommandCount={_commandCount})";
     
     public async Task RunAsync()
     {
@@ -51,13 +51,13 @@ public class PingPongBenchmark : IBenchmark
         }
     }
 
-    public async Task InitializeAsync()
+    public async Task SetupAsync()
     {
         _server = EmbeddedAxonServer.WithAccessControlDisabled(new NullLogger<EmbeddedAxonServer>());
         await _server.InitializeAsync();
         
         var context = Context.Default;
-        var component = new ComponentName(nameof(PingPongBenchmark));
+        var component = new ComponentName(nameof(PingPongCommandBenchmark));
         var clientInstance1 = new ClientInstanceId("1");
         var clientInstance2 = new ClientInstanceId("2");
 
@@ -99,7 +99,7 @@ public class PingPongBenchmark : IBenchmark
         await _handler.WaitUntilCompleted();
     }
 
-    public async Task DisposeAsync()
+    public async Task TeardownAsync()
     {
         await _server.DisposeAsync();
         // await _ping.DisposeAsync();

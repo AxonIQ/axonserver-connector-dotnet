@@ -4,9 +4,9 @@ public interface IBenchmark
 {
     string Name { get; }
     
-    Task InitializeAsync();
+    Task SetupAsync();
 
     Task RunAsync(); 
         
-    Task DisposeAsync();
+    Task TeardownAsync();
 }
