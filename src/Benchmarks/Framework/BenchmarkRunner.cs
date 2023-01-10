@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Benchmarks.Framework;
 
 public class BenchmarkRunner : IBenchmarkRunner
@@ -24,7 +22,7 @@ public class BenchmarkRunner : IBenchmarkRunner
             using (Telemetry.Source.StartActivity("teardown"))
             {
                 await benchmark.TeardownAsync();
-            }    
+            }
         }
     }
 }

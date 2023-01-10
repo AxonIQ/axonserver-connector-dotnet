@@ -11,6 +11,11 @@ public abstract class AxonServer : IAxonServer
     {
         return Server.InitializeAsync();
     }
+    
+    public Task WaitUntilAvailableAsync(TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default)
+    {
+        return Server.WaitUntilAvailableAsync(maximumWaitTime, delayBetweenAttempts);
+    }
 
     public SystemProperties Properties => Server.Properties;
 

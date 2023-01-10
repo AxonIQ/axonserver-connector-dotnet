@@ -17,6 +17,9 @@ namespace AxonIQ.AxonServer.Embedded;
 
 public class EmbeddedAxonClusterNode : IAxonClusterNode
 {
+    private static readonly TimeSpan DefaultMaximumWaitTime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DefaultDelayBetweenAttempts = TimeSpan.FromSeconds(1);
+    
     private readonly ILogger _logger;
     private IContainerService? _container;
 
@@ -178,14 +181,13 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         _container = builder.Build().Start();
     }
 
-    internal async Task WaitUntilAvailableAsync(int cluster)
+    internal async Task WaitUntilAvailableAsync(int cluster, TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default)
     {
         if (_container == null)
             throw new InvalidOperationException("The cluster node has not been initialized");
         
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        var maximumWaitTime = TimeSpan.FromMinutes(2);
         var attempt = 0;
         var available = false;
         var endpoint = _container.ToHostExposedEndpoint("8024/tcp");
@@ -208,7 +210,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
             
 
         var watch = Stopwatch.StartNew();
-        while (!available && watch.Elapsed < maximumWaitTime)
+        while (!available && watch.Elapsed < (maximumWaitTime ?? DefaultMaximumWaitTime))
         {
             _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being health checked on node {Node} at {Endpoint}",
                 cluster,
@@ -232,7 +234,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
                 }
                 else
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    await Task.Delay(delayBetweenAttempts ?? DefaultDelayBetweenAttempts);
                 }
             }
             catch (KeyNotFoundException exception)
@@ -241,7 +243,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
                     exception,
                     "[{ClusterId}]Embedded Axon Cluster actuator health does not contain have a 'status' or a 'components.raft.status' property with the value 'UP'",
                     cluster);
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(delayBetweenAttempts ?? DefaultDelayBetweenAttempts);
             }
             catch (HttpRequestException exception)
             {
@@ -252,7 +254,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
                     _container.Name,
                     requestUri.AbsoluteUri,
                     exception.Message);
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(delayBetweenAttempts ?? DefaultDelayBetweenAttempts);
             }
 
             attempt++;
@@ -261,7 +263,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         if (!available)
         {
             throw new InvalidOperationException(
-                $"[{cluster}]Embedded Axon Cluster could not be initialized. Failed to reach node {_container.Name} at {requestUri.AbsoluteUri} within {Convert.ToInt32(maximumWaitTime.TotalSeconds)} seconds and after {attempt} attempts");
+                $"[{cluster}]Embedded Axon Cluster could not be initialized. Failed to reach node {_container.Name} at {requestUri.AbsoluteUri} within {Convert.ToInt32((maximumWaitTime ?? DefaultMaximumWaitTime).TotalSeconds)} seconds and after {attempt} attempts");
         }
     }
 

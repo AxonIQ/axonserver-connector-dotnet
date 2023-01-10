@@ -5,12 +5,12 @@ namespace AxonIQ.AxonServer.Connector;
 public class QuerySubscriptions
 {
     public record Subscription(
-        QueryHandlerId QueryHandlerId,
-        SubscriptionId SubscriptionId,
+        RegistrationId QueryHandlerId,
+        RegistrationId SubscriptionId,
         QueryDefinition Query);
 
     public record QueryHandler(
-        QueryHandlerId QueryHandlerId,
+        RegistrationId QueryHandlerId,
         IQueryHandler Handler);
     
     public QuerySubscriptions(ClientIdentity clientIdentity, Func<DateTimeOffset> clock)
@@ -22,17 +22,17 @@ public class QuerySubscriptions
     public ClientIdentity ClientIdentity { get; }
     public Func<DateTimeOffset> Clock { get; }
     
-    public Dictionary<QueryHandlerId, QueryHandler> AllQueryHandlers { get; } = new();
-    public Dictionary<SubscriptionId, Subscription> AllSubscriptions { get; } = new();
-    public Dictionary<QueryHandlerId, CountdownCompletionSource> SubscribeCompletionSources { get; } = new();
-    public Dictionary<QueryHandlerId, CountdownCompletionSource> UnsubscribeCompletionSources { get; } = new();
-    public Dictionary<QueryName, HashSet<SubscriptionId>> ActiveSubscriptions { get; } = new();
+    public Dictionary<RegistrationId, QueryHandler> AllQueryHandlers { get; } = new();
+    public Dictionary<RegistrationId, Subscription> AllSubscriptions { get; } = new();
+    public Dictionary<RegistrationId, CountdownCompletionSource> SubscribeCompletionSources { get; } = new();
+    public Dictionary<RegistrationId, CountdownCompletionSource> UnsubscribeCompletionSources { get; } = new();
+    public Dictionary<QueryName, HashSet<RegistrationId>> ActiveSubscriptions { get; } = new();
     public Dictionary<QueryName, HashSet<IQueryHandler>> ActiveHandlers { get; } = new();
-    public Dictionary<InstructionId, SubscriptionId> SubscribeInstructions { get; } = new();
-    public Dictionary<InstructionId, SubscriptionId>  UnsubscribeInstructions { get; } = new();
+    public Dictionary<InstructionId, RegistrationId> SubscribeInstructions { get; } = new();
+    public Dictionary<InstructionId, RegistrationId>  UnsubscribeInstructions { get; } = new();
     
     public void RegisterQueryHandler(
-        QueryHandlerId queryHandlerId,
+        RegistrationId queryHandlerId,
         CountdownCompletionSource subscribeCompletionSource,
         IQueryHandler handler)
     {
@@ -48,8 +48,8 @@ public class QuerySubscriptions
     }
     
     public InstructionId SubscribeToQuery(
-        SubscriptionId subscriptionId,
-        QueryHandlerId queryHandlerId,
+        RegistrationId subscriptionId,
+        RegistrationId queryHandlerId,
         QueryDefinition query)
     {
         if (!AllSubscriptions.ContainsKey(subscriptionId))
@@ -113,7 +113,7 @@ public class QuerySubscriptions
                 else
                 {
                     ActiveSubscriptions.Add(subscribeSubscription.Query.QueryName,
-                        new HashSet<SubscriptionId>(new[] { subscribeSubscriptionId }));
+                        new HashSet<RegistrationId>(new[] { subscribeSubscriptionId }));
                     ActiveHandlers.Add(subscribeSubscription.Query.QueryName,
                         new HashSet<IQueryHandler>(new[] { queryHandler.Handler }));
                 }
@@ -153,7 +153,7 @@ public class QuerySubscriptions
     }
     
     public void UnregisterQueryHandler(
-        QueryHandlerId queryHandlerId,
+        RegistrationId queryHandlerId,
         CountdownCompletionSource unsubscribeCompletionSource)
     {
         if (AllQueryHandlers.ContainsKey(queryHandlerId))
@@ -167,7 +167,7 @@ public class QuerySubscriptions
         }
     }
     
-    public InstructionId? UnsubscribeFromQuery(SubscriptionId subscriptionId)
+    public InstructionId? UnsubscribeFromQuery(RegistrationId subscriptionId)
     {
         if (AllSubscriptions.TryGetValue(subscriptionId, out var subscription))
         {

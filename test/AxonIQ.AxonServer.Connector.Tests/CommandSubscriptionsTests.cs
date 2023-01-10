@@ -17,7 +17,7 @@ public class CommandSubscriptionsTests
         _fixture.CustomizeClientInstanceId();
         _fixture.CustomizeComponentName();
         _fixture.CustomizeLoadFactor();
-        _fixture.CustomizeCommandHandlerId();
+        _fixture.CustomizeRegistrationId();
         _fixture.CustomizeSubscriptionId();
         _fixture.CustomizeLoadFactor();
 
@@ -32,9 +32,9 @@ public class CommandSubscriptionsTests
     [Fact]
     public void RegisterCommandHandlerHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
         
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var completionSource = new CountdownCompletionSource(1);
         var loadFactor = _fixture.Create<LoadFactor>();
         Func<Command,CancellationToken,Task<CommandResponse>> handler = (_, _) => Task.FromResult(new CommandResponse());
@@ -42,19 +42,19 @@ public class CommandSubscriptionsTests
         sut.RegisterCommandHandler(handlerId, completionSource, loadFactor, handler);
 
         Assert.Equal(
-            new[] { new KeyValuePair<CommandHandlerId, CountdownCompletionSource>(handlerId, completionSource) },
+            new[] { new KeyValuePair<RegistrationId, CountdownCompletionSource>(handlerId, completionSource) },
             sut.SubscribeCompletionSources);
         Assert.Equal(
-            new[] { new KeyValuePair<CommandHandlerId, CommandSubscriptions.CommandHandler>(handlerId, new CommandSubscriptions.CommandHandler(handlerId, loadFactor, handler))},
+            new[] { new KeyValuePair<RegistrationId, CommandRegistrations.CommandHandler>(handlerId, new CommandRegistrations.CommandHandler(handlerId, loadFactor, handler))},
             sut.AllCommandHandlers);
     }
     
     [Fact]
     public void RegisterCommandHandlerMultipleTimesHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
         
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var completionSource = new CountdownCompletionSource(1);
         var loadFactor = _fixture.Create<LoadFactor>();
         Func<Command,CancellationToken,Task<CommandResponse>> handler = (_, _) => Task.FromResult(new CommandResponse());
@@ -63,19 +63,19 @@ public class CommandSubscriptionsTests
         sut.RegisterCommandHandler(handlerId, completionSource, loadFactor, handler);
 
         Assert.Equal(
-            new[] { new KeyValuePair<CommandHandlerId, CountdownCompletionSource>(handlerId, completionSource) },
+            new[] { new KeyValuePair<RegistrationId, CountdownCompletionSource>(handlerId, completionSource) },
             sut.SubscribeCompletionSources);
         Assert.Equal(
-            new[] { new KeyValuePair<CommandHandlerId, CommandSubscriptions.CommandHandler>(handlerId, new CommandSubscriptions.CommandHandler(handlerId, loadFactor, handler))},
+            new[] { new KeyValuePair<RegistrationId, CommandRegistrations.CommandHandler>(handlerId, new CommandRegistrations.CommandHandler(handlerId, loadFactor, handler))},
             sut.AllCommandHandlers);
     }
 
     [Fact]
     public void SubscribeToCommandHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId = _fixture.Create<SubscriptionId>();
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId = _fixture.Create<RegistrationId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         
         var instructionId = sut.SubscribeToCommand(handlerId,
@@ -84,24 +84,24 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId,
                         subscriptionId,
                         command
                     ))
             }, sut.AllSubscriptions);
         Assert.Equal(
-            new[] { new KeyValuePair<InstructionId, SubscriptionId>(instructionId, subscriptionId) },
+            new[] { new KeyValuePair<InstructionId, RegistrationId>(instructionId, subscriptionId) },
             sut.SubscribeInstructions);
     }
 
     [Fact]
     public void SubscribeToCommandWhenAlreadySubscribedWithSameCommandHandlerHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId = _fixture.Create<SubscriptionId>();
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId = _fixture.Create<RegistrationId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         
         var instructionId1 = sut.SubscribeToCommand(handlerId,
@@ -113,8 +113,8 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId,
                         subscriptionId,
                         command
@@ -122,8 +122,8 @@ public class CommandSubscriptionsTests
             }, sut.AllSubscriptions);
         Assert.Equal(
             new[] { 
-                new KeyValuePair<InstructionId, SubscriptionId>(instructionId1, subscriptionId),
-                new KeyValuePair<InstructionId, SubscriptionId>(instructionId2, subscriptionId)
+                new KeyValuePair<InstructionId, RegistrationId>(instructionId1, subscriptionId),
+                new KeyValuePair<InstructionId, RegistrationId>(instructionId2, subscriptionId)
             },
             sut.SubscribeInstructions);
     }
@@ -131,11 +131,11 @@ public class CommandSubscriptionsTests
     [Fact]
     public void SubscribeToCommandWhenAlreadySubscribedWithOtherCommandHandlerHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId1 = _fixture.Create<SubscriptionId>();
-        var handlerId1 = _fixture.Create<CommandHandlerId>();
-        var subscriptionId2 = _fixture.Create<SubscriptionId>();
-        var handlerId2 = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId1 = _fixture.Create<RegistrationId>();
+        var handlerId1 = _fixture.Create<RegistrationId>();
+        var subscriptionId2 = _fixture.Create<RegistrationId>();
+        var handlerId2 = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         
         var instructionId1 = sut.SubscribeToCommand(handlerId1,
@@ -147,14 +147,14 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId1,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId1,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId1,
                         subscriptionId1,
                         command
                     )),
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId2,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId2,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId2,
                         subscriptionId2,
                         command
@@ -162,8 +162,8 @@ public class CommandSubscriptionsTests
             }, sut.AllSubscriptions);
         Assert.Equal(
             new[] { 
-                new KeyValuePair<InstructionId, SubscriptionId>(instructionId1, subscriptionId1),
-                new KeyValuePair<InstructionId, SubscriptionId>(instructionId2, subscriptionId2) 
+                new KeyValuePair<InstructionId, RegistrationId>(instructionId1, subscriptionId1),
+                new KeyValuePair<InstructionId, RegistrationId>(instructionId2, subscriptionId2) 
             },
             sut.SubscribeInstructions);
     }
@@ -171,11 +171,11 @@ public class CommandSubscriptionsTests
     [Fact]
     public void SubscribeToCommandWhenAlreadySubscribeAndAcknowledgedWithOtherCommandHandlerHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId1 = _fixture.Create<SubscriptionId>();
-        var handlerId1 = _fixture.Create<CommandHandlerId>();
-        var subscriptionId2 = _fixture.Create<SubscriptionId>();
-        var handlerId2 = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId1 = _fixture.Create<RegistrationId>();
+        var handlerId1 = _fixture.Create<RegistrationId>();
+        var subscriptionId2 = _fixture.Create<RegistrationId>();
+        var handlerId2 = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         
         sut.RegisterCommandHandler(handlerId1, new CountdownCompletionSource(1), new LoadFactor(1), (_, _) => Task.FromResult(new CommandResponse()));
@@ -196,14 +196,14 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId1,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId1,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId1,
                         subscriptionId1,
                         command
                     )),
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId2,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId2,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId2,
                         subscriptionId2,
                         command
@@ -211,13 +211,13 @@ public class CommandSubscriptionsTests
             }, sut.AllSubscriptions);
         Assert.Equal(
             new[] { 
-                new KeyValuePair<InstructionId, SubscriptionId>(instructionId2, subscriptionId2) 
+                new KeyValuePair<InstructionId, RegistrationId>(instructionId2, subscriptionId2) 
             },
             sut.SubscribeInstructions);
         Assert.Equal(
             new []
             {
-                new KeyValuePair<CommandName,SubscriptionId>(command, subscriptionId1)
+                new KeyValuePair<CommandName,RegistrationId>(command, subscriptionId1)
             },
             sut.ActiveSubscriptions);
     }
@@ -225,11 +225,11 @@ public class CommandSubscriptionsTests
     [Fact]
     public void AcknowledgeWhenAlreadySubscribedAndAcknowledgedWithOtherCommandHandlerHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId1 = _fixture.Create<SubscriptionId>();
-        var handlerId1 = _fixture.Create<CommandHandlerId>();
-        var subscriptionId2 = _fixture.Create<SubscriptionId>();
-        var handlerId2 = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId1 = _fixture.Create<RegistrationId>();
+        var handlerId1 = _fixture.Create<RegistrationId>();
+        var subscriptionId2 = _fixture.Create<RegistrationId>();
+        var handlerId2 = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         
         sut.RegisterCommandHandler(handlerId1, new CountdownCompletionSource(1), new LoadFactor(1), (_, _) => Task.FromResult(new CommandResponse()));
@@ -255,8 +255,8 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId2,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId2,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId2,
                         subscriptionId2,
                         command
@@ -266,7 +266,7 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new []
             {
-                new KeyValuePair<CommandName,SubscriptionId>(command, subscriptionId2)
+                new KeyValuePair<CommandName,RegistrationId>(command, subscriptionId2)
             },
             sut.ActiveSubscriptions);
     }
@@ -274,9 +274,9 @@ public class CommandSubscriptionsTests
     [Fact]
     public void AcknowledgeSubscribeToCommandWithUnknownInstructionIdHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId = _fixture.Create<SubscriptionId>();
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId = _fixture.Create<RegistrationId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         
         var instructionId = sut.SubscribeToCommand(handlerId,
@@ -297,7 +297,7 @@ public class CommandSubscriptionsTests
         Assert.Empty(sut.ActiveSubscriptions);
         Assert.Equal(
             new[] { 
-                new KeyValuePair<InstructionId, SubscriptionId>(instructionId, subscriptionId) 
+                new KeyValuePair<InstructionId, RegistrationId>(instructionId, subscriptionId) 
             },
             sut.SubscribeInstructions);
     }
@@ -305,9 +305,9 @@ public class CommandSubscriptionsTests
     [Fact]
     public void AcknowledgeSuccessfulSubscribeToCommandWithKnownInstructionIdHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId = _fixture.Create<SubscriptionId>();
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId = _fixture.Create<RegistrationId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         var loadFactor = _fixture.Create<LoadFactor>();
         Func<Command,CancellationToken,Task<CommandResponse>> handler = (_, _) => Task.FromResult(new CommandResponse());
@@ -331,7 +331,7 @@ public class CommandSubscriptionsTests
         });
         
         Assert.Equal(
-            new [] { new KeyValuePair<CommandName,SubscriptionId>(command, subscriptionId)},
+            new [] { new KeyValuePair<CommandName,RegistrationId>(command, subscriptionId)},
             sut.ActiveSubscriptions);
         Assert.Empty(sut.SubscribeInstructions);
         Assert.True(completionSource.Completion.IsCompletedSuccessfully);
@@ -340,9 +340,9 @@ public class CommandSubscriptionsTests
     [Fact]
     public void AcknowledgeUnsuccessfulSubscribeToCommandWithKnownInstructionIdHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId = _fixture.Create<SubscriptionId>();
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId = _fixture.Create<RegistrationId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         var loadFactor = _fixture.Create<LoadFactor>();
         Func<Command,CancellationToken,Task<CommandResponse>> handler = (_, _) => Task.FromResult(new CommandResponse());
@@ -373,20 +373,20 @@ public class CommandSubscriptionsTests
     [Fact]
     public void SubscribeToCommandMultipleTimesWithOutOfOrderAcknowledgementsHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
         
         var command = _fixture.Create<CommandName>();
         var loadFactor = _fixture.Create<LoadFactor>();
         Func<Command,CancellationToken,Task<CommandResponse>> handler = (_, _) => Task.FromResult(new CommandResponse());
         
-        var subscriptionId1 = _fixture.Create<SubscriptionId>();
-        var handlerId1 = _fixture.Create<CommandHandlerId>();
+        var subscriptionId1 = _fixture.Create<RegistrationId>();
+        var handlerId1 = _fixture.Create<RegistrationId>();
         var completionSource1 = new CountdownCompletionSource(1);
         
         sut.RegisterCommandHandler(handlerId1, completionSource1, loadFactor, handler);
         
-        var subscriptionId2 = _fixture.Create<SubscriptionId>();
-        var handlerId2 = _fixture.Create<CommandHandlerId>();
+        var subscriptionId2 = _fixture.Create<RegistrationId>();
+        var handlerId2 = _fixture.Create<RegistrationId>();
         var completionSource2 = new CountdownCompletionSource(1);
         
         sut.RegisterCommandHandler(handlerId2, completionSource2, loadFactor, handler);
@@ -416,7 +416,7 @@ public class CommandSubscriptionsTests
         });
         
         Assert.Equal(
-            new [] { new KeyValuePair<CommandName, SubscriptionId>(command, subscriptionId2)},
+            new [] { new KeyValuePair<CommandName, RegistrationId>(command, subscriptionId2)},
             sut.ActiveSubscriptions);
         Assert.Empty(sut.SubscribeInstructions);
         Assert.Empty(sut.SupersededSubscriptions);
@@ -427,9 +427,9 @@ public class CommandSubscriptionsTests
     [Fact]
     public void UnregisterUnknownCommandHandlerHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
         
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var completionSource = new CountdownCompletionSource(1);
         
         sut.UnregisterCommandHandler(handlerId, completionSource);
@@ -442,9 +442,9 @@ public class CommandSubscriptionsTests
     [Fact]
     public void UnregisterKnownCommandHandlerHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
         
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var completionSource = new CountdownCompletionSource(1);
         
         sut.RegisterCommandHandler(handlerId, new CountdownCompletionSource(1), new LoadFactor(1), (command, token) => Task.FromResult(new CommandResponse()));
@@ -452,7 +452,7 @@ public class CommandSubscriptionsTests
         sut.UnregisterCommandHandler(handlerId, completionSource);
 
         Assert.Equal(
-            new[] { new KeyValuePair<CommandHandlerId, CountdownCompletionSource>(handlerId, completionSource) },
+            new[] { new KeyValuePair<RegistrationId, CountdownCompletionSource>(handlerId, completionSource) },
             sut.UnsubscribeCompletionSources);
         Assert.Empty(sut.UnsubscribeInstructions);
         Assert.Empty(sut.AllCommandHandlers);
@@ -461,9 +461,9 @@ public class CommandSubscriptionsTests
     [Fact]
     public void UnsubscribeToCommandHasExpectedResult()
     {
-        var sut = new CommandSubscriptions(_clientIdentity, _clock);
-        var subscriptionId = _fixture.Create<SubscriptionId>();
-        var handlerId = _fixture.Create<CommandHandlerId>();
+        var sut = new CommandRegistrations(_clientIdentity, _clock);
+        var subscriptionId = _fixture.Create<RegistrationId>();
+        var handlerId = _fixture.Create<RegistrationId>();
         var command = _fixture.Create<CommandName>();
         
         sut.RegisterCommandHandler(handlerId, new CountdownCompletionSource(1), new LoadFactor(1), (command, token) => Task.FromResult(new CommandResponse()));
@@ -483,15 +483,15 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<SubscriptionId, CommandSubscriptions.Subscription>(subscriptionId,
-                    new CommandSubscriptions.Subscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId,
+                    new CommandRegistrations.CommandSubscription(
                         handlerId,
                         subscriptionId,
                         command
                     ))
             }, sut.AllSubscriptions);
         Assert.Equal(
-            new[] { new KeyValuePair<InstructionId, SubscriptionId>(unsubscribeInstructionId!.Value, subscriptionId) },
+            new[] { new KeyValuePair<InstructionId, RegistrationId>(unsubscribeInstructionId!.Value, subscriptionId) },
             sut.UnsubscribeInstructions);
     }
 }

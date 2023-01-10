@@ -519,20 +519,20 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         public record Disconnect : Protocol;
         
         public record SubscribeQueryHandler(
-            QueryHandlerId QueryHandlerId,
+            RegistrationId QueryHandlerId,
             IQueryHandler Handler,
-            SubscribedQuery[] SubscribedQueries,
+            RegisteredQuery[] SubscribedQueries,
             CountdownCompletionSource CompletionSource) : Protocol;
         
         public record UnsubscribeQueryHandler(
-            QueryHandlerId QueryHandlerId,
-            SubscribedQuery[] SubscribedQueries,
+            RegistrationId QueryHandlerId,
+            RegisteredQuery[] SubscribedQueries,
             CountdownCompletionSource CompletionSource) : Protocol;
 
         public record SendQueryProviderOutbound(QueryProviderOutbound Instruction) : Protocol;
     }
     
-    private record SubscribedQuery(SubscriptionId SubscriptionId, QueryDefinition Query);
+    private record RegisteredQuery(RegistrationId SubscriptionId, QueryDefinition Query);
     
     private record State
     {
@@ -566,21 +566,21 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
             throw new ArgumentException("The queries requires at least one query to be specified",
                 nameof(queries));
 
-        var queryHandlerId = QueryHandlerId.New();
-        var subscribedQueries = queries.Select(query => new SubscribedQuery(SubscriptionId.New(), query)).ToArray();
+        var registrationId = RegistrationId.New();
+        var registeredQueries = queries.Select(query => new RegisteredQuery(RegistrationId.New(), query)).ToArray();
         var subscribeCompletionSource = new CountdownCompletionSource(queries.Length);
         await _channel.Writer.WriteAsync(new Protocol.SubscribeQueryHandler(
-            queryHandlerId, 
+            registrationId, 
             handler,
-            subscribedQueries, 
+            registeredQueries, 
             subscribeCompletionSource));
         return new QueryHandlerRegistration(subscribeCompletionSource.Completion, async () =>
         {
             var unsubscribeCompletionSource = new CountdownCompletionSource(queries.Length);
             await _channel.Writer.WriteAsync(
                 new Protocol.UnsubscribeQueryHandler(
-                    queryHandlerId,
-                    subscribedQueries,
+                    registrationId,
+                    registeredQueries,
                     unsubscribeCompletionSource)).ConfigureAwait(false);
             await unsubscribeCompletionSource.Completion.ConfigureAwait(false);
         });

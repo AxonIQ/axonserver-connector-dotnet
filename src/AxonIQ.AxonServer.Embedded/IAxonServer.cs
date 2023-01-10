@@ -14,5 +14,6 @@ public interface IAxonServer
     GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options);
     
     Task InitializeAsync();
+    Task WaitUntilAvailableAsync(TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default);
     Task DisposeAsync();
 }

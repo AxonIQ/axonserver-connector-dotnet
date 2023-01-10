@@ -12,6 +12,11 @@ public abstract class AxonCluster : IAxonCluster
         return Cluster.InitializeAsync();
     }
 
+    public Task WaitUntilAvailableAsync(TimeSpan? maximumWaitTime, TimeSpan? delayBetweenAttempts)
+    {
+        return Cluster.WaitUntilAvailableAsync(maximumWaitTime, delayBetweenAttempts);
+    }
+
     public IReadOnlyList<IAxonClusterNode> Nodes => Cluster.Nodes;
 
     public IReadOnlyList<Context> Contexts => Cluster.Contexts;

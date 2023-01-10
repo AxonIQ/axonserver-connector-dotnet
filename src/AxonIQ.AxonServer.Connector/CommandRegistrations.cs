@@ -3,19 +3,19 @@ using Io.Axoniq.Axonserver.Grpc.Command;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class CommandSubscriptions
+public class CommandRegistrations
 {
-    public record Subscription(
-        CommandHandlerId CommandHandlerId,
-        SubscriptionId SubscriptionId,
+    public record CommandSubscription(
+        RegistrationId CommandHandlerRegistrationId,
+        RegistrationId CommandRegistrationId,
         CommandName Command);
 
     public record CommandHandler(
-        CommandHandlerId CommandHandlerId,
+        RegistrationId CommandHandlerRegistrationId,
         LoadFactor LoadFactor,
         Func<Command, CancellationToken, Task<CommandResponse>> Handler);
 
-    public CommandSubscriptions(ClientIdentity clientIdentity, Func<DateTimeOffset> clock)
+    public CommandRegistrations(ClientIdentity clientIdentity, Func<DateTimeOffset> clock)
     {
         ClientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
         Clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -23,50 +23,50 @@ public class CommandSubscriptions
         
     public ClientIdentity ClientIdentity { get; }
     public Func<DateTimeOffset> Clock { get; }
-    public Dictionary<CommandHandlerId, CommandHandler> AllCommandHandlers { get; } = new();
-    public Dictionary<SubscriptionId, Subscription> AllSubscriptions { get; } = new();
-    public Dictionary<CommandHandlerId, CountdownCompletionSource> SubscribeCompletionSources { get; } = new();
-    public Dictionary<CommandHandlerId, CountdownCompletionSource> UnsubscribeCompletionSources { get; } = new();
-    public Dictionary<CommandName, SubscriptionId> ActiveSubscriptions { get; } = new();
+    public Dictionary<RegistrationId, CommandHandler> AllCommandHandlers { get; } = new();
+    public Dictionary<RegistrationId, CommandSubscription> AllSubscriptions { get; } = new();
+    public Dictionary<RegistrationId, CountdownCompletionSource> SubscribeCompletionSources { get; } = new();
+    public Dictionary<RegistrationId, CountdownCompletionSource> UnsubscribeCompletionSources { get; } = new();
+    public Dictionary<CommandName, RegistrationId> ActiveSubscriptions { get; } = new();
     public Dictionary<CommandName, Func<Command, CancellationToken, Task<CommandResponse>>> ActiveHandlers { get; } = new();
-    public Dictionary<InstructionId, SubscriptionId> SubscribeInstructions { get; } = new();
-    public Dictionary<InstructionId, SubscriptionId>  UnsubscribeInstructions { get; } = new();
-    public HashSet<SubscriptionId> SupersededSubscriptions { get; } = new();
+    public Dictionary<InstructionId, RegistrationId> SubscribeInstructions { get; } = new();
+    public Dictionary<InstructionId, RegistrationId>  UnsubscribeInstructions { get; } = new();
+    public HashSet<RegistrationId> SupersededSubscriptions { get; } = new();
 
     public void RegisterCommandHandler(
-        CommandHandlerId commandHandlerId,
+        RegistrationId commandHandlerRegistrationId,
         CountdownCompletionSource subscribeCompletionSource,
         LoadFactor loadFactor,
         Func<Command, CancellationToken, Task<CommandResponse>> handler)
     {
-        if (!AllCommandHandlers.ContainsKey(commandHandlerId))
+        if (!AllCommandHandlers.ContainsKey(commandHandlerRegistrationId))
         {
-            if (!SubscribeCompletionSources.ContainsKey(commandHandlerId))
+            if (!SubscribeCompletionSources.ContainsKey(commandHandlerRegistrationId))
             {
-                SubscribeCompletionSources.Add(commandHandlerId, subscribeCompletionSource);
+                SubscribeCompletionSources.Add(commandHandlerRegistrationId, subscribeCompletionSource);
             }
             
-            AllCommandHandlers.Add(commandHandlerId, new CommandHandler(commandHandlerId, loadFactor, handler));
+            AllCommandHandlers.Add(commandHandlerRegistrationId, new CommandHandler(commandHandlerRegistrationId, loadFactor, handler));
         }
     }
         
     public InstructionId SubscribeToCommand(
-        CommandHandlerId commandHandlerId,
-        SubscriptionId subscriptionId,
+        RegistrationId commandHandlerRegistrationId,
+        RegistrationId commandRegistrationId,
         CommandName command)
     {
-        if (!AllSubscriptions.ContainsKey(subscriptionId))
+        if (!AllSubscriptions.ContainsKey(commandRegistrationId))
         {
-            AllSubscriptions.Add(subscriptionId, new Subscription(
-                commandHandlerId,
-                subscriptionId,
+            AllSubscriptions.Add(commandRegistrationId, new CommandSubscription(
+                commandHandlerRegistrationId,
+                commandRegistrationId,
                 command
             ));
         }
 
         foreach (var otherSubscriptionId in SubscribeInstructions.Values)
         {
-            if (otherSubscriptionId != subscriptionId &&
+            if (otherSubscriptionId != commandRegistrationId &&
                 AllSubscriptions.TryGetValue(otherSubscriptionId, out var otherSubscription) && otherSubscription.Command.Equals(command))
             {
                 SupersededSubscriptions.Add(otherSubscriptionId);
@@ -74,7 +74,7 @@ public class CommandSubscriptions
         }
             
         var instructionId = InstructionId.New();
-        SubscribeInstructions.Add(instructionId, subscriptionId);
+        SubscribeInstructions.Add(instructionId, commandRegistrationId);
         return instructionId;
     }
 
@@ -87,13 +87,13 @@ public class CommandSubscriptions
         {
             SubscribeInstructions.Remove(instructionId);
                 
-            if (SubscribeCompletionSources.TryGetValue(subscribeSubscription.CommandHandlerId, out var completionSource))
+            if (SubscribeCompletionSources.TryGetValue(subscribeSubscription.CommandHandlerRegistrationId, out var completionSource))
             {
                 if (acknowledgement.Success)
                 {
                     if (completionSource.SignalSuccess())
                     {
-                        SubscribeCompletionSources.Remove(subscribeSubscription.CommandHandlerId);
+                        SubscribeCompletionSources.Remove(subscribeSubscription.CommandHandlerRegistrationId);
                     }
                 }
                 else
@@ -105,7 +105,7 @@ public class CommandSubscriptions
                         acknowledgement.Error.Details);
                     if (completionSource.SignalFault(exception))
                     {
-                        SubscribeCompletionSources.Remove(subscribeSubscription.CommandHandlerId);
+                        SubscribeCompletionSources.Remove(subscribeSubscription.CommandHandlerRegistrationId);
                     }
                 }
             }
@@ -117,12 +117,12 @@ public class CommandSubscriptions
             }
             else
             {
-                if (acknowledgement.Success && AllCommandHandlers.TryGetValue(subscribeSubscription.CommandHandlerId, out var commandHandler))
+                if (acknowledgement.Success && AllCommandHandlers.TryGetValue(subscribeSubscription.CommandHandlerRegistrationId, out var commandHandler))
                 {
                     if (ActiveSubscriptions.TryGetValue(subscribeSubscription.Command,
                             out var activeSubscriptionId))
                     {
-                        ActiveSubscriptions[subscribeSubscription.Command] = subscribeSubscription.SubscriptionId;
+                        ActiveSubscriptions[subscribeSubscription.Command] = subscribeSubscription.CommandRegistrationId;
                         ActiveHandlers[subscribeSubscription.Command] = commandHandler.Handler;
                         AllSubscriptions.Remove(activeSubscriptionId);
                     }
@@ -140,13 +140,13 @@ public class CommandSubscriptions
             UnsubscribeInstructions.Remove(instructionId);
             AllSubscriptions.Remove(unsubscribeSubscriptionId);
             
-            if (UnsubscribeCompletionSources.TryGetValue(unsubscribeSubscription.CommandHandlerId, out var completionSource))
+            if (UnsubscribeCompletionSources.TryGetValue(unsubscribeSubscription.CommandHandlerRegistrationId, out var completionSource))
             {
                 if (acknowledgement.Success)
                 {
                     if (completionSource.SignalSuccess())
                     {
-                        UnsubscribeCompletionSources.Remove(unsubscribeSubscription.CommandHandlerId);
+                        UnsubscribeCompletionSources.Remove(unsubscribeSubscription.CommandHandlerRegistrationId);
                     }
                 }
                 else
@@ -158,7 +158,7 @@ public class CommandSubscriptions
                         acknowledgement.Error.Details);
                     if (completionSource.SignalFault(exception))
                     {
-                        UnsubscribeCompletionSources.Remove(unsubscribeSubscription.CommandHandlerId);
+                        UnsubscribeCompletionSources.Remove(unsubscribeSubscription.CommandHandlerRegistrationId);
                     }
                 }
             }
@@ -166,32 +166,32 @@ public class CommandSubscriptions
     }
     
     public void UnregisterCommandHandler(
-        CommandHandlerId commandHandlerId,
+        RegistrationId commandHandlerRegistrationId,
         CountdownCompletionSource unsubscribeCompletionSource)
     {
-        if (AllCommandHandlers.ContainsKey(commandHandlerId))
+        if (AllCommandHandlers.ContainsKey(commandHandlerRegistrationId))
         {
-            if (!UnsubscribeCompletionSources.ContainsKey(commandHandlerId))
+            if (!UnsubscribeCompletionSources.ContainsKey(commandHandlerRegistrationId))
             {
-                UnsubscribeCompletionSources.Add(commandHandlerId, unsubscribeCompletionSource);
+                UnsubscribeCompletionSources.Add(commandHandlerRegistrationId, unsubscribeCompletionSource);
             }
             
-            AllCommandHandlers.Remove(commandHandlerId);
+            AllCommandHandlers.Remove(commandHandlerRegistrationId);
         }
     }
 
-    public InstructionId? UnsubscribeFromCommand(SubscriptionId subscriptionId)
+    public InstructionId? UnsubscribeFromCommand(RegistrationId commandRegistrationId)
     {
-        if (AllSubscriptions.TryGetValue(subscriptionId, out var subscription))
+        if (AllSubscriptions.TryGetValue(commandRegistrationId, out var subscription))
         {
             if (ActiveSubscriptions.TryGetValue(subscription.Command, out var activeSubscriptionId) &&
-                activeSubscriptionId == subscriptionId)
+                activeSubscriptionId == commandRegistrationId)
             {
                 ActiveSubscriptions.Remove(subscription.Command);
                 ActiveHandlers.Remove(subscription.Command);
                 
                 var instructionId = InstructionId.New();
-                UnsubscribeInstructions.Add(instructionId, subscriptionId);
+                UnsubscribeInstructions.Add(instructionId, commandRegistrationId);
                 return instructionId;
             }
         }

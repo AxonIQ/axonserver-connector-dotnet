@@ -39,7 +39,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         _logger = loggerFactory.CreateLogger<CommandChannel>();
 
         _state = new State.Disconnected(
-            new CommandSubscriptions(clientIdentity, clock),
+            new CommandRegistrations(clientIdentity, clock),
             new FlowController(permits, permitsBatch),
             new TaskRunCache());
         _channel = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
@@ -97,13 +97,13 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             "Opened command stream for context '{Context}'",
                             Context);
 
-                        foreach (var entry in disconnected.CommandSubscriptions.AllSubscriptions)
+                        foreach (var entry in disconnected.CommandRegistrations.AllSubscriptions)
                         {
                             var handler =
-                                disconnected.CommandSubscriptions.AllCommandHandlers[entry.Value.CommandHandlerId];
+                                disconnected.CommandRegistrations.AllCommandHandlers[entry.Value.CommandHandlerRegistrationId];
 
                             var instructionId =
-                                disconnected.CommandSubscriptions.SubscribeToCommand(handler.CommandHandlerId,
+                                disconnected.CommandRegistrations.SubscribeToCommand(handler.CommandHandlerRegistrationId,
                                     entry.Key, entry.Value.Command);
                             
                             var request = new CommandProviderOutbound
@@ -136,7 +136,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                         _state = new State.Connected(
                             stream,
                             ConsumeResponseStream(stream.ResponseStream, ct),
-                            disconnected.CommandSubscriptions,
+                            disconnected.CommandRegistrations,
                             disconnected.Flow,
                             disconnected.CommandTasks
                         );
@@ -183,19 +183,19 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    connected.CommandSubscriptions.RegisterCommandHandler(
-                                        subscribe.CommandHandlerId,
+                                    connected.CommandRegistrations.RegisterCommandHandler(
+                                        subscribe.RegistrationId,
                                         subscribe.CompletionSource,
                                         subscribe.LoadFactor,
                                         subscribe.Handler);
 
-                                    foreach (var (subscriptionId, command) in subscribe.SubscribedCommands)
+                                    foreach (var (subscriptionId, command) in subscribe.RegisteredCommands)
                                     {
                                         _logger.LogInformation(
                                             "Registered handler for command '{CommandName}' in context '{Context}'",
                                             command.ToString(), Context.ToString());
 
-                                        var instructionId = connected.CommandSubscriptions.SubscribeToCommand(subscribe.CommandHandlerId,
+                                        var instructionId = connected.CommandRegistrations.SubscribeToCommand(subscribe.RegistrationId,
                                             subscriptionId, command);
                                         var request = new CommandProviderOutbound
                                         {
@@ -222,7 +222,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                     {
                                         _logger.LogWarning(
                                             "Could not fault the subscribe completion source of command handler '{CommandHandlerId}'",
-                                            subscribe.CommandHandlerId.ToString());
+                                            subscribe.RegistrationId.ToString());
                                     }
 
                                     break;
@@ -233,13 +233,13 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                             switch (_state)
                             {
                                 case State.Connected connected:
-                                    connected.CommandSubscriptions.UnregisterCommandHandler(
-                                        unsubscribe.CommandHandlerId,
+                                    connected.CommandRegistrations.UnregisterCommandHandler(
+                                        unsubscribe.RegistrationId,
                                         unsubscribe.CompletionSource);
                                     
-                                    foreach (var (subscriptionId, command) in unsubscribe.SubscribedCommands)
+                                    foreach (var (subscriptionId, command) in unsubscribe.RegisteredCommands)
                                     {
-                                        var instructionId = connected.CommandSubscriptions.UnsubscribeFromCommand(subscriptionId);
+                                        var instructionId = connected.CommandRegistrations.UnsubscribeFromCommand(subscriptionId);
                                         if (instructionId.HasValue)
                                         {
                                             _logger.LogInformation(
@@ -271,7 +271,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                     {
                                         _logger.LogWarning(
                                             "Could not fault the unsubscribe completion source of command handler '{CommandHandlerId}'",
-                                            unsubscribe.CommandHandlerId.ToString());
+                                            unsubscribe.RegistrationId.ToString());
                                     }
 
                                     break;
@@ -303,7 +303,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                         case CommandProviderInbound.RequestOneofCase.None:
                                             break;
                                         case CommandProviderInbound.RequestOneofCase.Ack:
-                                            connected.CommandSubscriptions.Acknowledge(receive.Message.Ack);
+                                            connected.CommandRegistrations.Acknowledge(receive.Message.Ack);
                                             
                                             if (connected.Flow.Increment())
                                             {
@@ -318,7 +318,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                             }
                                             break;
                                         case CommandProviderInbound.RequestOneofCase.Command:
-                                            if (connected.CommandSubscriptions.ActiveHandlers.TryGetValue(
+                                            if (connected.CommandRegistrations.ActiveHandlers.TryGetValue(
                                                     new CommandName(receive.Message.Command.Name), out var handler))
                                             {
                                                 if (receive.Message.InstructionId != null)
@@ -494,7 +494,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     public Func<DateTimeOffset> Clock { get; }
     public CommandService.CommandServiceClient Service { get; }
 
-    private record SubscribedCommand(SubscriptionId SubscriptionId, CommandName CommandName);
+    private record RegisteredCommand(RegistrationId CommandRegistrationId, CommandName CommandName);
     
     private record Protocol
     {
@@ -505,15 +505,15 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         public record SendCommandResponse(long Token, CommandResponse CommandResponse) : Protocol;
 
         public record SubscribeCommandHandler(
-            CommandHandlerId CommandHandlerId,
+            RegistrationId RegistrationId,
             Func<Command, CancellationToken, Task<CommandResponse>> Handler,
             LoadFactor LoadFactor,
-            SubscribedCommand[] SubscribedCommands,
+            RegisteredCommand[] RegisteredCommands,
             CountdownCompletionSource CompletionSource) : Protocol;
 
         public record UnsubscribeCommandHandler(
-            CommandHandlerId CommandHandlerId,
-            SubscribedCommand[] SubscribedCommands,
+            RegistrationId RegistrationId,
+            RegisteredCommand[] RegisteredCommands,
             CountdownCompletionSource CompletionSource) : Protocol;
 
         public record Reconnect : Protocol;
@@ -524,14 +524,14 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     private record State
     {
         public record Disconnected(
-            CommandSubscriptions CommandSubscriptions,
+            CommandRegistrations CommandRegistrations,
             FlowController Flow,
             TaskRunCache CommandTasks) : State;
 
         public record Connected(
             AsyncDuplexStreamingCall<CommandProviderOutbound, CommandProviderInbound> Stream,
             Task ConsumeResponseStreamLoop,
-            CommandSubscriptions CommandSubscriptions,
+            CommandRegistrations CommandRegistrations,
             FlowController Flow,
             TaskRunCache CommandTasks) : State;
     }
@@ -554,22 +554,22 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             throw new ArgumentException("The command names requires at least one command name to be specified",
                 nameof(commandNames));
 
-        var commandHandlerId = CommandHandlerId.New();
-        var subscribedCommands = commandNames.Select(name => new SubscribedCommand(SubscriptionId.New(), name)).ToArray();
+        var registrationId = RegistrationId.New();
+        var registeredCommands = commandNames.Select(name => new RegisteredCommand(RegistrationId.New(), name)).ToArray();
         var subscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
         await _channel.Writer.WriteAsync(new Protocol.SubscribeCommandHandler(
-            commandHandlerId, 
+            registrationId, 
             handler, 
             loadFactor,
-            subscribedCommands, 
+            registeredCommands, 
             subscribeCompletionSource)).ConfigureAwait(false);
         return new CommandHandlerRegistration(subscribeCompletionSource.Completion, async () =>
         {
             var unsubscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
             await _channel.Writer.WriteAsync(
                 new Protocol.UnsubscribeCommandHandler(
-                    commandHandlerId,
-                    subscribedCommands,
+                    registrationId,
+                    registeredCommands,
                     unsubscribeCompletionSource)).ConfigureAwait(false);
             await unsubscribeCompletionSource.Completion.ConfigureAwait(false);
         });
@@ -579,10 +579,11 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
     {
         if (command == null) throw new ArgumentNullException(nameof(command));
         
-        using var activity = Telemetry.Source.StartActivity("CommandChannel.SendCommand");
-        activity?.SetTag("axoniq.client_id", ClientIdentity.ClientInstanceId.ToString());
-        activity?.SetTag("axoniq.component_name", ClientIdentity.ComponentName.ToString());
-        activity?.SetTag("axoniq.context", Context.ToString());
+        using var activity = 
+            Telemetry.Source.StartActivity("CommandChannel.SendCommand")
+                .SetClientIdTag(ClientIdentity.ClientInstanceId)
+                .SetComponentNameTag(ClientIdentity.ComponentName)
+                .SetContextTag(Context);
         
         var request = new Command(command)
         {
@@ -606,8 +607,9 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             });
         }
         
-        activity?.SetTag("axoniq.message_id", request.MessageIdentifier);
-        activity?.SetTag("axoniq.command_name", request.Name);
+        activity
+            .SetMessageIdTag(request.MessageIdentifier)
+            .SetCommandNameTag(request.Name);
 
         if (_logger.IsEnabled(LogLevel.Debug))
         {

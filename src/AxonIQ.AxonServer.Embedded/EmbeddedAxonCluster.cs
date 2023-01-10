@@ -61,14 +61,17 @@ public class EmbeddedAxonCluster : IAxonCluster
         }
 
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got started", _id);
-        
+        _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got initialized", _id);
+    }
+
+    public async Task WaitUntilAvailableAsync(TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default)
+    {
         foreach (var node in _nodes)
         {
-            await node.WaitUntilAvailableAsync(_id);
+            await node.WaitUntilAvailableAsync(_id, maximumWaitTime, delayBetweenAttempts);
         }
 
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster became available", _id);
-        _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster got initialized", _id);
     }
     
     public IReadOnlyList<DnsEndPoint> GetHttpEndpoints()

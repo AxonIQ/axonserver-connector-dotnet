@@ -15,6 +15,9 @@ namespace AxonIQ.AxonServer.Embedded;
 
 public class EmbeddedAxonServer : IAxonServer
 {
+    private static readonly TimeSpan DefaultMaximumWaitTime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DefaultDelayBetweenAttempts = TimeSpan.FromSeconds(1);
+    
     private readonly ILogger<EmbeddedAxonServer> _logger;
     private IContainerService? _container;
     private DirectoryInfo? _serverFiles;
@@ -61,8 +64,11 @@ public class EmbeddedAxonServer : IAxonServer
         _container = builder.Build().Start();
         
         _logger.LogDebug("Embedded Axon Server got started");
-        
-        var maximumWaitTime = TimeSpan.FromMinutes(2);
+        _logger.LogDebug("Embedded Axon Server got initialized");
+    }
+
+    public async Task WaitUntilAvailableAsync(TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default)
+    {
         var attempt = 0;
         var available = false;
         using var client = new HttpClient();
@@ -76,7 +82,7 @@ public class EmbeddedAxonServer : IAxonServer
         }.Uri;
 
         var watch = Stopwatch.StartNew();
-        while (!available && watch.Elapsed < maximumWaitTime)
+        while (!available && watch.Elapsed < (maximumWaitTime ?? DefaultMaximumWaitTime))
         {
             _logger.LogDebug("Embedded Axon Server is being health checked at {Endpoint}",
                 requestUri.AbsoluteUri);
@@ -93,7 +99,7 @@ public class EmbeddedAxonServer : IAxonServer
                 }
                 else
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    await Task.Delay(delayBetweenAttempts ?? DefaultDelayBetweenAttempts);
                 }
             }
             catch (KeyNotFoundException exception)
@@ -101,7 +107,7 @@ public class EmbeddedAxonServer : IAxonServer
                 _logger.LogDebug(
                     exception,
                     "Embedded Axon Server actuator health does not contain a 'status' property with the value 'UP'");
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(delayBetweenAttempts ?? DefaultDelayBetweenAttempts);
             }
             catch (HttpRequestException exception)
             {
@@ -110,7 +116,7 @@ public class EmbeddedAxonServer : IAxonServer
                     "Embedded Axon Server could not be reached at {Endpoint} because {Exception}",
                     requestUri.AbsoluteUri,
                     exception.Message);
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(delayBetweenAttempts ?? DefaultDelayBetweenAttempts);
             }
 
             attempt++;
@@ -119,11 +125,10 @@ public class EmbeddedAxonServer : IAxonServer
         if (!available)
         {
             throw new InvalidOperationException(
-                $"Embedded Axon Server could not be initialized. Failed to reach it at {requestUri.AbsoluteUri} within {Convert.ToInt32(maximumWaitTime.TotalSeconds)} seconds and after {attempt} attempts");
+                $"Embedded Axon Server could not be initialized. Failed to reach it at {requestUri.AbsoluteUri} within {Convert.ToInt32((maximumWaitTime ?? DefaultMaximumWaitTime).TotalSeconds)} seconds and after {attempt} attempts");
         }
 
         _logger.LogDebug("Embedded Axon Server became available");
-        _logger.LogDebug("Embedded Axon Server got initialized");
     }
 
     public DnsEndPoint GetHttpEndpoint()

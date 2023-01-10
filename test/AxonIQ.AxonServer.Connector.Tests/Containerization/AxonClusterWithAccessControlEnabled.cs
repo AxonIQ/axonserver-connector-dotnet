@@ -17,4 +17,15 @@ public class AxonClusterWithAccessControlEnabled : AxonCluster, IAsyncLifetime
     }
 
     protected override IAxonCluster Cluster { get; }
+    
+    async Task IAsyncLifetime.InitializeAsync()
+    {
+        await Cluster.InitializeAsync();
+        await Cluster.WaitUntilAvailableAsync();
+    }
+
+    Task IAsyncLifetime.DisposeAsync()
+    {
+        return Cluster.DisposeAsync();
+    }
 }

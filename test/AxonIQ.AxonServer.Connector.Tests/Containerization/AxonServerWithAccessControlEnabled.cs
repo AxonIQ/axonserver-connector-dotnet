@@ -17,4 +17,15 @@ public class AxonServerWithAccessControlEnabled : Embedded.AxonServer, IAsyncLif
     }
 
     protected override IAxonServer Server { get; }
+    
+    async Task IAsyncLifetime.InitializeAsync()
+    {
+        await Server.InitializeAsync();
+        await Server.WaitUntilAvailableAsync();
+    }
+
+    Task IAsyncLifetime.DisposeAsync()
+    {
+        return Server.DisposeAsync();
+    }
 }

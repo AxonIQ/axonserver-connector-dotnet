@@ -503,6 +503,7 @@ public class AxonServerGrpcChannelFactoryTests
             try
             {
                 await cluster.InitializeAsync();
+                await cluster.WaitUntilAvailableAsync();
                 
                 var clientIdentity = _fixture.Create<ClientIdentity>();
                 var context = Context.Default;

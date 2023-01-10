@@ -18,5 +18,6 @@ public interface IAxonCluster
     DnsEndPoint GetRandomGrpcEndpoint();
     
     Task InitializeAsync();
+    Task WaitUntilAvailableAsync(TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default);
     Task DisposeAsync();
 }
