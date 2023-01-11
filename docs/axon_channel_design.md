@@ -1,4 +1,4 @@
-Similarly to the Java Connector for Axon Server, `AxonServerConnection`s get handed out to by the `AxonServerConnectionFactory`.
+Similarly to the Java Connector for Axon Server, `AxonServerConnection`s get handed out to the caller by the `AxonServerConnectionFactory`.
 The connection factory keeps track of all handed out connections so far.
 Connections are context bound, meaning that if you ask for the same context twice, you get back the same connection.
 For most applications, the `AxonServerConnectionFactory` and `AxonServerConnection` can be treated as singletons, meaning only a single instance needs to exist.
@@ -44,7 +44,7 @@ On the other hand because we do not want to hinder the overall throughput.
 There are two key areas we must pay attention to.
 One is the interaction with caller code, e.g. we have no way of knowing how long handling a command will take.
 Commands must not be handled in a sequential fashion.
-For this reason work is kicked off as task we do not await inside the loop, thereby unblocking the loop itself, allowing it to pick up and handle the next protocol message.
+For this reason work is kicked off as task we do not await inside the loop, thereby unblocking the loop itself, allowing it to pick up and handle the next protocol message. Command responses to be sent first appear as yet another protocol message on the inbox. This too makes sense, since writing to the underlying gRPC full duplex stream (in other words, sending to Axon Server) must be done sequentially.
 The other is the interaction with a gRPC channel.
 Given the speed at which gRPC operates, the act of sending can be done inside the loop.
 But there are many reasons why a gRPC call would fail.
