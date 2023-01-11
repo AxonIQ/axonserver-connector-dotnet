@@ -8,7 +8,7 @@ namespace AxonIQ.AxonServer.Connector.Tests;
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 public class CanAccessAxonServerContainer
 {
-    private readonly Containerization.AxonServer _container;
+    private readonly Embedded.AxonServer _container;
     private readonly ITestOutputHelper _logger;
 
     public CanAccessAxonServerContainer(AxonServerWithAccessControlDisabled container,

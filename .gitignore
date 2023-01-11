@@ -4,9 +4,11 @@
 .fake
 .idea
 .ionide
+.vscode
 bin
 obj
 *.user
 axoniq.license
 axonserver.properties
 cluster-template.yml
+src/Benchmarks/java/target

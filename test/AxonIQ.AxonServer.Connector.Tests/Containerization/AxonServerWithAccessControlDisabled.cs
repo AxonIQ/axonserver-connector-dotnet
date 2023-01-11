@@ -1,10 +1,12 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Embedded;
 using Microsoft.Extensions.Logging;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
 
-public class AxonServerWithAccessControlDisabled : AxonServer
+public class AxonServerWithAccessControlDisabled : Embedded.AxonServer, IAsyncLifetime
 {
     public AxonServerWithAccessControlDisabled(IMessageSink sink)
     {
@@ -15,4 +17,15 @@ public class AxonServerWithAccessControlDisabled : AxonServer
     }
 
     protected override IAxonServer Server { get; }
+
+    async Task IAsyncLifetime.InitializeAsync()
+    {
+        await Server.InitializeAsync();
+        await Server.WaitUntilAvailableAsync();
+    }
+
+    Task IAsyncLifetime.DisposeAsync()
+    {
+        return Server.DisposeAsync();
+    }
 }

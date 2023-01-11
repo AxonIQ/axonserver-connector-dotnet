@@ -1,5 +1,6 @@
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
+using AxonIQ.AxonServer.Embedded;
 using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;

@@ -29,11 +29,11 @@ public static class FixtureExtensions
                 .OmitAutoProperties());
     }
     
-    public static void CustomizeCommandHandlerId(this IFixture fixture)
+    public static void CustomizeRegistrationId(this IFixture fixture)
     {
-        fixture.Customize<CommandHandlerId>(composer =>
+        fixture.Customize<RegistrationId>(composer =>
             composer
-                .FromFactory(CommandHandlerId.New)
+                .FromFactory(RegistrationId.New)
                 .OmitAutoProperties());
     }
     

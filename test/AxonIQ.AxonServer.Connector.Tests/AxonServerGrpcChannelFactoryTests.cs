@@ -2,6 +2,7 @@ using System.Net;
 using AutoFixture;
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using AxonIQ.AxonServer.Embedded;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
@@ -502,6 +503,7 @@ public class AxonServerGrpcChannelFactoryTests
             try
             {
                 await cluster.InitializeAsync();
+                await cluster.WaitUntilAvailableAsync();
                 
                 var clientIdentity = _fixture.Create<ClientIdentity>();
                 var context = Context.Default;
