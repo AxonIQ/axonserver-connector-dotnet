@@ -448,15 +448,16 @@ public class AdminChannelForAxonClusterIntegrationTests
     [Fact]
     public async Task GetAllNodesHasExpectedResult()
     {
+        var names = _cluster.Nodes.Select(node => node.Properties.NodeSetup.Name).ToArray();
         var connection = await CreateSystemUnderTest();
         await connection.WaitUntilReady();
         var sut = connection.AdminChannel;
         var actual = await sut.GetAllNodes();
-        Assert.Contains(actual, overview => overview.NodeName == "axonserver-0");
-        Assert.Contains(actual, overview => overview.NodeName == "axonserver-1");
-        Assert.Contains(actual, overview => overview.NodeName == "axonserver-2");
+        foreach (var name in names)
+        {
+            Assert.Contains(actual, overview => overview.NodeName == name);    
+        }
     }
-    //
     // [Fact]
     // public async Task AddNodeToReplicationGroupHasExpectedResult()
     // {
