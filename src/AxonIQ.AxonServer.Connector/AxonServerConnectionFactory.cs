@@ -8,13 +8,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class AxonServerConnectionFactory
 {
-    private readonly AxonServerGrpcChannelFactory _channelFactory;
-    private readonly Scheduler _scheduler;
     private readonly ConcurrentDictionary<Context, Lazy<AxonServerConnection>> _connections;
-    private readonly PermitCount _commandPermits;
-    private readonly PermitCount _queryPermits;
-    private readonly IReadOnlyList<Interceptor> _interceptors;
-    private readonly TimeSpan _eventProcessorUpdateFrequency;
 
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
@@ -27,24 +21,25 @@ public class AxonServerConnectionFactory
         Authentication = options.Authentication;
         LoggerFactory = options.LoggerFactory;
 
-        _scheduler = new Scheduler(
+        Scheduler = new Scheduler(
             options.Clock, 
             TimeSpan.FromMilliseconds(100),
             options.LoggerFactory.CreateLogger<Scheduler>());
 
-        _channelFactory =
+        ChannelFactory =
             new AxonServerGrpcChannelFactory(
                 ClientIdentity, 
-                Authentication, 
-                RoutingServers, 
+                options.Authentication, 
+                options.RoutingServers, 
                 options.LoggerFactory, 
                 options.Interceptors,
-                options.GrpcChannelOptions ?? new GrpcChannelOptions());
+                (options.GrpcChannelOptions?.Clone() ?? new GrpcChannelOptions()).ConfigureAxonOptions());
 
-        _interceptors = options.Interceptors;
-        _commandPermits = options.CommandPermits;
-        _queryPermits = options.QueryPermits;
-        _eventProcessorUpdateFrequency = options.EventProcessorUpdateFrequency;
+        Interceptors = options.Interceptors;
+        CommandPermits = options.CommandPermits;
+        QueryPermits = options.QueryPermits;
+        EventProcessorUpdateFrequency = options.EventProcessorUpdateFrequency;
+        ConnectBackoffPolicyOptions = options.ConnectBackoffPolicyOptions;
 
         _connections = new ConcurrentDictionary<Context, Lazy<AxonServerConnection>>();
     }
@@ -52,12 +47,19 @@ public class AxonServerConnectionFactory
     public ClientIdentity ClientIdentity { get; }
     public IReadOnlyList<DnsEndPoint> RoutingServers { get; }
     public IAxonServerAuthentication Authentication { get; }
+    public Scheduler Scheduler { get; }
+    public AxonServerGrpcChannelFactory ChannelFactory { get; }
+    public IReadOnlyList<Interceptor> Interceptors { get; }
+    public PermitCount CommandPermits { get; }
+    public PermitCount QueryPermits { get; }
+    public TimeSpan EventProcessorUpdateFrequency { get; }
+    public BackoffPolicyOptions ConnectBackoffPolicyOptions { get; }
     public ILoggerFactory LoggerFactory { get; }
 
     public async Task<IAxonServerConnection> Connect(Context context)
     {
         var connection = _connections.GetOrAdd(context,
-            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, _channelFactory, _interceptors, _scheduler, _commandPermits, _queryPermits, _eventProcessorUpdateFrequency, LoggerFactory)))
+            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(context, ChannelFactory, Interceptors, Scheduler, CommandPermits, QueryPermits, EventProcessorUpdateFrequency, ConnectBackoffPolicyOptions, LoggerFactory)))
             .Value;
         await connection.Connect().ConfigureAwait(false);
         return connection;

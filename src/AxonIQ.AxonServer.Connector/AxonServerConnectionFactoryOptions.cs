@@ -47,7 +47,8 @@ public class AxonServerConnectionFactoryOptions
         IReadOnlyList<Interceptor> interceptors,
         PermitCount commandPermits,
         PermitCount queryPermits,
-        TimeSpan eventProcessorUpdateFrequency)
+        TimeSpan eventProcessorUpdateFrequency,
+        BackoffPolicyOptions connectBackoffPolicyOptions)
     {
         ComponentName = componentName;
         ClientInstanceId = clientInstanceId;
@@ -61,6 +62,7 @@ public class AxonServerConnectionFactoryOptions
         CommandPermits = commandPermits;
         QueryPermits = queryPermits;
         EventProcessorUpdateFrequency = eventProcessorUpdateFrequency;
+        ConnectBackoffPolicyOptions = connectBackoffPolicyOptions;
     }
 
     public ComponentName ComponentName { get; }
@@ -75,6 +77,7 @@ public class AxonServerConnectionFactoryOptions
     public PermitCount CommandPermits { get; }
     public PermitCount QueryPermits { get; }
     public TimeSpan EventProcessorUpdateFrequency { get; }
+    public BackoffPolicyOptions ConnectBackoffPolicyOptions { get; }
 
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
@@ -92,6 +95,7 @@ public class AxonServerConnectionFactoryOptions
         private PermitCount _commandPermits;
         private PermitCount _queryPermits;
         private TimeSpan _eventProcessorUpdateFrequency;
+        private BackoffPolicyOptions _connectBackoffPolicyOptions;
 
         internal Builder(ComponentName componentName, ClientInstanceId clientInstanceId)
         {
@@ -112,6 +116,7 @@ public class AxonServerConnectionFactoryOptions
             _commandPermits = AxonServerConnectionFactoryDefaults.DefaultCommandPermits;
             _queryPermits = AxonServerConnectionFactoryDefaults.DefaultQueryPermits;
             _eventProcessorUpdateFrequency = AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency;
+            _connectBackoffPolicyOptions = AxonServerConnectionFactoryDefaults.DefaultConnectBackoffPolicyOptions;
         }
 
         public IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name)
@@ -249,7 +254,14 @@ public class AxonServerConnectionFactoryOptions
 
             return this;
         }
-        
+
+        public IAxonServerConnectionFactoryOptionsBuilder WithConnectBackoffPolicy(BackoffPolicyOptions options)
+        {
+            _connectBackoffPolicyOptions = options ?? throw new ArgumentNullException(nameof(options));
+            
+            return this;
+        }
+
         public IAxonServerConnectionFactoryOptionsBuilder WithEventProcessorUpdateFrequency(TimeSpan frequency)
         {
             _eventProcessorUpdateFrequency = TimeSpanMath.Max(AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency, frequency);
@@ -276,7 +288,8 @@ public class AxonServerConnectionFactoryOptions
                 _interceptors,
                 _commandPermits,
                 _queryPermits,
-                _eventProcessorUpdateFrequency);
+                _eventProcessorUpdateFrequency,
+                _connectBackoffPolicyOptions);
         }
     }
 }

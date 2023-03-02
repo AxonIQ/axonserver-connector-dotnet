@@ -1,0 +1,12 @@
+@startuml Heartbeat Monitor
+[*]->Disabled
+Disabled-->Enabled: Enable
+Enabled-->Paused: Pause
+Paused->Enabled: Enable, Resume
+Paused->Disabled: Disable
+Enabled->Disabled: Disable
+Disabled->Disabled: Disable, Resume, Pause, Purge
+Enabled->Enabled: Enable, Resume, Purge
+Paused->Paused: Pause, Purge
+Enabled->Enabled: Check, CheckSucceeded, CheckFailed, ReceiveServerHeartbeat, ReceiveClientHeartbeatAcknowledgement
+@enduml

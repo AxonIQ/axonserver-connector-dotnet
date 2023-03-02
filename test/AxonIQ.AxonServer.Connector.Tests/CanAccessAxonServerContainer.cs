@@ -1,4 +1,6 @@
 using AxonIQ.AxonServer.Connector.Tests.Containerization;
+using Grpc.Net.Client;
+using Grpc.Net.Client.Configuration;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Xunit;
 using Xunit.Abstractions;

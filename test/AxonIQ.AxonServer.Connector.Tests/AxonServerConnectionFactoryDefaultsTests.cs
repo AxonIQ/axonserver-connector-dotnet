@@ -79,4 +79,15 @@ public class AxonServerConnectionFactoryDefaultsTests
 
         Assert.Equal(new PermitCount(5_000), result);
     }
+
+    [Fact]
+    public void DefaultConnectBackoffPolicyOptions()
+    {
+        var result = AxonServerConnectionFactoryDefaults.DefaultConnectBackoffPolicyOptions;
+        
+        Assert.Equal(new BackoffPolicyOptions(
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromSeconds(1),
+            1.1), result);
+    }
 }

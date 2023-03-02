@@ -11,13 +11,13 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServer.Connector.Tests;
 
 [Collection(nameof(AxonClusterWithAccessControlDisabledCollection))]
-public class AdminChannelForAxonClusterIntegrationTests
+public class AxonClusterAdminChannelIntegrationTests
 {
     private readonly IAxonCluster _cluster;
     private readonly Fixture _fixture;
     private readonly ILoggerFactory _loggerFactory;
 
-    public AdminChannelForAxonClusterIntegrationTests(AxonClusterWithAccessControlDisabled cluster, ITestOutputHelper output)
+    public AxonClusterAdminChannelIntegrationTests(AxonClusterWithAccessControlDisabled cluster, ITestOutputHelper output)
     {
         _cluster = cluster ?? throw new ArgumentNullException(nameof(cluster));
         _fixture = new Fixture();

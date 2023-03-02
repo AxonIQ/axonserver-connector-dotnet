@@ -45,7 +45,7 @@ public class CommandSubscriptionsTests
             new[] { new KeyValuePair<RegistrationId, CountdownCompletionSource>(handlerId, completionSource) },
             sut.SubscribeCompletionSources);
         Assert.Equal(
-            new[] { new KeyValuePair<RegistrationId, CommandRegistrations.CommandHandler>(handlerId, new CommandRegistrations.CommandHandler(handlerId, loadFactor, handler))},
+            new[] { new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommandHandler>(handlerId, new CommandRegistrations.RegisteredCommandHandler(handlerId, loadFactor, handler))},
             sut.AllCommandHandlers);
     }
     
@@ -66,7 +66,7 @@ public class CommandSubscriptionsTests
             new[] { new KeyValuePair<RegistrationId, CountdownCompletionSource>(handlerId, completionSource) },
             sut.SubscribeCompletionSources);
         Assert.Equal(
-            new[] { new KeyValuePair<RegistrationId, CommandRegistrations.CommandHandler>(handlerId, new CommandRegistrations.CommandHandler(handlerId, loadFactor, handler))},
+            new[] { new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommandHandler>(handlerId, new CommandRegistrations.RegisteredCommandHandler(handlerId, loadFactor, handler))},
             sut.AllCommandHandlers);
     }
 
@@ -84,8 +84,8 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId,
                         subscriptionId,
                         command
@@ -113,8 +113,8 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId,
                         subscriptionId,
                         command
@@ -147,14 +147,14 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId1,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId1,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId1,
                         subscriptionId1,
                         command
                     )),
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId2,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId2,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId2,
                         subscriptionId2,
                         command
@@ -196,14 +196,14 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId1,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId1,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId1,
                         subscriptionId1,
                         command
                     )),
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId2,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId2,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId2,
                         subscriptionId2,
                         command
@@ -219,7 +219,7 @@ public class CommandSubscriptionsTests
             {
                 new KeyValuePair<CommandName,RegistrationId>(command, subscriptionId1)
             },
-            sut.ActiveSubscriptions);
+            sut.ActiveRegistrations);
     }
     
     [Fact]
@@ -255,8 +255,8 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId2,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId2,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId2,
                         subscriptionId2,
                         command
@@ -268,7 +268,7 @@ public class CommandSubscriptionsTests
             {
                 new KeyValuePair<CommandName,RegistrationId>(command, subscriptionId2)
             },
-            sut.ActiveSubscriptions);
+            sut.ActiveRegistrations);
     }
     
     [Fact]
@@ -294,7 +294,7 @@ public class CommandSubscriptionsTests
             }
         });
         
-        Assert.Empty(sut.ActiveSubscriptions);
+        Assert.Empty(sut.ActiveRegistrations);
         Assert.Equal(
             new[] { 
                 new KeyValuePair<InstructionId, RegistrationId>(instructionId, subscriptionId) 
@@ -332,7 +332,7 @@ public class CommandSubscriptionsTests
         
         Assert.Equal(
             new [] { new KeyValuePair<CommandName,RegistrationId>(command, subscriptionId)},
-            sut.ActiveSubscriptions);
+            sut.ActiveRegistrations);
         Assert.Empty(sut.SubscribeInstructions);
         Assert.True(completionSource.Completion.IsCompletedSuccessfully);
     }
@@ -365,7 +365,7 @@ public class CommandSubscriptionsTests
             }
         });
         
-        Assert.Empty(sut.ActiveSubscriptions);
+        Assert.Empty(sut.ActiveRegistrations);
         Assert.Empty(sut.SubscribeInstructions);
         Assert.True(completionSource.Completion.IsFaulted);
     }
@@ -394,14 +394,14 @@ public class CommandSubscriptionsTests
         var instructionId1 = sut.SubscribeToCommand(handlerId1,
             subscriptionId1, command);
         
-        Assert.Empty(sut.SupersededSubscriptions);
+        Assert.Empty(sut.SupersededCommandRegistrations);
         
         var instructionId2 = sut.SubscribeToCommand(handlerId2,
             subscriptionId2, command);
         
         Assert.Equal(
             new [] { subscriptionId1 },
-            sut.SupersededSubscriptions);
+            sut.SupersededCommandRegistrations);
         
         sut.Acknowledge(new InstructionAck
         {
@@ -417,9 +417,9 @@ public class CommandSubscriptionsTests
         
         Assert.Equal(
             new [] { new KeyValuePair<CommandName, RegistrationId>(command, subscriptionId2)},
-            sut.ActiveSubscriptions);
+            sut.ActiveRegistrations);
         Assert.Empty(sut.SubscribeInstructions);
-        Assert.Empty(sut.SupersededSubscriptions);
+        Assert.Empty(sut.SupersededCommandRegistrations);
         Assert.True(completionSource1.Completion.IsCompletedSuccessfully);
         Assert.True(completionSource2.Completion.IsCompletedSuccessfully);
     }
@@ -483,8 +483,8 @@ public class CommandSubscriptionsTests
         Assert.Equal(
             new[]
             {
-                new KeyValuePair<RegistrationId, CommandRegistrations.CommandSubscription>(subscriptionId,
-                    new CommandRegistrations.CommandSubscription(
+                new KeyValuePair<RegistrationId, CommandRegistrations.RegisteredCommand>(subscriptionId,
+                    new CommandRegistrations.RegisteredCommand(
                         handlerId,
                         subscriptionId,
                         command

@@ -40,6 +40,7 @@ public class AxonServerGrpcChannelFactory
         var index = 0;
         while (channel == null && index < RoutingServers.Count)
         {
+            
             var server = RoutingServers[index];
             _logger.LogInformation("Requesting connection details from {Host}:{Port}", server.Host, server.Port);
             var candidate = GrpcChannel.ForAddress(server.ToUri(), GrpcChannelOptions);

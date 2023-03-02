@@ -11,13 +11,13 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServer.Connector.Tests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
-public class AdminChannelForAxonServerIntegrationTests
+public class AxonServerAdminChannelIntegrationTests
 {
     private readonly IAxonServer _container;
     private readonly Fixture _fixture;
     private readonly ILoggerFactory _loggerFactory;
 
-    public AdminChannelForAxonServerIntegrationTests(AxonServerWithAccessControlDisabled container, ITestOutputHelper output)
+    public AxonServerAdminChannelIntegrationTests(AxonServerWithAccessControlDisabled container, ITestOutputHelper output)
     {
         _container = container ?? throw new ArgumentNullException(nameof(container));
         _fixture = new Fixture();

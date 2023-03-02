@@ -5,8 +5,10 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class Scheduler : IScheduler
 {
+    public static readonly TimeSpan Frequency = TimeSpan.FromMilliseconds(100);
+    
     private readonly Func<DateTimeOffset> _clock;
-    private readonly TimeSpan _timerFrequency;
+    private readonly TimeSpan _frequency;
     private readonly ILogger<Scheduler> _logger;
     
     private readonly Channel<Protocol> _inbox;
@@ -14,13 +16,23 @@ public class Scheduler : IScheduler
     private readonly Task _protocol;
     private readonly Timer _timer;
 
-    public Scheduler(Func<DateTimeOffset> clock, TimeSpan timerFrequency, ILogger<Scheduler> logger)
+    public Scheduler(Func<DateTimeOffset> clock, ILogger<Scheduler> logger)
+        : this(clock, Frequency, logger)
+    {
+    }
+
+    public Scheduler(Func<DateTimeOffset> clock, TimeSpan frequency, ILogger<Scheduler> logger)
     {
         if (clock == null) throw new ArgumentNullException(nameof(clock));
         if (logger == null) throw new ArgumentNullException(nameof(logger));
+        if (frequency < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(frequency), frequency,
+                "The frequency with which the scheduler checks for due scheduled tasks can not be negative.");
+        }
 
         _clock = clock;
-        _timerFrequency = timerFrequency;
+        _frequency = frequency;
         _logger = logger;
         _inbox = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
         {
@@ -51,12 +63,18 @@ public class Scheduler : IScheduler
                 switch (message)
                 {
                     case Protocol.Tick tick:
-                        
                         var due = all.Where(scheduled => scheduled.Due <= tick.Time).ToArray();
                         _logger.LogDebug("Scheduler has {Count} tasks due", due.Length);
                         foreach (var scheduled in due)
                         {
-                            await scheduled.Task().ConfigureAwait(false);
+                            try
+                            {
+                                await scheduled.Task().ConfigureAwait(false);
+                            }
+                            catch (Exception exception)
+                            {
+                                _logger.LogCritical(exception, "Scheduled task could not be executed due to an unexpected exception");
+                            }
                         }
                         all.ExceptWith(due);
                         if (all.Count == 0)
@@ -68,13 +86,20 @@ public class Scheduler : IScheduler
                     case Protocol.ScheduleTask schedule:
                         if (schedule.Due < _clock())
                         {
-                            await schedule.Task().ConfigureAwait(false);
+                            try
+                            {
+                                await schedule.Task().ConfigureAwait(false);
+                            }
+                            catch (Exception exception)
+                            {
+                                _logger.LogCritical(exception, "Scheduled task could not be executed due to an unexpected exception");
+                            }
                         }
                         else
                         {
                             if (all.Count == 0)
                             {
-                                _timer.Change(_timerFrequency, _timerFrequency);
+                                _timer.Change(_frequency, _frequency);
                                 _logger.LogDebug("Scheduler timer was enabled because there are tasks");
                             }
 
@@ -99,6 +124,11 @@ public class Scheduler : IScheduler
     public async ValueTask ScheduleTask(Func<ValueTask> task, DateTimeOffset due)
     {
         await _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, due));
+    }
+    
+    public async ValueTask ScheduleTask(Func<ValueTask> task, TimeSpan due)
+    {
+        await _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, _clock().Add(due)));
     }
 
     public async ValueTask DisposeAsync()

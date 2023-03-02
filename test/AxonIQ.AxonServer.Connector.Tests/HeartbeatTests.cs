@@ -8,11 +8,11 @@ using Xunit;
 namespace AxonIQ.AxonServer.Connector.Tests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
-public class HeartbeatTests
+public class HeartbeatSanityTests
 {
     private readonly IAxonServer _container;
 
-    public HeartbeatTests(AxonServerWithAccessControlDisabled container)
+    public HeartbeatSanityTests(AxonServerWithAccessControlDisabled container)
     {
         _container = container ?? throw new ArgumentNullException(nameof(container));
     }
@@ -21,17 +21,16 @@ public class HeartbeatTests
     public async Task HeartbeatGetsAcknowledged()
     {
         var channel = _container.CreateGrpcChannel(null);
-        var context = Context.Default;
         var callInvoker = channel.Intercept(metadata =>
         {
-            context.WriteTo(metadata);
+            Context.Default.WriteTo(metadata);
             return metadata;
         });
         var service = new PlatformService.PlatformServiceClient(callInvoker);
         var stream = service.OpenStream();
         await stream.RequestStream.WriteAsync(new PlatformInboundInstruction
         {
-            InstructionId = Guid.NewGuid().ToString("D"),
+            InstructionId = InstructionId.New().ToString(),
             Register = new ClientIdentification
             {
                 ClientId = "1234",
@@ -39,7 +38,7 @@ public class HeartbeatTests
                 Version = "1.0"
             }
         });
-        var instructionId = Guid.NewGuid().ToString("D");
+        var instructionId = InstructionId.New().ToString();
         await stream.RequestStream.WriteAsync(new PlatformInboundInstruction
         {
             InstructionId = instructionId,

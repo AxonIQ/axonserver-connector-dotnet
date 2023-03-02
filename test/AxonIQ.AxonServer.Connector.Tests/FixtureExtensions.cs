@@ -95,4 +95,15 @@ public static class FixtureExtensions
                 .FromFactory<int>(value => new SegmentId(Math.Abs(value)))
                 .OmitAutoProperties());
     }
+    
+    public static void CustomizeBackoffPolicyOptions(this IFixture fixture)
+    {
+        fixture.Customize<BackoffPolicyOptions>(composer =>
+            composer
+                .FromFactory((Random random) => new BackoffPolicyOptions(
+                    TimeSpan.FromSeconds(random.Next(1,5)),
+                    TimeSpan.FromSeconds(random.Next(5,10)),
+                    random.NextDouble() + 1.0))
+                .OmitAutoProperties());
+    }
 }
