@@ -13,12 +13,14 @@ internal class AxonActor<TProtocol, TState> : IAsyncDisposable
     private readonly Channel<TProtocol> _inbox;
     private readonly Task _consumer;
 
-    public AxonActor(Func<TProtocol, TState, CancellationToken, Task<TState>> receiver, TState initialState, IScheduler scheduler, ILogger logger)
+    public AxonActor(Func<TProtocol, TState, CancellationToken, Task<TState>> receiver, TState initialState,
+        IScheduler scheduler, ILogger logger)
         : this(receiver, new SelfOwnedState(initialState), scheduler, logger)
     {
     }
     
-    public AxonActor(Func<TProtocol, TState, CancellationToken, Task<TState>> receiver, IAxonActorStateOwner<TState> owner, IScheduler scheduler, ILogger logger)
+    public AxonActor(Func<TProtocol, TState, CancellationToken, Task<TState>> receiver,
+        IAxonActorStateOwner<TState> owner, IScheduler scheduler, ILogger logger)
     {
         _receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
@@ -27,8 +29,13 @@ internal class AxonActor<TProtocol, TState> : IAsyncDisposable
         
         _inboxCancellationTokenSource = new CancellationTokenSource();
         
-        _inbox = Channel.CreateUnbounded<TProtocol>(new UnboundedChannelOptions
-            { SingleWriter = false, SingleReader = true, AllowSynchronousContinuations = false });
+        _inbox = Channel.CreateUnbounded<TProtocol>(
+            new UnboundedChannelOptions
+            {
+                SingleWriter = false, 
+                SingleReader = true, 
+                AllowSynchronousContinuations = false // TODO: Figure out if this needs to be false or true
+            });
 
         _consumer = ConsumeInbox(_inboxCancellationTokenSource.Token);
     }
@@ -45,7 +52,7 @@ internal class AxonActor<TProtocol, TState> : IAsyncDisposable
                     
                     if (_logger.IsEnabled(LogLevel.Debug))
                     {
-                        _logger.LogDebug("Began {Message} when {State}", message.ToString(), _owner.State!.ToString());
+                        _logger.LogDebug("Received {Message} when {State}", message.ToString(), _owner.State!.ToString());
                     }
 
                     _owner.State = await _receiver(message, _owner.State, ct);
@@ -56,17 +63,24 @@ internal class AxonActor<TProtocol, TState> : IAsyncDisposable
                     }
                 }
             }
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Actor protocol loop is exciting gracefully");
+            }
         }
         catch (OperationCanceledException exception)
-        { 
-            _logger.LogDebug(exception,
-                "Channel protocol loop is exciting because an operation was cancelled");
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(exception,
+                    $"Actor protocol loop is exciting because an operation was cancelled");    
+            }
         }
         catch (Exception exception)
         {
             _logger.LogCritical(
                 exception,
-                "Channel protocol loop is exciting because of an unexpected exception");
+                "Actor protocol loop is exciting because of an unexpected exception");
         }
     }
 
@@ -74,32 +88,48 @@ internal class AxonActor<TProtocol, TState> : IAsyncDisposable
 
     public TState State => _owner.State;
 
+    public ValueTask ScheduleAsync(TProtocol message, TimeSpan due) =>
+        _scheduler.ScheduleTask(() => TellAsync(message), due);
+    
     public ValueTask ScheduleAsync(TProtocol message, TimeSpan due, CancellationToken ct) =>
-        _scheduler.ScheduleTask(() => _inbox.Writer.WriteAsync(message, ct), due);
+        _scheduler.ScheduleTask(() => TellAsync(message, ct), due);
 
     public ValueTask TellAsync(TProtocol message) => TellAsync(message, _inboxCancellationTokenSource.Token);
     public ValueTask TellAsync(TProtocol message, CancellationToken ct) => _inbox.Writer.WriteAsync(message, ct);
-
-    //TODO: Need to get rid of events and then this can follow.
-    public void TellSync(TProtocol message)
-    {
-        if (!_inbox.Writer.TryWrite(message))
-        {
-            _logger.LogDebug(
-                "Could not tell the connection to reconnect because the inbox refused to accept the message");
-        }
-    }
 
     public bool IsCancellationRequested => _inboxCancellationTokenSource.IsCancellationRequested;
 
     public async ValueTask DisposeAsync()
     {
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Disposing actor");
+        }
         _inboxCancellationTokenSource.Cancel();
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Cancelled actor's token source");
+        }
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion.ConfigureAwait(false);
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Completed actor's inbox writer");
+        }
         await _consumer.ConfigureAwait(false);
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Awaited actor's inbox consumer's completion");
+        }
         _inboxCancellationTokenSource.Dispose();
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Disposed actor's cancellation token source");
+        }
         _consumer.Dispose();
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Disposed actor");
+        }
     }
     
     private class SelfOwnedState: IAxonActorStateOwner<TState>

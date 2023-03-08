@@ -120,7 +120,7 @@ public class AxonServerAdminChannelIntegrationTests
     
     // Users
 
-    [Fact]
+    [Fact(Skip = "Because the axon cluster is reused between invocations, the order tests run in is unpredictable, it's impossible to test this scenario")]
     public async Task GetAllUsersWhenNoneReturnsExpectedResult()
     {
         var connection = await CreateSystemUnderTest();

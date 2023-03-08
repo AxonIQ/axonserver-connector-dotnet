@@ -33,6 +33,12 @@ public interface IAxonServerConnection : IAsyncDisposable
     /// </summary>
     /// <returns>A <see cref="Task"/> that confirms a connection has been established.</returns>
     Task WaitUntilConnected();
+
+    /// <summary>
+    /// Waits until a connection with Axon Server has been established or until the timeout has been reached.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> that confirms a connection has been established or faulted with a <see cref="TimeoutException"/>.</returns>
+    Task WaitUntilConnected(TimeSpan timeout) => WaitUntilConnected().WaitAsync(timeout);
     
     /// <summary>
     /// Raised when the connection with Axon Server was established. 
@@ -56,8 +62,14 @@ public interface IAxonServerConnection : IAsyncDisposable
     bool IsReady { get; }
     
     /// <summary>
-    /// Waits until the connection is able to send and receive instructions.
+    /// Waits until a connection is able to send and receive instructions.
     /// </summary>
-    /// <returns>A <see cref="Task"/> that confirms the connection is able to send and receive instructions.</returns>
+    /// <returns>A <see cref="Task"/> that confirms a connection is able to send and receive instructions.</returns>
     Task WaitUntilReady();
+    
+    /// <summary>
+    /// Waits until a connection is able to send and receive instructions or until the timeout has been reached.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> that confirms a connection is able to send and receive instructions or faulted with a <see cref="TimeoutException"/>.</returns>
+    Task WaitUntilReady(TimeSpan timeout) => WaitUntilReady().WaitAsync(timeout);
 }

@@ -173,11 +173,11 @@ public class EventProcessorIntegrationTests
     
     private class AwaitableEventProcessor : IEventProcessorInstructionHandler
     {
-        public TaskCompletionSource ReleaseSegmentCompletion { get; } = new TaskCompletionSource();
-        public TaskCompletionSource SplitSegmentCompletion { get; } = new TaskCompletionSource();
-        public TaskCompletionSource MergeSegmentCompletion { get; } = new TaskCompletionSource();
-        public TaskCompletionSource PauseCompletion { get; } = new TaskCompletionSource();
-        public TaskCompletionSource StartCompletion { get; } = new TaskCompletionSource();
+        public TaskCompletionSource ReleaseSegmentCompletion { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource SplitSegmentCompletion { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource MergeSegmentCompletion { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource PauseCompletion { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource StartCompletion { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         
         public Task<bool> ReleaseSegment(SegmentId segment)
         {

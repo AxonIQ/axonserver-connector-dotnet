@@ -642,7 +642,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             _logger.LogDebug("Dispatching the command {Command} with message identifier {MessageIdentifier}",
                 request.Name, request.MessageIdentifier);
         }
-
+        
         try
         {
             return await Service.DispatchAsync(request, cancellationToken: ct).ConfigureAwait(false);

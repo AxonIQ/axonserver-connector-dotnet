@@ -29,7 +29,7 @@ internal static class GrpcChannelOptionsExtensions
 
     public static GrpcChannelOptions ConfigureAxonOptions(this GrpcChannelOptions options)
     {
-        options.ThrowOperationCanceledOnCancellation = true;
+        options.ThrowOperationCanceledOnCancellation = false;
         return options;
     }
 }

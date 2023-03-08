@@ -68,7 +68,7 @@ public class AxonServerConnectionIntegrationTests
     {
         await using var sut = await CreateSystemUnderTest();
 
-        var source = new TaskCompletionSource(); 
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
         sut.Connected += (_, _) =>
         {
             source.TrySetResult();
@@ -81,7 +81,7 @@ public class AxonServerConnectionIntegrationTests
     {
         await using var sut = await CreateSystemUnderTest();
 
-        var source = new TaskCompletionSource(); 
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
         sut.Connected += (_, _) =>
         {
             source.TrySetResult();
@@ -116,7 +116,7 @@ public class AxonServerConnectionIntegrationTests
     {
         await using var sut = await CreateSystemUnderTest();
 
-        var source = new TaskCompletionSource(); 
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
         sut.Ready += (_, _) =>
         {
             source.TrySetResult();
@@ -155,7 +155,7 @@ public class AxonServerConnectionIntegrationTests
                 });
             });
         await sut.ControlChannel.EnableHeartbeat(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
-        var source = new TaskCompletionSource(); 
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
         sut.Connected += (_, _) =>
         {
             source.TrySetResult();

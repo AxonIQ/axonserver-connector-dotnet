@@ -1,6 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Threading.Channels;
-using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
@@ -49,8 +46,7 @@ public class AxonServerConnection : IAxonServerConnection
         _interceptors = interceptors;
         _logger = loggerFactory.CreateLogger<AxonServerConnection>();
         
-        _actor = new AxonActor<Protocol, State>(
-            Receive,
+        _actor = new AxonActor<Protocol, State>(Receive,
             new ConnectionOwnedState(this, new State.Disconnected()),
             scheduler,
             _logger);

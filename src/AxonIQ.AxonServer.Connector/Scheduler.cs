@@ -5,7 +5,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class Scheduler : IScheduler
 {
-    public static readonly TimeSpan Frequency = TimeSpan.FromMilliseconds(100);
+    public static readonly TimeSpan Frequency = TimeSpan.FromMilliseconds(10);
     
     private readonly Func<DateTimeOffset> _clock;
     private readonly TimeSpan _frequency;
@@ -55,60 +55,104 @@ public class Scheduler : IScheduler
 
     private async Task RunChannelProtocol(CancellationToken ct)
     {
-        var all = new HashSet<ScheduledTask>();
-        while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
+        var all = new List<ScheduledTask>();
+        try
         {
-            while (_inbox.Reader.TryRead(out var message))
+            while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
-                switch (message)
+                while (_inbox.Reader.TryRead(out var message))
                 {
-                    case Protocol.Tick tick:
-                        var due = all.Where(scheduled => scheduled.Due <= tick.Time).ToArray();
-                        _logger.LogDebug("Scheduler has {Count} tasks due", due.Length);
-                        foreach (var scheduled in due)
-                        {
-                            try
+                    if (_logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug("Began {Message}", message.ToString());
+                    }
+                    switch (message)
+                    {
+                        case Protocol.Tick tick:
+                            var due = all.Where(scheduled => scheduled.Due <= tick.Time).ToArray();
+                            if (_logger.IsEnabled(LogLevel.Debug))
                             {
-                                await scheduled.Task().ConfigureAwait(false);
+                                _logger.LogDebug("Scheduler has {Count} tasks due", due.Length);
                             }
-                            catch (Exception exception)
+
+                            foreach (var scheduled in due)
                             {
-                                _logger.LogCritical(exception, "Scheduled task could not be executed due to an unexpected exception");
+                                try
+                                {
+                                    await scheduled.Task().ConfigureAwait(false);
+                                }
+                                catch(OperationCanceledException exception)
+                                {
+                                    _logger.LogDebug(exception,
+                                        "Scheduled task could not be executed because an operation was cancelled");
+                                }
+                                catch (Exception exception)
+                                {
+                                    _logger.LogCritical(exception, "Scheduled task could not be executed due to an unexpected exception");
+                                }
+
+                                all.Remove(scheduled);
                             }
-                        }
-                        all.ExceptWith(due);
-                        if (all.Count == 0)
-                        {
-                            _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                            _logger.LogDebug("Scheduler timer was disabled because there are no tasks");
-                        }
-                        break;
-                    case Protocol.ScheduleTask schedule:
-                        if (schedule.Due < _clock())
-                        {
-                            try
-                            {
-                                await schedule.Task().ConfigureAwait(false);
-                            }
-                            catch (Exception exception)
-                            {
-                                _logger.LogCritical(exception, "Scheduled task could not be executed due to an unexpected exception");
-                            }
-                        }
-                        else
-                        {
+                            
                             if (all.Count == 0)
                             {
-                                _timer.Change(_frequency, _frequency);
-                                _logger.LogDebug("Scheduler timer was enabled because there are tasks");
+                                _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                                if (_logger.IsEnabled(LogLevel.Debug))
+                                {
+                                    _logger.LogDebug("Scheduler timer was disabled because there are no tasks");
+                                }
+                            }
+                            break;
+                        case Protocol.ScheduleTask schedule:
+                            if (schedule.Due < _clock())
+                            {
+                                try
+                                {
+                                    await schedule.Task().ConfigureAwait(false);
+                                }
+                                catch(OperationCanceledException exception)
+                                {
+                                    _logger.LogDebug(exception,
+                                    "Scheduled task could not be executed because an operation was cancelled");
+                                }
+                                catch (Exception exception)
+                                {
+                                    _logger.LogCritical(exception, "Scheduled task could not be executed due to an unexpected exception");
+                                }
+                            }
+                            else
+                            {
+                                if (all.Count == 0)
+                                {
+                                    _timer.Change(_frequency, _frequency);
+                                    if (_logger.IsEnabled(LogLevel.Debug))
+                                    {
+                                        _logger.LogDebug("Scheduler timer was enabled because there are tasks");
+                                    }
+                                }
+
+                                all.Add(new ScheduledTask(schedule.Task, schedule.Due));
                             }
 
-                            all.Add(new ScheduledTask(schedule.Task, schedule.Due));
-                        }
-
-                        break;
+                            break;
+                    }
+                    if (_logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug("Completed {Message}", message.ToString());
+                    }
                 }
             }
+        }
+        catch (OperationCanceledException exception)
+        { 
+            _logger.LogDebug(exception,
+                "Scheduler protocol loop is exciting because an operation was cancelled");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogCritical(
+                exception,
+                "Scheduler protocol loop is exciting because of an unexpected exception");
         }
     }
 
@@ -121,14 +165,14 @@ public class Scheduler : IScheduler
         public record ScheduleTask(Func<ValueTask> Task, DateTimeOffset Due) : Protocol;
     }
 
-    public async ValueTask ScheduleTask(Func<ValueTask> task, DateTimeOffset due)
+    public ValueTask ScheduleTask(Func<ValueTask> task, DateTimeOffset due)
     {
-        await _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, due));
+        return _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, due));
     }
     
-    public async ValueTask ScheduleTask(Func<ValueTask> task, TimeSpan due)
+    public ValueTask ScheduleTask(Func<ValueTask> task, TimeSpan due)
     {
-        await _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, _clock().Add(due)));
+        return _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, _clock().Add(due)));
     }
 
     public async ValueTask DisposeAsync()
