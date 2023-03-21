@@ -10,7 +10,7 @@ namespace AxonIQ.AxonServer.Connector;
 [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
 public class CommandChannel : ICommandChannel, IAsyncDisposable
 {
-    private readonly AxonActor<Protocol, State> _actor;
+    private readonly AxonActor<Message, State> _actor;
     private readonly ILogger<CommandChannel> _logger;
 
     public CommandChannel(
@@ -32,7 +32,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         Context = context;
         Service = new CommandService.CommandServiceClient(callInvoker);
         _logger = loggerFactory.CreateLogger<CommandChannel>();
-        _actor = new AxonActor<Protocol, State>(
+        _actor = new AxonActor<Message, State>(
             Receive,
             new State.Disconnected(
                 new CommandRegistrations(clientIdentity, scheduler.Clock),
@@ -51,13 +51,13 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             {
                 await foreach (var response in reader.ReadAllAsync(ct).ConfigureAwait(false))
                 {
-                    await _actor.TellAsync(new Protocol.ReceiveCommandProviderInbound(response), ct)
+                    await _actor.TellAsync(new Message.ReceiveCommandProviderInbound(response), ct)
                         .ConfigureAwait(false);
                 }
             }
             catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
             {
-                await _actor.TellAsync(new Protocol.Reconnect(), ct).ConfigureAwait(false);
+                await _actor.TellAsync(new Message.Reconnect(), ct).ConfigureAwait(false);
                 _logger.LogError(
                     exception,
                     "The command channel instruction stream is no longer being read because of an unexpected exception. Reconnection has been scheduled");
@@ -171,16 +171,16 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         return state;
     }
 
-    private async Task<State> Receive(Protocol message, State state, CancellationToken ct)
+    private async Task<State> Receive(Message message, State state, CancellationToken ct)
     {
         switch (message)
         {
-            case Protocol.Connect:
+            case Message.Connect:
                 state = await EnsureConnected(state, ct).ConfigureAwait(false);
                 
                 if (state is State.Disconnected)
                 {
-                    await _actor.ScheduleAsync(new Protocol.Connect(), state.ConnectBackoffPolicy.Next(), ct).ConfigureAwait(false);
+                    await _actor.ScheduleAsync(new Message.Connect(), state.ConnectBackoffPolicy.Next(), ct).ConfigureAwait(false);
                 }
                 else
                 {
@@ -188,7 +188,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 }
 
                 break;
-            case Protocol.RegisterCommandHandler register:
+            case Message.RegisterCommandHandler register:
                 state = await EnsureConnected(state, ct).ConfigureAwait(false);
                 
                 switch (state)
@@ -240,7 +240,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 }
 
                 break;
-            case Protocol.UnregisterCommandHandler unregister:
+            case Message.UnregisterCommandHandler unregister:
                 switch (state)
                 {
                     case State.Connected connected:
@@ -289,7 +289,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 }
 
                 break;
-            case Protocol.Reconnect:
+            case Message.Reconnect:
                 switch (state)
                 {
                     case State.Connected connected:
@@ -309,7 +309,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
                 if (state is State.Disconnected)
                 {
-                    await _actor.ScheduleAsync(new Protocol.Reconnect(), state.ConnectBackoffPolicy.Next(), ct).ConfigureAwait(false);
+                    await _actor.ScheduleAsync(new Message.Reconnect(), state.ConnectBackoffPolicy.Next(), ct).ConfigureAwait(false);
                 }
                 else
                 {
@@ -317,7 +317,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 }
                     
                 break;
-            case Protocol.Disconnect:
+            case Message.Disconnect:
                 switch (state)
                 {
                     case State.Connected connected:
@@ -334,7 +334,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 }
 
                 break;
-            case Protocol.ReceiveCommandProviderInbound receive:
+            case Message.ReceiveCommandProviderInbound receive:
                 switch (state)
                 {
                     case State.Connected connected:
@@ -389,7 +389,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                                 .MessageIdentifier
                                                     };
                                                 await _actor.TellAsync(
-                                                    new Protocol.SendCommandResponse(
+                                                    new Message.SendCommandResponse(
                                                         token,
                                                         response));
                                             }
@@ -413,7 +413,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                             .MessageIdentifier
                                                 };
                                                 await _actor.TellAsync(
-                                                    new Protocol.SendCommandResponse(
+                                                    new Message.SendCommandResponse(
                                                         token,
                                                         response));
                                             }
@@ -470,7 +470,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
                 break;
 
-            case Protocol.SendCommandResponse send:
+            case Message.SendCommandResponse send:
                 switch (state)
                 {
                     case State.Connected connected:
@@ -511,29 +511,29 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
     private record RegisteredCommand(RegistrationId CommandRegistrationId, CommandName CommandName);
     
-    private record Protocol
+    private record Message
     {
-        public record Connect : Protocol;
+        public record Connect : Message;
 
-        public record ReceiveCommandProviderInbound(CommandProviderInbound Message) : Protocol;
+        public record ReceiveCommandProviderInbound(CommandProviderInbound Message) : Message;
 
-        public record SendCommandResponse(long Token, CommandResponse CommandResponse) : Protocol;
+        public record SendCommandResponse(long Token, CommandResponse CommandResponse) : Message;
 
         public record RegisterCommandHandler(
             RegistrationId RegistrationId,
             Func<Command, CancellationToken, Task<CommandResponse>> Handler,
             LoadFactor LoadFactor,
             RegisteredCommand[] RegisteredCommands,
-            CountdownCompletionSource CompletionSource) : Protocol;
+            CountdownCompletionSource CompletionSource) : Message;
 
         public record UnregisterCommandHandler(
             RegistrationId RegistrationId,
             RegisteredCommand[] RegisteredCommands,
-            CountdownCompletionSource CompletionSource) : Protocol;
+            CountdownCompletionSource CompletionSource) : Message;
 
-        public record Reconnect : Protocol;
+        public record Reconnect : Message;
 
-        public record Disconnect : Protocol;
+        public record Disconnect : Message;
     }
 
     private record State(CommandRegistrations CommandRegistrations,
@@ -566,7 +566,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
     public async ValueTask Reconnect()
     {
-        await _actor.TellAsync(new Protocol.Reconnect()).ConfigureAwait(false);
+        await _actor.TellAsync(new Message.Reconnect()).ConfigureAwait(false);
     }
     
     public async Task<ICommandHandlerRegistration> RegisterCommandHandler(
@@ -583,7 +583,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         var registrationId = RegistrationId.New();
         var registeredCommands = commandNames.Select(name => new RegisteredCommand(RegistrationId.New(), name)).ToArray();
         var subscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
-        await _actor.TellAsync(new Protocol.RegisterCommandHandler(
+        await _actor.TellAsync(new Message.RegisterCommandHandler(
             registrationId, 
             handler, 
             loadFactor,
@@ -593,7 +593,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         {
             var unsubscribeCompletionSource = new CountdownCompletionSource(commandNames.Length);
             await _actor.TellAsync(
-                new Protocol.UnregisterCommandHandler(
+                new Message.UnregisterCommandHandler(
                     registrationId,
                     registeredCommands,
                     unsubscribeCompletionSource)).ConfigureAwait(false);

@@ -1,0 +1,13 @@
+@startuml AxonServerConnection Statemachine
+[*] --> Disconnected
+Disconnected --> Connecting: Connect [Attempt = 0] / GrpcChannelEstablished
+Connecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ConnectControlChannel
+Connecting --> Connecting: GrpcChannelEstablished(Ok channel) [channel null] / Schedule(Connect(Attempt + 1))\nGrpcChannelEstablished(Error exception) / Schedule(Connect(Attempt + 1))
+Connected --> Reconnecting: Reconnect [Attempt = 0] / GrpcChannelEstablished
+Reconnecting --> Reconnecting: GrpcChannelEstablished(Ok channel) [channel null] / Schedule(Reconnect(Attempt + 1))\nGrpcChannelEstablished(Error exception) / Schedule(Reconnect(Attempt + 1))
+Reconnecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ReconnectChannels
+Connected --> Connected: ConnectControlChannel\nReconnectChannels
+Connected --> Disconnected: Disconnect
+Connecting --> Disconnected: Disconnect
+Reconnecting --> Disconnected: Disconnect
+@enduml

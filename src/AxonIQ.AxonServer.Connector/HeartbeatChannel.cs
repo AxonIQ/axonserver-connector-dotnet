@@ -11,20 +11,20 @@ public class HeartbeatChannel : IAsyncDisposable
     public static readonly TimeSpan PurgeInterval = TimeSpan.FromMinutes(15);
     private static readonly Heartbeat HeartbeatInstance = new ();
 
-    private readonly AxonActor<Protocol, State> _actor;
+    private readonly AxonActor<Message, State> _actor;
     private readonly WritePlatformInboundInstruction _writer;
-    private readonly OnHeartbeatMissed _onHeartbeatMissed;
+    private readonly HeartbeatMissed _onHeartbeatMissed;
     private readonly TimeSpan _minimumCheckInterval;
     private readonly TimeSpan _purgeInterval;
     private readonly ILogger<HeartbeatChannel> _logger;
     private readonly VersionClock _versionClock;
 
-    public HeartbeatChannel(WritePlatformInboundInstruction writer, OnHeartbeatMissed onHeartbeatMissed, IScheduler scheduler, ILogger<HeartbeatChannel> logger) 
+    public HeartbeatChannel(WritePlatformInboundInstruction writer, HeartbeatMissed onHeartbeatMissed, IScheduler scheduler, ILogger<HeartbeatChannel> logger) 
         : this(writer, onHeartbeatMissed, MinimumCheckInterval, PurgeInterval, scheduler, logger)
     {
     }
 
-    public HeartbeatChannel(WritePlatformInboundInstruction writer, OnHeartbeatMissed onHeartbeatMissed, TimeSpan minimumCheckInterval, TimeSpan purgeInterval, IScheduler scheduler, ILogger<HeartbeatChannel> logger) 
+    public HeartbeatChannel(WritePlatformInboundInstruction writer, HeartbeatMissed onHeartbeatMissed, TimeSpan minimumCheckInterval, TimeSpan purgeInterval, IScheduler scheduler, ILogger<HeartbeatChannel> logger) 
     {
         if (writer == null) throw new ArgumentNullException(nameof(writer));
         if (onHeartbeatMissed == null) throw new ArgumentNullException(nameof(onHeartbeatMissed));
@@ -47,7 +47,7 @@ public class HeartbeatChannel : IAsyncDisposable
         _minimumCheckInterval = minimumCheckInterval;
         _purgeInterval = purgeInterval;
         _versionClock = new VersionClock();
-        _actor = new AxonActor<Protocol, State>(
+        _actor = new AxonActor<Message, State>(
             Receive,
             new State.Disabled(ImmutableList<SentHeartbeat>.Empty, _versionClock.LogicalTime),
             scheduler,
@@ -55,12 +55,12 @@ public class HeartbeatChannel : IAsyncDisposable
         );
     }
 
-    private async Task<State> Receive(Protocol message, State state, CancellationToken ct)
+    private async Task<State> Receive(Message message, State state, CancellationToken ct)
     {
         var wallTime = _actor.Clock();
         switch (message)
         {
-            case Protocol.Enable enable:
+            case Message.Enable enable:
                 // Note: Enable always causes a state transition regardless of the state we are in 
                 state = new State.Enabled(
                     enable.Interval,
@@ -69,13 +69,13 @@ public class HeartbeatChannel : IAsyncDisposable
                     wallTime.Add(enable.Timeout),
                     state.SentHeartbeats,
                     enable.LogicalTime);
-                await _actor.TellAsync(new Protocol.Check(state.LogicalTime), ct);
+                await _actor.TellAsync(new Message.Check(state.LogicalTime), ct);
                 
                 break;
-            case Protocol.Disable disable:
+            case Message.Disable disable:
                 state = new State.Disabled(state.SentHeartbeats, disable.LogicalTime);
                 break;
-            case Protocol.Pause pause:
+            case Message.Pause pause:
                 switch (state)
                 {
                     case State.Enabled enabled:
@@ -93,7 +93,7 @@ public class HeartbeatChannel : IAsyncDisposable
                         break;
                 }
                 break;
-            case Protocol.Resume resume:
+            case Message.Resume resume:
                 switch (state)
                 {
                     case State.Paused paused:
@@ -105,7 +105,7 @@ public class HeartbeatChannel : IAsyncDisposable
                             wallTime.Add(paused.Timeout),
                             state.SentHeartbeats,
                             resume.LogicalTime);
-                        await _actor.TellAsync(new Protocol.Check(state.LogicalTime), ct);
+                        await _actor.TellAsync(new Message.Check(state.LogicalTime), ct);
                         break;
                     }
                     case State.Enabled enabled:
@@ -116,7 +116,7 @@ public class HeartbeatChannel : IAsyncDisposable
                             wallTime.Add(enabled.Timeout),
                             state.SentHeartbeats,
                             resume.LogicalTime);
-                        await _actor.TellAsync(new Protocol.Check(state.LogicalTime), ct);
+                        await _actor.TellAsync(new Message.Check(state.LogicalTime), ct);
                         break;
                     case State.Disabled:
                         _logger.LogDebug(
@@ -125,7 +125,7 @@ public class HeartbeatChannel : IAsyncDisposable
                 }
 
                 break;
-            case Protocol.Check check:
+            case Message.Check check:
                 switch (state)
                 {
                     // Note: Only check when enabled and the timer that triggered a check is using the latest configuration 
@@ -149,7 +149,7 @@ public class HeartbeatChannel : IAsyncDisposable
                         if (enabled.NextHeartbeatCheckAt < wallTime)
                         {
                             var time = enabled.LogicalTime;
-                            await _actor.TellAsync(new Protocol.SendClientHeartbeat(time), ct);
+                            await _actor.TellAsync(new Message.SendClientHeartbeat(time), ct);
                             enabled = enabled with
                             {
                                 NextHeartbeatCheckAt = wallTime.Add(enabled.Interval)
@@ -162,12 +162,12 @@ public class HeartbeatChannel : IAsyncDisposable
 
                         state = enabled;
                         
-                        await _actor.ScheduleAsync(new Protocol.Check(enabled.LogicalTime), enabled.Interval, ct);
+                        await _actor.ScheduleAsync(new Message.Check(enabled.LogicalTime), enabled.Interval, ct);
 
                         break;
                     }
                     case State.Enabled enabled when check.LogicalTime != enabled.LogicalTime:
-                        await _actor.ScheduleAsync(new Protocol.Check(enabled.LogicalTime), enabled.Interval, ct);
+                        await _actor.ScheduleAsync(new Message.Check(enabled.LogicalTime), enabled.Interval, ct);
                         
                         _logger.LogDebug("Could not check heartbeat because the check request is outdated");
                         break;
@@ -177,7 +177,7 @@ public class HeartbeatChannel : IAsyncDisposable
                 }
 
                 break;
-            case Protocol.SendClientHeartbeat send:
+            case Message.SendClientHeartbeat send:
                 switch (state)
                 {
                     // Note: Only send when enabled and the send request is using the latest configuration 
@@ -187,7 +187,7 @@ public class HeartbeatChannel : IAsyncDisposable
                         if (state.SentHeartbeats.Count == 0)
                         {
                             await _actor.ScheduleAsync(
-                                    new Protocol.PurgeClientHeartbeats(_actor.Clock(), enabled.LogicalTime),
+                                    new Message.PurgeClientHeartbeats(_actor.Clock(), enabled.LogicalTime),
                                     _purgeInterval,
                                     ct)
                                 .ConfigureAwait(false);
@@ -208,7 +208,7 @@ public class HeartbeatChannel : IAsyncDisposable
                 }
 
                 break;
-            case Protocol.ReceiveClientHeartbeatAcknowledgement receive:
+            case Message.ReceiveClientHeartbeatAcknowledgement receive:
                 var match =
                     state
                         .SentHeartbeats
@@ -218,11 +218,11 @@ public class HeartbeatChannel : IAsyncDisposable
                 {
                     if (receive.Acknowledgement.Success)
                     {
-                        await _actor.TellAsync(new Protocol.CheckSucceeded(state.LogicalTime), ct).ConfigureAwait(false);
+                        await _actor.TellAsync(new Message.CheckSucceeded(state.LogicalTime), ct).ConfigureAwait(false);
                     }
                     else
                     {
-                        await _actor.TellAsync(new Protocol.CheckFailed(receive.Acknowledgement.Error, state.LogicalTime), ct).ConfigureAwait(false);
+                        await _actor.TellAsync(new Message.CheckFailed(receive.Acknowledgement.Error, state.LogicalTime), ct).ConfigureAwait(false);
                     }
 
                     state = state with
@@ -232,7 +232,7 @@ public class HeartbeatChannel : IAsyncDisposable
                 }
                 
                 break;
-            case Protocol.PurgeClientHeartbeats purge:
+            case Message.PurgeClientHeartbeats purge:
                 var overdue = 
                     state
                         .SentHeartbeats
@@ -254,14 +254,14 @@ public class HeartbeatChannel : IAsyncDisposable
                 if (state.SentHeartbeats.Count != 0)
                 {
                     await _actor.ScheduleAsync(
-                            new Protocol.PurgeClientHeartbeats(_actor.Clock(), state.LogicalTime),
+                            new Message.PurgeClientHeartbeats(_actor.Clock(), state.LogicalTime),
                             _purgeInterval,
                             ct)
                         .ConfigureAwait(false);
                 }
 
                 break;
-            case Protocol.CheckFailed failed:
+            case Message.CheckFailed failed:
                 // if AxonServer indicates it doesn't know this instruction, we have at least reached it.
                 // We can assume the connection is alive
                 if (ErrorCategory.Parse(failed.Error.ErrorCode)
@@ -301,7 +301,7 @@ public class HeartbeatChannel : IAsyncDisposable
                 }
 
                 break;
-            case Protocol.CheckSucceeded succeeded:
+            case Message.CheckSucceeded succeeded:
                 switch (state)
                 {
                     case State.Enabled enabled when succeeded.LogicalTime == enabled.LogicalTime:
@@ -326,7 +326,7 @@ public class HeartbeatChannel : IAsyncDisposable
                 }
 
                 break;
-            case Protocol.ReceiveServerHeartbeat receive:
+            case Message.ReceiveServerHeartbeat receive:
                 switch (state)
                 {
                     case State.Enabled enabled when receive.LogicalTime == enabled.LogicalTime:
@@ -369,19 +369,19 @@ public class HeartbeatChannel : IAsyncDisposable
         return state;
     }
     
-    private record Protocol(ulong LogicalTime)
+    private record Message(ulong LogicalTime)
     {
-        public record Enable(TimeSpan Interval, TimeSpan Timeout, ulong LogicalTime) : Protocol(LogicalTime);
-        public record Check(ulong LogicalTime) : Protocol(LogicalTime);
-        public record SendClientHeartbeat(ulong LogicalTime) : Protocol(LogicalTime);
-        public record ReceiveClientHeartbeatAcknowledgement(InstructionAck Acknowledgement, ulong LogicalTime) : Protocol(LogicalTime);
-        public record PurgeClientHeartbeats(DateTimeOffset Due, ulong LogicalTime) : Protocol(LogicalTime);
-        public record Disable(ulong LogicalTime) : Protocol(LogicalTime);
-        public record Pause(ulong LogicalTime) : Protocol(LogicalTime);
-        public record Resume(ulong LogicalTime) : Protocol(LogicalTime);
-        public record CheckSucceeded(ulong LogicalTime) : Protocol(LogicalTime);
-        public record CheckFailed(ErrorMessage Error, ulong LogicalTime) : Protocol(LogicalTime);
-        public record ReceiveServerHeartbeat(ulong LogicalTime) : Protocol(LogicalTime);
+        public record Enable(TimeSpan Interval, TimeSpan Timeout, ulong LogicalTime) : Message(LogicalTime);
+        public record Check(ulong LogicalTime) : Message(LogicalTime);
+        public record SendClientHeartbeat(ulong LogicalTime) : Message(LogicalTime);
+        public record ReceiveClientHeartbeatAcknowledgement(InstructionAck Acknowledgement, ulong LogicalTime) : Message(LogicalTime);
+        public record PurgeClientHeartbeats(DateTimeOffset Due, ulong LogicalTime) : Message(LogicalTime);
+        public record Disable(ulong LogicalTime) : Message(LogicalTime);
+        public record Pause(ulong LogicalTime) : Message(LogicalTime);
+        public record Resume(ulong LogicalTime) : Message(LogicalTime);
+        public record CheckSucceeded(ulong LogicalTime) : Message(LogicalTime);
+        public record CheckFailed(ErrorMessage Error, ulong LogicalTime) : Message(LogicalTime);
+        public record ReceiveServerHeartbeat(ulong LogicalTime) : Message(LogicalTime);
     }
     
     private record SentHeartbeat(InstructionId InstructionId, DateTimeOffset Due);
@@ -416,7 +416,7 @@ public class HeartbeatChannel : IAsyncDisposable
     public async Task Enable(TimeSpan interval, TimeSpan timeout)
     {
         await _actor.TellAsync(
-            new Protocol.Enable(
+            new Message.Enable(
                 TimeSpanMath.Max(interval, _minimumCheckInterval),
                 timeout,
                 _versionClock.Next()
@@ -427,7 +427,7 @@ public class HeartbeatChannel : IAsyncDisposable
     public async Task Disable()
     {
         await _actor.TellAsync(
-            new Protocol.Disable(
+            new Message.Disable(
                 _versionClock.Next()
             )
         ).ConfigureAwait(false);
@@ -436,7 +436,7 @@ public class HeartbeatChannel : IAsyncDisposable
     public async Task Pause()
     {
         await _actor.TellAsync(
-            new Protocol.Pause(
+            new Message.Pause(
                 _versionClock.Next()
             )
         ).ConfigureAwait(false);
@@ -445,7 +445,7 @@ public class HeartbeatChannel : IAsyncDisposable
     public async Task Resume()
     {
         await _actor.TellAsync(
-            new Protocol.Resume(
+            new Message.Resume(
                 _versionClock.Next()
             )
         ).ConfigureAwait(false);
@@ -454,7 +454,7 @@ public class HeartbeatChannel : IAsyncDisposable
     public async Task ReceiveServerHeartbeat()
     {
         await _actor.TellAsync(
-            new Protocol.ReceiveServerHeartbeat(
+            new Message.ReceiveServerHeartbeat(
                 _versionClock.LogicalTime
             )
         ).ConfigureAwait(false);
@@ -463,7 +463,7 @@ public class HeartbeatChannel : IAsyncDisposable
     public async Task ReceiveClientHeartbeatAcknowledgement(InstructionAck acknowledgement)
     {
         await _actor.TellAsync(
-            new Protocol.ReceiveClientHeartbeatAcknowledgement(
+            new Message.ReceiveClientHeartbeatAcknowledgement(
                 acknowledgement,
                 _versionClock.LogicalTime
             )

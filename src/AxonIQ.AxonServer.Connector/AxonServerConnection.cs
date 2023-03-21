@@ -12,7 +12,7 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly Context _context;
     private readonly ILogger<AxonServerConnection> _logger;
 
-    private readonly AxonActor<Protocol, State> _actor;
+    private readonly AxonActor<Message, State> _actor;
     private readonly ControlChannel _controlChannel;
     private readonly Lazy<AdminChannel> _adminChannel;
     private readonly Lazy<CommandChannel> _commandChannel;
@@ -45,9 +45,25 @@ public class AxonServerConnection : IAxonServerConnection
         _channelFactory = channelFactory;
         _interceptors = interceptors;
         _logger = loggerFactory.CreateLogger<AxonServerConnection>();
-        
-        _actor = new AxonActor<Protocol, State>(Receive,
-            new ConnectionOwnedState(this, new State.Disconnected()),
+
+        _actor = new AxonActor<Message, State>(
+            Receive,
+            (before, after) =>
+            {
+                if (before is not State.Connected && after is State.Connected)
+                {
+                    
+                    OnConnected();
+                }
+
+                if (before is not State.Disconnected && after is State.Disconnected)
+                {
+                    OnDisconnected();
+                }
+                
+                return ValueTask.CompletedTask;
+            }, 
+            new State.Disconnected(),
             scheduler,
             _logger);
         var callInvokerProxy = new CallInvokerProxy(() => _actor.State.CallInvoker);
@@ -89,18 +105,31 @@ public class AxonServerConnection : IAxonServerConnection
         _controlChannel.Connected += _onConnectedHandler;
     }
 
-    private async Task<State> Receive(Protocol message, State state, CancellationToken ct)
+#pragma warning disable CS4014
+    private async Task<State> Receive(Message message, State state, CancellationToken ct)
     {
-        switch (message)
+        switch (state, message)
         {
-            case Protocol.Connect:
-                switch (state)
+            case (State.Disconnected, Message.Connect connect):
+                if (connect.Attempt == 0)
                 {
-                    case State.Disconnected:
-                        var channel = await _channelFactory.Create(_context).ConfigureAwait(false);
-                        if (channel != null)
+                    _channelFactory
+                        .Create(_context)
+                        .TellToAsync(_actor,
+                            result => new Message.GrpcChannelEstablished(result),
+                            ct);
+                    
+                    state = new State.Connecting(connect.Attempt);
+                }
+
+                break;
+            case (State.Connecting connecting, Message.GrpcChannelEstablished established):
+                switch (established.Result)
+                {
+                    case TaskResult<GrpcChannel?>.Ok ok:
+                        if (ok.Value != null)
                         {
-                            var callInvoker = channel
+                            var callInvoker = ok.Value
                                 .CreateCallInvoker()
                                 .Intercept(_interceptors.ToArray())
                                 .Intercept(metadata =>
@@ -109,10 +138,8 @@ public class AxonServerConnection : IAxonServerConnection
                                     _context.WriteTo(metadata);
                                     return metadata;
                                 });
-                            state = new State.Connected(channel, callInvoker);
-                            //State needs to be set for the control channel to pick up
-                            //the right call invoker - therefor we use a message instead
-                            await _actor.TellAsync(new Protocol.OnConnected(), ct);
+                            state = new State.Connected(ok.Value, callInvoker);
+                            await _actor.TellAsync(new Message.ConnectControlChannel(), ct);
                         }
                         else
                         {
@@ -120,77 +147,148 @@ public class AxonServerConnection : IAxonServerConnection
                                 "Could not create channel for context '{Context}'",
                                 _context);
 
-                            await _actor.ScheduleAsync(new Protocol.Connect(), TimeSpan.FromMilliseconds(500), ct);
+                            await _actor.ScheduleAsync(new Message.Connect(connecting.Attempt + 1), TimeSpan.FromMilliseconds(500), ct);
                         }
-
                         break;
-                    case State.Connected:
-                        _logger.LogInformation(
-                            "AxonServerConnection for context '{Context}' is already connected",
-                            _context.ToString());
-                        break;
-                }
-
-                break;
-            case Protocol.OnConnected:
-                if (state is State.Connected)
-                {
-                    await _controlChannel.Connect().ConfigureAwait(false);
-                }
-
-                break;
-            case Protocol.Reconnect:
-                switch (state)
-                {
-                    case State.Connected connected:
-                        await _controlChannel.Reconnect().ConfigureAwait(false);
-
-                        _logger.LogInformation(
-                            "Reconnect for context {Context} requested. Closing current connection",
+                    case TaskResult<GrpcChannel?>.Error error:
+                        _logger.LogError(
+                            error.Exception,
+                            "Could not create channel for context '{Context}'",
                             _context);
-                        await connected.Channel.ShutdownAsync().ConfigureAwait(false);
-                        connected.Channel.Dispose();
 
-                        state = new State.Disconnected();
-
-                        await _actor.TellAsync(new Protocol.Connect(), ct).ConfigureAwait(false);
-
+                        await _actor.ScheduleAsync(new Message.Connect(connecting.Attempt + 1), TimeSpan.FromMilliseconds(500), ct);
+                        
                         break;
                 }
 
+                break;
+            case (State.Connected, Message.ConnectControlChannel):
+                await _controlChannel.Connect().ConfigureAwait(false);
+
+                break;
+            case (State.Connected connected, Message.Reconnect reconnect):
+                try
+                {
+                    await connected.Channel.ShutdownAsync();
+                    connected.Channel.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogCritical(exception, "Failed to shut down channel");
+                }
+                
+                _channelFactory
+                    .Create(_context)
+                    .TellToAsync(_actor,
+                        result => new Message.GrpcChannelEstablished(result),
+                        ct);
+
+                state = new State.Reconnecting(reconnect.Attempt); 
+                
+                break;
+            case (State.Reconnecting reconnecting, Message.GrpcChannelEstablished established):
+                switch (established.Result)
+                {
+                    case TaskResult<GrpcChannel?>.Ok ok:
+                        if (ok.Value != null)
+                        {
+                            var callInvoker = ok.Value
+                                .CreateCallInvoker()
+                                .Intercept(_interceptors.ToArray())
+                                .Intercept(metadata =>
+                                {
+                                    _channelFactory.Authentication.WriteTo(metadata);
+                                    _context.WriteTo(metadata);
+                                    return metadata;
+                                });
+                            state = new State.Connected(ok.Value, callInvoker);
+                            await _actor.TellAsync(new Message.ReconnectChannels(), ct);
+                        }
+                        else
+                        {
+                            _logger.LogWarning(
+                                "Could not create channel for context '{Context}'",
+                                _context);
+
+                            await _actor.ScheduleAsync(new Message.Reconnect(reconnecting.Attempt + 1), TimeSpan.FromMilliseconds(500), ct);
+                        }
+                        break;
+                    case TaskResult<GrpcChannel?>.Error error:
+                        _logger.LogError(
+                            error.Exception,
+                            "Could not create channel for context '{Context}'",
+                            _context);
+
+                        await _actor.ScheduleAsync(new Message.Reconnect(reconnecting.Attempt + 1), TimeSpan.FromMilliseconds(500), ct);
+                        
+                        break;
+                }
+
+                break;
+            case (State.Connected, Message.ReconnectChannels):
+                await _controlChannel.Reconnect().ConfigureAwait(false);
+                
+                if (_commandChannel.IsValueCreated)
+                {
+                    await _commandChannel.Value.Reconnect().ConfigureAwait(false);
+                }
+
+                if (_queryChannel.IsValueCreated)
+                {
+                    await _queryChannel.Value.Reconnect().ConfigureAwait(false);
+                }
+
+                if (_eventChannel.IsValueCreated)
+                {
+                    await _eventChannel.Value.Reconnect().ConfigureAwait(false);
+                }
+
+                break;
+            case (State.Connected connected, Message.Disconnect):
+                try
+                {
+                    await connected.Channel.ShutdownAsync();
+                    connected.Channel.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogCritical(exception, "Failed to shut down channel");
+                }
+                
+                state = new State.Disconnected();
+                
+                break;
+            case (State.Connecting, Message.Disconnect):
+            case (State.Reconnecting, Message.Disconnect):
+                
+                state = new State.Disconnected();
+                
                 break;
         }
 
         return state;
     }
+#pragma warning restore CS4014
 
     public async Task Connect()
     {
         await _actor.TellAsync(
-            new Protocol.Connect()
+            new Message.Connect(0)
+        ).ConfigureAwait(false);
+    }
+    
+    public async Task Disconnect()
+    {
+        await _actor.TellAsync(
+            new Message.Disconnect()
         ).ConfigureAwait(false);
     }
 
     private async ValueTask Reconnect()
     {
         await _actor.TellAsync(
-            new Protocol.Reconnect()
+            new Message.Reconnect(0)
         ).ConfigureAwait(false);
-
-        if (_commandChannel.IsValueCreated)
-        {
-            await _commandChannel.Value.Reconnect().ConfigureAwait(false);
-        }
-
-        if (_queryChannel.IsValueCreated)
-        {
-            await _queryChannel.Value.Reconnect().ConfigureAwait(false);
-        }
-
-        if (_eventChannel.IsValueCreated)
-        {
-            await _eventChannel.Value.Reconnect().ConfigureAwait(false);
-        }
     }
 
     public Task WaitUntilConnected()
@@ -272,17 +370,24 @@ public class AxonServerConnection : IAxonServerConnection
         return source.Task;
     }
 
-    private record Protocol
+    private record Message
     {
-        public record Connect : Protocol;
-        public record OnConnected : Protocol;
+        public record Connect(ulong Attempt) : Message;
+        public record ConnectControlChannel : Message;
+        
+        public record Disconnect : Message;
 
-        public record Reconnect : Protocol;
+        public record Reconnect(ulong Attempt) : Message;
+        public record ReconnectChannels : Message;
+
+        public record GrpcChannelEstablished(TaskResult<GrpcChannel?> Result) : Message;
     }
 
     private record State(CallInvoker? CallInvoker)
     {
         public record Disconnected() : State((CallInvoker?)null);
+        public record Connecting(ulong Attempt) : State((CallInvoker?)null);
+        public record Reconnecting(ulong Attempt) : State((CallInvoker?)null);
 
         public record Connected(GrpcChannel Channel, CallInvoker CallInvoker) : State(CallInvoker);
     }
@@ -312,30 +417,5 @@ public class AxonServerConnection : IAxonServerConnection
         }
 
         await _actor.DisposeAsync().ConfigureAwait(false);
-    }
-
-    private class ConnectionOwnedState : IAxonActorStateOwner<State>
-    {
-        private readonly AxonServerConnection _connection;
-        private State _state;
-
-        public ConnectionOwnedState(AxonServerConnection connection, State initialState)
-        {
-            _connection = connection;
-            _state = initialState;
-        }
-
-        public State State
-        {
-            get => _state;
-            set
-            {
-                var connected = _state is not State.Connected && value is State.Connected;
-                var disconnected = _state is not State.Disconnected && value is State.Disconnected;
-                _state = value;
-                if (connected) _connection.OnConnected();
-                if (disconnected) _connection.OnDisconnected();
-            }
-        }
     }
 }

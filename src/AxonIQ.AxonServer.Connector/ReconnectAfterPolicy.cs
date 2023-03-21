@@ -4,6 +4,19 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal static class ReconnectAfterPolicy
 {
+    public static TimeSpan FromException(Exception exception)
+    {
+        var statusCode =
+            exception switch
+            {
+                RpcException rpc => rpc.StatusCode,
+                IOException => StatusCode.Unknown,
+                _ => StatusCode.Unknown
+            };
+
+        return FromStatusCode(statusCode);
+    }
+    
     public static TimeSpan FromStatusCode(StatusCode code)
     {
         var after = TimeSpan.FromMilliseconds(500);

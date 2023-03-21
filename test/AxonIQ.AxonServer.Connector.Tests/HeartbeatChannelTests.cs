@@ -156,7 +156,7 @@ public class HeartbeatChannelTests
             _schedulerLogger = new TestOutputHelperLogger<Scheduler>(output);
         }
         
-        private async Task<HeartbeatChannel> CreateSystemUnderTest(WritePlatformInboundInstruction writer, OnHeartbeatMissed onHeartbeatMissed)
+        private async Task<HeartbeatChannel> CreateSystemUnderTest(WritePlatformInboundInstruction writer, HeartbeatMissed onHeartbeatMissed)
         {
             var sut = new HeartbeatChannel(writer,
                 onHeartbeatMissed,
@@ -173,7 +173,7 @@ public class HeartbeatChannelTests
         public async Task HeartbeatMissedGetsTriggeredWhenHeartbeatIsNeverAcknowledged()
         {
             var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            OnHeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
+            HeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
             WritePlatformInboundInstruction writer = _ => ValueTask.CompletedTask; 
             await using var sut = await CreateSystemUnderTest(writer, missed);
             
@@ -184,7 +184,7 @@ public class HeartbeatChannelTests
         public async Task HeartbeatMissedGetsTriggeredWhenHeartbeatIsNotAcknowledgedInTime()
         {
             var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            OnHeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
+            HeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
             var instructions = new List<PlatformInboundInstruction>();
             WritePlatformInboundInstruction writer = instruction =>
             {
@@ -214,7 +214,7 @@ public class HeartbeatChannelTests
         public async Task HeartbeatMissedDoesNotGetTriggeredWhenHeartbeatIsAcknowledgedInTime()
         {
             var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            OnHeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
+            HeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
             var instructions = new List<PlatformInboundInstruction>();
             WritePlatformInboundInstruction writer = instruction =>
             {
@@ -234,7 +234,7 @@ public class HeartbeatChannelTests
         [Fact]
         public async Task EnableHasExpectedResult()
         {
-            OnHeartbeatMissed missed = () => ValueTask.CompletedTask;
+            HeartbeatMissed missed = () => ValueTask.CompletedTask;
             var writer = new WrittenPlatformInboundInstructionCountdown(2); // 1 count for the initial enable, 1 for the second enable
             await using var sut = await CreateSystemUnderTest(writer.Write, missed);
             
@@ -246,7 +246,7 @@ public class HeartbeatChannelTests
         [Fact]
         public async Task DisableHasExpectedResult()
         {
-            OnHeartbeatMissed missed = () => ValueTask.CompletedTask;
+            HeartbeatMissed missed = () => ValueTask.CompletedTask;
             var writer = new WrittenPlatformInboundInstructionCountdown(2);
             await using var sut = await CreateSystemUnderTest(writer.Write, missed);
         
@@ -258,7 +258,7 @@ public class HeartbeatChannelTests
         [Fact]
         public async Task PauseHasExpectedResult()
         {
-            OnHeartbeatMissed missed = () => ValueTask.CompletedTask;
+            HeartbeatMissed missed = () => ValueTask.CompletedTask;
             var writer = new WrittenPlatformInboundInstructionCountdown(2);
             await using var sut = await CreateSystemUnderTest(writer.Write, missed);
         
@@ -270,7 +270,7 @@ public class HeartbeatChannelTests
         [Fact]
         public async Task ResumeHasExpectedResult()
         {
-            OnHeartbeatMissed missed = () => ValueTask.CompletedTask;
+            HeartbeatMissed missed = () => ValueTask.CompletedTask;
             var writer = new WrittenPlatformInboundInstructionCountdown(2);
             await using var sut = await CreateSystemUnderTest(writer.Write, missed);
         
@@ -433,7 +433,7 @@ public class HeartbeatChannelTests
             _schedulerLogger = new TestOutputHelperLogger<Scheduler>(output);
         }
         
-        private async Task<HeartbeatChannel> CreateSystemUnderTest(WritePlatformInboundInstruction writer, OnHeartbeatMissed onHeartbeatMissed)
+        private async Task<HeartbeatChannel> CreateSystemUnderTest(WritePlatformInboundInstruction writer, HeartbeatMissed onHeartbeatMissed)
         {
             var sut = new HeartbeatChannel(writer,
                 onHeartbeatMissed,
@@ -449,7 +449,7 @@ public class HeartbeatChannelTests
         public async Task NeverAcknowledgingHasExpectedResult()
         {
             var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            OnHeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
+            HeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
             var writer = new CaptureClientHeartbeatInstructionWriter();
             await using var sut = await CreateSystemUnderTest(writer.Write, missed);
     
@@ -461,7 +461,7 @@ public class HeartbeatChannelTests
         public async Task AcknowledgingTooLateHasExpectedResult()
         {
             var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            OnHeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
+            HeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
             var writer = new CaptureClientHeartbeatInstructionWriter();
             await using var sut = await CreateSystemUnderTest(writer.Write, missed);
             

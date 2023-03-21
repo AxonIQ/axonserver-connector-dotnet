@@ -11,9 +11,9 @@ public class Scheduler : IScheduler
     private readonly TimeSpan _frequency;
     private readonly ILogger<Scheduler> _logger;
     
-    private readonly Channel<Protocol> _inbox;
+    private readonly Channel<Message> _inbox;
     private readonly CancellationTokenSource _inboxCancellation;
-    private readonly Task _protocol;
+    private readonly Task _consumer;
     private readonly Timer _timer;
 
     public Scheduler(Func<DateTimeOffset> clock, ILogger<Scheduler> logger)
@@ -34,26 +34,26 @@ public class Scheduler : IScheduler
         _clock = clock;
         _frequency = frequency;
         _logger = logger;
-        _inbox = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
+        _inboxCancellation = new CancellationTokenSource();
+        _inbox = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
         {
             SingleReader = true,
             SingleWriter = false
         });
-        _inboxCancellation = new CancellationTokenSource();
-        _protocol = RunChannelProtocol(_inboxCancellation.Token);
         _timer = new Timer(_ =>
         {
-            var message = new Protocol.Tick(clock());
+            var message = new Message.Tick(clock());
             if (!_inbox.Writer.TryWrite(message))
             {
                 _logger.LogDebug("Could not tell the scheduler to tick because the inbox refused to accept the message");
             }
         }, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _consumer = ConsumeInbox(_inboxCancellation.Token);
     }
 
     public Func<DateTimeOffset> Clock => _clock;
 
-    private async Task RunChannelProtocol(CancellationToken ct)
+    private async Task ConsumeInbox(CancellationToken ct)
     {
         var all = new List<ScheduledTask>();
         try
@@ -68,7 +68,7 @@ public class Scheduler : IScheduler
                     }
                     switch (message)
                     {
-                        case Protocol.Tick tick:
+                        case Message.Tick tick:
                             var due = all.Where(scheduled => scheduled.Due <= tick.Time).ToArray();
                             if (_logger.IsEnabled(LogLevel.Debug))
                             {
@@ -103,7 +103,7 @@ public class Scheduler : IScheduler
                                 }
                             }
                             break;
-                        case Protocol.ScheduleTask schedule:
+                        case Message.ScheduleTask schedule:
                             if (schedule.Due < _clock())
                             {
                                 try
@@ -158,31 +158,30 @@ public class Scheduler : IScheduler
 
     private record ScheduledTask(Func<ValueTask> Task, DateTimeOffset Due);
     
-    private record Protocol
+    private record Message
     {
-        public record Tick(DateTimeOffset Time) : Protocol;
+        public record Tick(DateTimeOffset Time) : Message;
 
-        public record ScheduleTask(Func<ValueTask> Task, DateTimeOffset Due) : Protocol;
+        public record ScheduleTask(Func<ValueTask> Task, DateTimeOffset Due) : Message;
     }
 
     public ValueTask ScheduleTask(Func<ValueTask> task, DateTimeOffset due)
     {
-        return _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, due));
+        return _inbox.Writer.WriteAsync(new Message.ScheduleTask(task, due));
     }
     
     public ValueTask ScheduleTask(Func<ValueTask> task, TimeSpan due)
     {
-        return _inbox.Writer.WriteAsync(new Protocol.ScheduleTask(task, _clock().Add(due)));
+        return _inbox.Writer.WriteAsync(new Message.ScheduleTask(task, _clock().Add(due)));
     }
 
     public async ValueTask DisposeAsync()
     {
         _inboxCancellation.Cancel();
         _inbox.Writer.Complete();
-        await _inbox.Reader.Completion.ConfigureAwait(false);
-        await _protocol.ConfigureAwait(false);
+        await _consumer.ConfigureAwait(false);
         await _timer.DisposeAsync().ConfigureAwait(false);
         _inboxCancellation.Dispose();
-        _protocol.Dispose();
+        _consumer.Dispose();
     }
 }
