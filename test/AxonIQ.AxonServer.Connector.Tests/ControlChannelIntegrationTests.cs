@@ -38,7 +38,7 @@ public class ControlChannelIntegrationTests
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
-        return factory.Connect(Context.Default);
+        return factory.ConnectAsync(Context.Default);
     }
     
     [Fact]
@@ -50,50 +50,42 @@ public class ControlChannelIntegrationTests
         Assert.True(result.IsCompleted);
     }
     
-    [Fact(Skip = "This needs work")]
-    public async Task RecoveryAfterMissedHeartbeat()
-    {
-        var interceptor = new ControlledAvailabilityInterceptor();
-
-        var connection = await CreateSystemUnderTest(options => options.WithInterceptors(interceptor));
-        var sut = connection.ControlChannel;
-        await connection.WaitUntilReady();
-        
-        await sut.EnableHeartbeat(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
-        // Allow the heartbeat pump to start
-        await Task.Delay(TimeSpan.FromSeconds(2));
-        
-        Assert.True(connection.IsConnected);
-        Assert.True(connection.IsReady);
-        
-        // Observe a disconnect
-        var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        connection.Disconnected += (_, _) =>
-        {
-            disconnected.TrySetResult();
-        };
-        
-        //Simulate unavailability
-        interceptor.Available = false;
-        
-        //Wait for the disconnect to be observed
-        await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.False(connection.IsConnected);
-        Assert.False(connection.IsReady);
-        
-        //Observe a connect
-        var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        connection.Connected += (_, _) =>
-        {
-            connected.TrySetResult();
-        };
-        
-        //Simulate availability
-        interceptor.Available = true;
-        
-        //Wait for the connect to be observed
-        await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True(connection.IsConnected);
-        Assert.True(connection.IsReady);
-    }
+    // [Fact(Skip = "This needs work")]
+    // public async Task RecoveryAfterMissedHeartbeat()
+    // {
+    //     var interceptor = new ControlledAvailabilityInterceptor();
+    //
+    //     var connection = await CreateSystemUnderTest(options => options.WithInterceptors(interceptor));
+    //     var sut = connection.ControlChannel;
+    //     await connection.WaitUntilReadyAsync();
+    //     
+    //     await sut.EnableHeartbeat(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
+    //     // Allow the heartbeat pump to start
+    //     await Task.Delay(TimeSpan.FromSeconds(2));
+    //     
+    //     Assert.True(connection.IsConnected);
+    //     Assert.True(connection.IsReady);
+    //     
+    //     // Observe a disconnect
+    //     var disconnected = connection.WaitUntilClosedAsync();
+    //     
+    //     //Simulate unavailability
+    //     interceptor.Available = false;
+    //
+    //     await disconnected.WaitAsync(TimeSpan.FromSeconds(5));
+    //     
+    //     Assert.False(connection.IsConnected);
+    //     Assert.False(connection.IsReady);
+    //     
+    //     //Observe a connect
+    //     var connected = connection.WaitUntilConnectedAsync();
+    //     
+    //     //Simulate availability
+    //     interceptor.Available = true;
+    //     
+    //     await connected.WaitAsync(TimeSpan.FromSeconds(5));
+    //     
+    //     Assert.True(connection.IsConnected);
+    //     Assert.True(connection.IsReady);
+    // }
 }

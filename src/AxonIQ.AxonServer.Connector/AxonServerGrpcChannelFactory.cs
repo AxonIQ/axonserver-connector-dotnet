@@ -1,4 +1,5 @@
 using System.Net;
+using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
@@ -6,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class AxonServerGrpcChannelFactory
+internal class AxonServerGrpcChannelFactory
 {
     private readonly ILogger<AxonServerGrpcChannelFactory> _logger;
 
@@ -16,7 +17,9 @@ public class AxonServerGrpcChannelFactory
         IReadOnlyList<DnsEndPoint> routingServers,
         ILoggerFactory loggerFactory,
         IReadOnlyList<Interceptor> interceptors,
-        GrpcChannelOptions grpcChannelOptions)
+        GrpcChannelOptions grpcChannelOptions,
+        Func<DateTimeOffset> clock,
+        TimeSpan connectionTimeout)
     {
         ClientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
         Authentication = authentication ?? throw new ArgumentNullException(nameof(authentication));
@@ -24,6 +27,8 @@ public class AxonServerGrpcChannelFactory
         LoggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         Interceptors = interceptors ?? throw new ArgumentNullException(nameof(interceptors));
         GrpcChannelOptions = grpcChannelOptions ?? throw new ArgumentNullException(nameof(grpcChannelOptions));
+        Clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        ConnectionTimeout = connectionTimeout;
         _logger = loggerFactory.CreateLogger<AxonServerGrpcChannelFactory>();
     }
     
@@ -33,6 +38,8 @@ public class AxonServerGrpcChannelFactory
     public ILoggerFactory LoggerFactory { get; }
     public IReadOnlyList<Interceptor> Interceptors { get; }
     public GrpcChannelOptions GrpcChannelOptions { get; }
+    public Func<DateTimeOffset> Clock { get; }
+    public TimeSpan ConnectionTimeout { get; }
 
     public async Task<GrpcChannel?> Create(Context context)
     {
@@ -57,7 +64,7 @@ public class AxonServerGrpcChannelFactory
                 var service = new PlatformService.PlatformServiceClient(callInvoker);
                 var info = await service.GetPlatformServerAsync(
                     ClientIdentity.ToClientIdentification()
-                    //, new CallOptions(deadline: DateTime.Now)
+                    , new CallOptions(deadline: Clock().UtcDateTime.Add(ConnectionTimeout))
                 ).ConfigureAwait(false);
                 _logger.LogDebug("Received PlatformInfo suggesting [{NodeName}] ({Host}:{Port}), {SameConnection}",
                     info.Primary.NodeName,

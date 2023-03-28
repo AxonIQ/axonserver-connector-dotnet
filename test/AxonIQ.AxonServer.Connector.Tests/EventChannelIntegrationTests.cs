@@ -40,7 +40,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
-        return factory.Connect(Context.Default);
+        return factory.ConnectAsync(Context.Default);
     }
 
     private Event CreateEvent(string payload)
@@ -97,7 +97,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
         
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -111,7 +111,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
         
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
     
@@ -129,7 +129,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -159,7 +159,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -192,7 +192,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -237,7 +237,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -253,7 +253,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -273,7 +273,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -293,7 +293,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -313,7 +313,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -342,7 +342,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -377,7 +377,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -406,7 +406,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -421,7 +421,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -439,7 +439,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -471,7 +471,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -485,7 +485,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -513,7 +513,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -527,7 +527,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -555,7 +555,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
 
@@ -569,7 +569,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -597,7 +597,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -625,7 +625,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -675,7 +675,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -718,7 +718,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         
@@ -770,7 +770,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     {
         var connection = await CreateSystemUnderTest();
 
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.EventChannel;
         

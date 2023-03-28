@@ -1,4 +1,5 @@
 using Google.Protobuf.Reflection;
+using Io.Axoniq.Axonserver.Grpc;
 
 namespace AxonIQ.AxonServer.Connector;
 
@@ -56,4 +57,14 @@ public class AxonServerException : Exception
     public ErrorCategory ErrorCategory { get; }
     public string Location { get; }
     public IReadOnlyCollection<string> Details { get; }
+
+    internal static AxonServerException FromErrorMessage(ClientIdentity clientIdentity, ErrorMessage error)
+    {
+        return new AxonServerException(
+            clientIdentity,
+            ErrorCategory.Parse(error.ErrorCode),
+            error.Message,
+            error.Location,
+            error.Details);
+    }
 }

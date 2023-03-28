@@ -1,13 +1,15 @@
-@startuml AxonServerConnection Statemachine
+@startuml AxonServerConnection state machine
 [*] --> Disconnected
-Disconnected --> Connecting: Connect [Attempt = 0] / GrpcChannelEstablished
-Connecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ConnectControlChannel
-Connecting --> Connecting: GrpcChannelEstablished(Ok channel) [channel null] / Schedule(Connect(Attempt + 1))\nGrpcChannelEstablished(Error exception) / Schedule(Connect(Attempt + 1))
+Disconnected --> Connecting: Connect [Attempt = 0] / GrpcChannelEstablished \n Reconnect [Attempt = 0] / GrpcChannelEstablished
+Connecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ConnectControlChannel, GrpcChannelStateChanged
+Connecting --> Connecting: GrpcChannelEstablished(Ok channel) [channel null] / Schedule(Connect(Attempt + 1)) \n GrpcChannelEstablished(Error exception) / Schedule(Connect(Attempt + 1))
 Connected --> Reconnecting: Reconnect [Attempt = 0] / GrpcChannelEstablished
 Reconnecting --> Reconnecting: GrpcChannelEstablished(Ok channel) [channel null] / Schedule(Reconnect(Attempt + 1))\nGrpcChannelEstablished(Error exception) / Schedule(Reconnect(Attempt + 1))
-Reconnecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ReconnectChannels
-Connected --> Connected: ConnectControlChannel\nReconnectChannels
-Connected --> Disconnected: Disconnect
-Connecting --> Disconnected: Disconnect
-Reconnecting --> Disconnected: Disconnect
+Reconnecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ReconnectChannels, GrpcChannelStateChanged
+Connected --> Connected: ConnectControlChannel \n ReconnectChannels \n GrpcChannelStateChanged(Ok) [ConnectivityState = Ready] / GrpcChannelStateChanged
+Connected --> Connecting: GrpcChannelStateChanged [ConnectivityState <> Ready] / GrpcChannelEstablished, GrpcChannelStateChanged
+Connected --> Closed: Close
+Connecting --> Closed: Close
+Reconnecting --> Closed: Close
+Closed --> [*]
 @enduml

@@ -40,7 +40,7 @@ public class CommandChannelIntegrationTests
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
-        return factory.Connect(Context.Default);
+        return factory.ConnectAsync(Context.Default);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class CommandChannelIntegrationTests
     public async Task RegisterCommandHandlerWhileConnectedHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnected();
+        await connection.WaitUntilConnectedAsync();
         
         var sut = connection.CommandChannel;
 
@@ -98,7 +98,7 @@ public class CommandChannelIntegrationTests
     public async Task UnregisterCommandHandlerHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnected();
+        await connection.WaitUntilConnectedAsync();
         
         var sut = connection.CommandChannel;
 
@@ -145,10 +145,10 @@ public class CommandChannelIntegrationTests
         var server = await CreateSystemUnderTest(
             configure => 
             configure.WithRoutingServers(_container.GetGrpcProxyEndpoint()));
-        await server.WaitUntilReady();
+        await server.WaitUntilReadyAsync();
 
         var client = await CreateSystemUnderTest();
-        await client.WaitUntilReady();
+        await client.WaitUntilReadyAsync();
         
         var requestId = InstructionId.New();
         var responseId = InstructionId.New();

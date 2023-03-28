@@ -11,6 +11,6 @@ public interface IControlChannel
 
     Task<IEventProcessorRegistration> RegisterEventProcessor(
         EventProcessorName name,
-        Func<Task<EventProcessorInfo>> infoSupplier,
+        Func<Task<EventProcessorInfo?>> supplier,
         IEventProcessorInstructionHandler handler);
 }

@@ -13,16 +13,14 @@ public static class AxonServerConnectionFactoryDefaults
 
     public static readonly IAxonServerAuthentication Authentication = AxonServerAuthentication.None;
 
-    public static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(10_000);
-
     public static readonly PermitCount MinimumCommandPermits = new(16);
     public static readonly PermitCount MinimumQueryPermits = new(16);
     public static readonly PermitCount DefaultQueryPermits = new(5000);
     public static readonly PermitCount DefaultCommandPermits = new(5000);
     public static readonly TimeSpan DefaultEventProcessorUpdateFrequency = TimeSpan.FromMilliseconds(2000);
 
-    public static readonly BackoffPolicyOptions DefaultConnectBackoffPolicyOptions = new(
-        TimeSpan.FromMilliseconds(100),
-        TimeSpan.FromSeconds(1),
-        1.1);
+    public static readonly ReconnectOptions DefaultReconnectOptions = new(
+        TimeSpan.FromMilliseconds(10000),
+        TimeSpan.FromMilliseconds(2000),
+        true);
 }

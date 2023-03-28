@@ -96,14 +96,14 @@ public static class FixtureExtensions
                 .OmitAutoProperties());
     }
     
-    public static void CustomizeBackoffPolicyOptions(this IFixture fixture)
+    public static void CustomizeReconnectOptions(this IFixture fixture)
     {
-        fixture.Customize<BackoffPolicyOptions>(composer =>
+        fixture.Customize<ReconnectOptions>(composer =>
             composer
-                .FromFactory((Random random) => new BackoffPolicyOptions(
-                    TimeSpan.FromSeconds(random.Next(1,5)),
-                    TimeSpan.FromSeconds(random.Next(5,10)),
-                    random.NextDouble() + 1.0))
+                .FromFactory((Random random) => new ReconnectOptions(
+                    TimeSpan.FromMilliseconds(random.Next(100,1000)),
+                    TimeSpan.FromMilliseconds(random.Next(100,1000)),
+                    random.Next() % 2 == 0))
                 .OmitAutoProperties());
     }
 }

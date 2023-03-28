@@ -20,16 +20,18 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         CallInvoker callInvoker,
         PermitCount permits,
         PermitCount permitsBatch,
-        BackoffPolicyOptions connectBackoffPolicyOptions,
+        ReconnectOptions reconnectOptions,
         ILoggerFactory loggerFactory)
     {
         if (clientIdentity == null) throw new ArgumentNullException(nameof(clientIdentity));
         if (callInvoker == null) throw new ArgumentNullException(nameof(callInvoker));
         if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
         if (scheduler == null) throw new ArgumentNullException(nameof(scheduler));
+        if (reconnectOptions == null) throw new ArgumentNullException(nameof(reconnectOptions));
 
         ClientIdentity = clientIdentity;
         Context = context;
+        ReconnectOptions = reconnectOptions;
         Service = new CommandService.CommandServiceClient(callInvoker);
         _logger = loggerFactory.CreateLogger<CommandChannel>();
         _actor = new AxonActor<Message, State>(
@@ -37,8 +39,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
             new State.Disconnected(
                 new CommandRegistrations(clientIdentity, scheduler.Clock),
                 new FlowController(permits, permitsBatch),
-                new TaskRunCache(),
-                new BackoffPolicy(connectBackoffPolicyOptions)),
+                new TaskRunCache()),
             scheduler,
             _logger);
     }
@@ -136,15 +137,13 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                         }).ConfigureAwait(false);
 
                         disconnected.Flow.Reset();
-                        disconnected.ConnectBackoffPolicy.Reset();
                         
                         state = new State.Connected(
                             stream,
                             ConsumeResponseStream(stream.ResponseStream, ct),
                             disconnected.CommandRegistrations,
                             disconnected.Flow,
-                            disconnected.CommandTasks,
-                            disconnected.ConnectBackoffPolicy
+                            disconnected.CommandTasks
                         );
                     }
                     else
@@ -180,11 +179,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                 
                 if (state is State.Disconnected)
                 {
-                    await _actor.ScheduleAsync(new Message.Connect(), state.ConnectBackoffPolicy.Next(), ct).ConfigureAwait(false);
-                }
-                else
-                {
-                    state.ConnectBackoffPolicy.Reset();
+                    await _actor.ScheduleAsync(new Message.Connect(), ReconnectOptions.ReconnectInterval, ct).ConfigureAwait(false);
                 }
 
                 break;
@@ -300,8 +295,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                         state = new State.Disconnected(
                             connected.CommandRegistrations, 
                             connected.Flow,
-                            connected.CommandTasks,
-                            connected.ConnectBackoffPolicy);
+                            connected.CommandTasks);
                         break;
                 }
 
@@ -309,11 +303,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
                 if (state is State.Disconnected)
                 {
-                    await _actor.ScheduleAsync(new Message.Reconnect(), state.ConnectBackoffPolicy.Next(), ct).ConfigureAwait(false);
-                }
-                else
-                {
-                    state.ConnectBackoffPolicy.Reset();
+                    await _actor.ScheduleAsync(new Message.Reconnect(), ReconnectOptions.ReconnectInterval, ct).ConfigureAwait(false);
                 }
                     
                 break;
@@ -328,8 +318,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                         state = new State.Disconnected(
                             connected.CommandRegistrations, 
                             connected.Flow,
-                            connected.CommandTasks,
-                            connected.ConnectBackoffPolicy);
+                            connected.CommandTasks);
                         break;
                 }
 
@@ -403,7 +392,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
                                                     {
                                                         Details =
                                                         {
-                                                            exception.ToString() ?? ""
+                                                            exception.ToString()
                                                         },
                                                         Location = "Client",
                                                         Message = exception.Message ?? ""
@@ -507,6 +496,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
     public ClientIdentity ClientIdentity { get; }
     public Context Context { get; }
+    public ReconnectOptions ReconnectOptions { get; }
     public CommandService.CommandServiceClient Service { get; }
 
     private record RegisteredCommand(RegistrationId CommandRegistrationId, CommandName CommandName);
@@ -538,28 +528,23 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
 
     private record State(CommandRegistrations CommandRegistrations,
         FlowController Flow,
-        TaskRunCache CommandTasks,
-        BackoffPolicy ConnectBackoffPolicy)
+        TaskRunCache CommandTasks)
     {
         public record Disconnected(
             CommandRegistrations CommandRegistrations,
             FlowController Flow,
-            TaskRunCache CommandTasks,
-            BackoffPolicy ConnectBackoffPolicy) : State(CommandRegistrations,
+            TaskRunCache CommandTasks) : State(CommandRegistrations,
             Flow,
-            CommandTasks,
-            ConnectBackoffPolicy);
+            CommandTasks);
 
         public record Connected(
             AsyncDuplexStreamingCall<CommandProviderOutbound, CommandProviderInbound> Stream,
             Task ConsumeResponseStreamLoop,
             CommandRegistrations CommandRegistrations,
             FlowController Flow,
-            TaskRunCache CommandTasks,
-            BackoffPolicy ConnectBackoffPolicy) : State(CommandRegistrations,
+            TaskRunCache CommandTasks) : State(CommandRegistrations,
             Flow,
-            CommandTasks,
-            ConnectBackoffPolicy);
+            CommandTasks);
     }
 
     public bool IsConnected => _actor.State is State.Connected;

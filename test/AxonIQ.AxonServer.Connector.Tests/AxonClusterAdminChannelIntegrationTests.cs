@@ -41,8 +41,8 @@ public class AxonClusterAdminChannelIntegrationTests
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
-        var connection = await factory.Connect(Context.Default);
-        await connection.WaitUntilReady();
+        var connection = await factory.ConnectAsync(Context.Default);
+        await connection.WaitUntilReadyAsync();
         return connection;
     }
     
@@ -417,7 +417,7 @@ public class AxonClusterAdminChannelIntegrationTests
     public async Task GetReplicationGroupHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
         await sut.CreateReplicationGroup(new CreateReplicationGroupRequest
         {
@@ -438,7 +438,7 @@ public class AxonClusterAdminChannelIntegrationTests
     public async Task GetAllReplicationGroupsHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
         var actual = await sut.GetAllReplicationGroups();
         Assert.Contains(actual, overview => overview.Name == Context.Default.ToString());
@@ -450,7 +450,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var names = _cluster.Nodes.Select(node => node.Properties.NodeSetup.Name).ToArray();
         var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilReady();
+        await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
         var actual = await sut.GetAllNodes();
         foreach (var name in names)

@@ -40,14 +40,14 @@ public class EventProcessorIntegrationTests
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
-        return factory.Connect(Context.Default);
+        return factory.ConnectAsync(Context.Default);
     }
 
     [Fact]
     public async Task RegisterEventProcessorCausesPeriodicInfoPollToHappen()
     {
         var sut = await CreateSystemUnderTest();
-        await sut.WaitUntilReady();
+        await sut.WaitUntilReadyAsync();
         
         var control = sut.ControlChannel;
         //var admin = sut.AdminChannel;
@@ -79,7 +79,7 @@ public class EventProcessorIntegrationTests
     public async Task EventProcessorHandlesStartRequestFromAdminChannel()
     {
         var sut = await CreateSystemUnderTest();
-        await sut.WaitUntilReady();
+        await sut.WaitUntilReadyAsync();
         
         var control = sut.ControlChannel;
         var admin = sut.AdminChannel;
@@ -113,7 +113,7 @@ public class EventProcessorIntegrationTests
     public async Task EventProcessorHandlesPauseRequestFromAdminChannel()
     {
         var sut = await CreateSystemUnderTest();
-        await sut.WaitUntilReady();
+        await sut.WaitUntilReadyAsync();
         
         var control = sut.ControlChannel;
         var admin = sut.AdminChannel;

@@ -18,7 +18,7 @@ public class AxonServerConnectionFactoryOptionsTests
         _fixture = new Fixture();
         _fixture.CustomizeComponentName();
         _fixture.CustomizeClientInstanceId();
-        _fixture.CustomizeBackoffPolicyOptions();
+        _fixture.CustomizeReconnectOptions();
     }
 
     [Fact]
@@ -556,15 +556,15 @@ public class AxonServerConnectionFactoryOptionsTests
     }
     
     [Fact]
-    public void WithConnectBackoffPolicyReturnsExpectedResult()
+    public void WithReconnectOptionsReturnsExpectedResult()
     {
-        var options = _fixture.Create<BackoffPolicyOptions>();
+        var options = _fixture.Create<ReconnectOptions>();
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
         var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
-        var result = sut.WithConnectBackoffPolicy(options).Build();
+        var result = sut.WithReconnectOptions(options).Build();
         
-        Assert.Equal(options, result.ConnectBackoffPolicyOptions);
+        Assert.Equal(options, result.ReconnectOptions);
     }
     
     [Fact]
@@ -575,7 +575,7 @@ public class AxonServerConnectionFactoryOptionsTests
         var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
         var result = sut.Build();
         
-        Assert.Equal(AxonServerConnectionFactoryDefaults.DefaultConnectBackoffPolicyOptions, result.ConnectBackoffPolicyOptions);
+        Assert.Equal(AxonServerConnectionFactoryDefaults.DefaultReconnectOptions, result.ReconnectOptions);
     }
     //TODO: Extend with tests that cover obtaining all other options from configuration
     

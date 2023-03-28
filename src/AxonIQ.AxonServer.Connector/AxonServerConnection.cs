@@ -5,11 +5,11 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class AxonServerConnection : IAxonServerConnection
+internal class AxonServerConnection : IAxonServerConnection
 {
-    private readonly AxonServerGrpcChannelFactory _channelFactory;
-    private readonly IReadOnlyList<Interceptor> _interceptors;
+    private readonly AxonServerConnectionFactory _factory;
     private readonly Context _context;
+    private readonly CallInvokerProxy _callInvoker;
     private readonly ILogger<AxonServerConnection> _logger;
 
     private readonly AxonActor<Message, State> _actor;
@@ -18,108 +18,80 @@ public class AxonServerConnection : IAxonServerConnection
     private readonly Lazy<CommandChannel> _commandChannel;
     private readonly Lazy<QueryChannel> _queryChannel;
     private readonly Lazy<EventChannel> _eventChannel;
-    private readonly EventHandler _onConnectedHandler;
 
-    public AxonServerConnection(Context context,
-        AxonServerGrpcChannelFactory channelFactory,
-        IReadOnlyList<Interceptor> interceptors,
-        IScheduler scheduler,
-        PermitCount commandPermits,
-        PermitCount queryPermits,
-        TimeSpan eventProcessorUpdateFrequency,
-        BackoffPolicyOptions connectBackoffPolicyOptions,
-        ILoggerFactory loggerFactory)
+    private bool _disposed;
+
+    public AxonServerConnection(AxonServerConnectionFactory factory, Context context)
     {
-        if (channelFactory == null)
-            throw new ArgumentNullException(nameof(channelFactory));
-        if (interceptors == null)
-            throw new ArgumentNullException(nameof(interceptors));
-        if (scheduler == null)
-            throw new ArgumentNullException(nameof(scheduler));
-        if (connectBackoffPolicyOptions == null)
-            throw new ArgumentNullException(nameof(connectBackoffPolicyOptions));
-        if (loggerFactory == null)
-            throw new ArgumentNullException(nameof(loggerFactory));
-
+        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         _context = context;
-        _channelFactory = channelFactory;
-        _interceptors = interceptors;
-        _logger = loggerFactory.CreateLogger<AxonServerConnection>();
-
+        
+        _logger = factory.LoggerFactory.CreateLogger<AxonServerConnection>();
+        
         _actor = new AxonActor<Message, State>(
             Receive,
-            (before, after) =>
-            {
-                if (before is not State.Connected && after is State.Connected)
-                {
-                    
-                    OnConnected();
-                }
-
-                if (before is not State.Disconnected && after is State.Disconnected)
-                {
-                    OnDisconnected();
-                }
-                
-                return ValueTask.CompletedTask;
-            }, 
-            new State.Disconnected(),
-            scheduler,
+            new State.Disconnected(new WaitUntil()),
+            factory.Scheduler,
             _logger);
-        var callInvokerProxy = new CallInvokerProxy(() => _actor.State.CallInvoker);
+        
+        _callInvoker = new CallInvokerProxy(() => _actor.State.CallInvoker);
+        
         _controlChannel = new ControlChannel(
-            channelFactory.ClientIdentity,
-            _context,
-            callInvokerProxy,
-            Reconnect,
-            scheduler,
-            eventProcessorUpdateFrequency,
-            loggerFactory);
+            this,
+            factory.Scheduler,
+            factory.EventProcessorUpdateFrequency,
+            factory.LoggerFactory);
         _adminChannel = new Lazy<AdminChannel>(() => new AdminChannel(
-            channelFactory.ClientIdentity,
-            callInvokerProxy));
+            factory.ChannelFactory.ClientIdentity,
+            CallInvoker));
         _commandChannel = new Lazy<CommandChannel>(() => new CommandChannel(
-            channelFactory.ClientIdentity,
+            factory.ChannelFactory.ClientIdentity,
             _context,
-            scheduler,
-            callInvokerProxy,
-            commandPermits,
-            new PermitCount(commandPermits.ToInt64() / 4L),
-            connectBackoffPolicyOptions,
-            loggerFactory));
+            factory.Scheduler,
+            CallInvoker,
+            factory.CommandPermits,
+            new PermitCount(factory.CommandPermits.ToInt64() / 4L),
+            factory.ReconnectOptions,
+            factory.LoggerFactory));
         _queryChannel = new Lazy<QueryChannel>(() => new QueryChannel(
-            channelFactory.ClientIdentity,
+            factory.ChannelFactory.ClientIdentity,
             _context,
-            scheduler.Clock,
-            callInvokerProxy,
-            queryPermits,
-            new PermitCount(queryPermits.ToInt64() / 4L),
-            loggerFactory));
+            factory.Scheduler.Clock,
+            CallInvoker,
+            factory.QueryPermits,
+            new PermitCount(factory.QueryPermits.ToInt64() / 4L),
+            factory.LoggerFactory));
         _eventChannel = new Lazy<EventChannel>(() => new EventChannel(
-            channelFactory.ClientIdentity,
+            factory.ChannelFactory.ClientIdentity,
             _context,
-            scheduler.Clock,
-            callInvokerProxy,
-            loggerFactory));
-        _onConnectedHandler = (_, _) => { OnReady(); };
-        _controlChannel.Connected += _onConnectedHandler;
+            factory.Scheduler.Clock,
+            CallInvoker,
+            factory.LoggerFactory));
     }
+
+    internal ClientIdentity ClientIdentity => _factory.ChannelFactory.ClientIdentity;
+
+    internal Context Context => _context;
+
+    private GrpcChannel? Channel => _actor.State is State.Connected connected ? connected.Channel : null;
+    internal ConnectivityState ConnectivityState => Channel?.State ?? ConnectivityState.Shutdown;
+    internal CallInvoker CallInvoker => _callInvoker;
 
 #pragma warning disable CS4014
     private async Task<State> Receive(Message message, State state, CancellationToken ct)
     {
         switch (state, message)
         {
-            case (State.Disconnected, Message.Connect connect):
+            case (State.Disconnected disconnected, Message.Connect connect):
                 if (connect.Attempt == 0)
                 {
-                    _channelFactory
+                    _factory.ChannelFactory
                         .Create(_context)
                         .TellToAsync(_actor,
                             result => new Message.GrpcChannelEstablished(result),
                             ct);
                     
-                    state = new State.Connecting(connect.Attempt);
+                    state = new State.Connecting(connect.Attempt, disconnected.WaitUntil);
                 }
 
                 break;
@@ -129,17 +101,33 @@ public class AxonServerConnection : IAxonServerConnection
                     case TaskResult<GrpcChannel?>.Ok ok:
                         if (ok.Value != null)
                         {
+                            ok
+                                .Value
+                                .WaitForStateChangedAsync(ConnectivityState.Ready, ct)
+                                .TellToAsync(
+                                    _actor,
+                                    result => new Message.GrpcChannelStateChanged(result),
+                                    ct);
+                            
                             var callInvoker = ok.Value
                                 .CreateCallInvoker()
-                                .Intercept(_interceptors.ToArray())
+                                .Intercept(_factory.Interceptors.ToArray())
                                 .Intercept(metadata =>
                                 {
-                                    _channelFactory.Authentication.WriteTo(metadata);
+                                    _factory.ChannelFactory.Authentication.WriteTo(metadata);
                                     _context.WriteTo(metadata);
                                     return metadata;
                                 });
-                            state = new State.Connected(ok.Value, callInvoker);
-                            await _actor.TellAsync(new Message.ConnectControlChannel(), ct);
+                            
+                            
+
+                            state = new State.Connected(ok.Value, callInvoker, connecting.WaitUntil);
+                            await _actor.TellAsync(new Message[]
+                            {
+                                new Message.ConnectControlChannel(),
+                                new Message.OnConnected(), 
+                                new Message.CheckReadiness()
+                            }, ct).ConfigureAwait(false);
                         }
                         else
                         {
@@ -162,6 +150,51 @@ public class AxonServerConnection : IAxonServerConnection
                 }
 
                 break;
+            case (State.Connected connected, Message.GrpcChannelStateChanged changed):
+                switch (changed.Result)
+                {
+                    case TaskResult.Ok:
+                        if (connected.Channel.State != ConnectivityState.Ready)
+                        {
+                            try
+                            {
+                                await connected.Channel.ShutdownAsync();
+                                connected.Channel.Dispose();
+                            }
+                            catch (Exception exception)
+                            {
+                                _logger.LogCritical(exception, "Failed to shut down channel");
+                            }
+                            
+                            _factory
+                                .ChannelFactory
+                                .Create(_context)
+                                .TellToAsync(_actor,
+                                    result => new Message.GrpcChannelEstablished(result),
+                                    ct);
+                    
+                            state = new State.Connecting(0, connected.WaitUntil);
+                        }
+                        else
+                        {
+                            connected
+                                .Channel
+                                .WaitForStateChangedAsync(ConnectivityState.Ready, ct)
+                                .TellToAsync(
+                                    _actor,
+                                    result => new Message.GrpcChannelStateChanged(result),
+                                    ct);
+                        }
+                        break;
+                    case TaskResult.Error error:
+                        _logger.LogCritical(
+                            error.Exception,
+                            "Could not watch channel for context '{Context}' for state changes",
+                            _context);
+                        break;
+                }
+                
+                break;
             case (State.Connected, Message.ConnectControlChannel):
                 await _controlChannel.Connect().ConfigureAwait(false);
 
@@ -177,13 +210,14 @@ public class AxonServerConnection : IAxonServerConnection
                     _logger.LogCritical(exception, "Failed to shut down channel");
                 }
                 
-                _channelFactory
+                _factory
+                    .ChannelFactory
                     .Create(_context)
                     .TellToAsync(_actor,
                         result => new Message.GrpcChannelEstablished(result),
                         ct);
 
-                state = new State.Reconnecting(reconnect.Attempt); 
+                state = new State.Reconnecting(reconnect.Attempt, connected.WaitUntil); 
                 
                 break;
             case (State.Reconnecting reconnecting, Message.GrpcChannelEstablished established):
@@ -192,17 +226,31 @@ public class AxonServerConnection : IAxonServerConnection
                     case TaskResult<GrpcChannel?>.Ok ok:
                         if (ok.Value != null)
                         {
+                            ok
+                                .Value
+                                .WaitForStateChangedAsync(ConnectivityState.Ready, ct)
+                                .TellToAsync(
+                                    _actor,
+                                    result => new Message.GrpcChannelStateChanged(result),
+                                    ct);
+                            
                             var callInvoker = ok.Value
                                 .CreateCallInvoker()
-                                .Intercept(_interceptors.ToArray())
+                                .Intercept(_factory.Interceptors.ToArray())
                                 .Intercept(metadata =>
                                 {
-                                    _channelFactory.Authentication.WriteTo(metadata);
+                                    _factory.ChannelFactory.Authentication.WriteTo(metadata);
                                     _context.WriteTo(metadata);
                                     return metadata;
                                 });
-                            state = new State.Connected(ok.Value, callInvoker);
-                            await _actor.TellAsync(new Message.ReconnectChannels(), ct);
+                            
+                            state = new State.Connected(ok.Value, callInvoker, reconnecting.WaitUntil);
+                            
+                            await _actor.TellAsync(new Message[] { 
+                                new Message.ReconnectChannels(),
+                                new Message.OnConnected(),
+                                new Message.CheckReadiness()
+                            }, ct);
                         }
                         else
                         {
@@ -244,25 +292,29 @@ public class AxonServerConnection : IAxonServerConnection
                 }
 
                 break;
-            case (State.Connected connected, Message.Disconnect):
-                try
-                {
-                    await connected.Channel.ShutdownAsync();
-                    connected.Channel.Dispose();
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogCritical(exception, "Failed to shut down channel");
-                }
-                
-                state = new State.Disconnected();
-                
+            case (State.Connected, Message.WaitUntilConnected waitUntilConnected):
+                waitUntilConnected.Completion.SetResult();
                 break;
-            case (State.Connecting, Message.Disconnect):
-            case (State.Reconnecting, Message.Disconnect):
-                
-                state = new State.Disconnected();
-                
+            case (_, Message.WaitUntilConnected waitUntilConnected):
+                state.WaitUntil.Connected(waitUntilConnected.Completion);
+                break;
+            case (_, Message.WaitUntilReady waitUntilReady):
+                if (!IsReady)
+                {
+                    state.WaitUntil.Ready(waitUntilReady.Completion);
+                }
+                else
+                {
+                    waitUntilReady.Completion.SetResult();
+                }
+
+                break;
+            case (_, Message.CheckReadiness):
+                if (IsReady) state.WaitUntil.OnReady();
+                break;
+            
+            case (_, Message.OnConnected):
+                state.WaitUntil.OnConnected();
                 break;
         }
 
@@ -270,141 +322,154 @@ public class AxonServerConnection : IAxonServerConnection
     }
 #pragma warning restore CS4014
 
-    public async Task Connect()
-    {
-        await _actor.TellAsync(
-            new Message.Connect(0)
-        ).ConfigureAwait(false);
-    }
-    
-    public async Task Disconnect()
-    {
-        await _actor.TellAsync(
-            new Message.Disconnect()
-        ).ConfigureAwait(false);
-    }
-
-    private async ValueTask Reconnect()
+    internal async ValueTask ReconnectAsync()
     {
         await _actor.TellAsync(
             new Message.Reconnect(0)
         ).ConfigureAwait(false);
     }
 
-    public Task WaitUntilConnected()
+    internal async ValueTask CheckReadinessAsync()
     {
-        if (IsConnected)
+        await _actor.TellAsync(
+            new Message.CheckReadiness()
+        ).ConfigureAwait(false);
+    }
+    internal async Task ConnectAsync()
+    {
+        await _actor.TellAsync(
+            new Message.Connect(0)
+        ).ConfigureAwait(false);
+    }
+
+    public async Task WaitUntilConnectedAsync()
+    {
+        ThrowIfDisposed();
+        if (!IsConnected)
         {
-            return Task.CompletedTask;
+            var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await _actor.TellAsync(new Message.WaitUntilConnected(source));
+            await source.Task.WaitAsync(_actor.CancellationToken);
         }
-
-        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        EventHandler? handler = null;
-        handler = (_, _) =>
+    }
+    
+    public async Task WaitUntilReadyAsync()
+    {
+        ThrowIfDisposed();
+        if (!IsReady)
         {
-            source.TrySetResult();
-            Connected -= handler;
-        };
-        Connected += handler;
-        if (IsConnected)
-        {
-            Connected -= handler;
-            return Task.CompletedTask;
+            var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await _actor.TellAsync(new Message.WaitUntilReady(source));
+            await source.Task.WaitAsync(_actor.CancellationToken);
         }
-
-        return source.Task;
     }
 
-    public event EventHandler? Connected;
+    public bool IsConnected => !_disposed && _actor.State is State.Connected;
 
-    protected virtual void OnConnected()
-    {
-        Connected?.Invoke(this, EventArgs.Empty);
-    }
-
-    public event EventHandler? Disconnected;
-
-    protected virtual void OnDisconnected()
-    {
-        Disconnected?.Invoke(this, EventArgs.Empty);
-    }
-
-    public bool IsConnected => _actor.State is State.Connected;
-
-    public event EventHandler? Ready;
-
-    protected virtual void OnReady()
-    {
-        Ready?.Invoke(this, EventArgs.Empty);
-    }
+    public bool IsClosed => _disposed;
 
     public bool IsReady =>
-        IsConnected
+        !_disposed 
+        && IsConnected
         && _controlChannel.IsConnected
         // _adminChannel does not have this notion
         && (!_commandChannel.IsValueCreated || _commandChannel.Value.IsConnected)
         // _eventChannel does not have this notion
         && (!_queryChannel.IsValueCreated || _queryChannel.Value.IsConnected);
 
-    public Task WaitUntilReady()
-    {
-        if (IsReady)
-        {
-            return Task.CompletedTask;
-        }
-
-        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        EventHandler? handler = null;
-        handler = (_, _) =>
-        {
-            source.TrySetResult();
-            Ready -= handler;
-        };
-        Ready += handler;
-        if (IsReady)
-        {
-            Ready -= handler;
-            return Task.CompletedTask;
-        }
-
-        return source.Task;
-    }
-
     private record Message
     {
         public record Connect(ulong Attempt) : Message;
         public record ConnectControlChannel : Message;
         
-        public record Disconnect : Message;
-
         public record Reconnect(ulong Attempt) : Message;
         public record ReconnectChannels : Message;
 
         public record GrpcChannelEstablished(TaskResult<GrpcChannel?> Result) : Message;
-    }
 
-    private record State(CallInvoker? CallInvoker)
+        public record GrpcChannelStateChanged(TaskResult Result) : Message;
+
+        public record WaitUntilConnected(TaskCompletionSource Completion) : Message;
+        public record WaitUntilReady(TaskCompletionSource Completion) : Message;
+
+        public record OnConnected : Message;
+        public record CheckReadiness : Message;
+    }
+    
+    private class WaitUntil
     {
-        public record Disconnected() : State((CallInvoker?)null);
-        public record Connecting(ulong Attempt) : State((CallInvoker?)null);
-        public record Reconnecting(ulong Attempt) : State((CallInvoker?)null);
+        private readonly List<TaskCompletionSource> _connected = new();
+        private readonly List<TaskCompletionSource> _ready = new();
 
-        public record Connected(GrpcChannel Channel, CallInvoker CallInvoker) : State(CallInvoker);
+        public void Connected(TaskCompletionSource source)
+        {
+            _connected.Add(source);
+        }
+        
+        public void Ready(TaskCompletionSource source)
+        {
+            _ready.Add(source);
+        }
+        
+        public void OnConnected()
+        {
+            _connected.ForEach(completion => completion.SetResult());
+            _connected.Clear();
+        }
+        
+        public void OnReady()
+        {
+            _ready.ForEach(completion => completion.SetResult());
+            _ready.Clear();
+        }
     }
 
-    public IControlChannel ControlChannel => _controlChannel;
+    private record State(CallInvoker? CallInvoker, WaitUntil WaitUntil)
+    {
+        public record Disconnected(WaitUntil WaitUntil) : State(null, WaitUntil);
 
-    public IAdminChannel AdminChannel => _adminChannel.Value;
+        public record Connecting(ulong Attempt, WaitUntil WaitUntil) : State(null, WaitUntil);
+        public record Reconnecting(ulong Attempt, WaitUntil WaitUntil) : State(null, WaitUntil);
 
-    public ICommandChannel CommandChannel => _commandChannel.Value;
+        public record Connected(GrpcChannel Channel, CallInvoker CallInvoker, WaitUntil WaitUntil) : State(CallInvoker, WaitUntil);
+    }
 
-    public IQueryChannel QueryChannel => _queryChannel.Value;
+    public IControlChannel ControlChannel
+    {
+        get { ThrowIfDisposed(); return _controlChannel; }
+    }
 
-    public IEventChannel EventChannel => _eventChannel.Value;
+    public IAdminChannel AdminChannel
+    {
+        get { ThrowIfDisposed(); return _adminChannel.Value; }
+    }
 
+    public ICommandChannel CommandChannel
+    {
+        get { ThrowIfDisposed(); return _commandChannel.Value; }
+    }
+
+    public IQueryChannel QueryChannel
+    {
+        get { ThrowIfDisposed(); return _queryChannel.Value; }
+    }
+
+    public IEventChannel EventChannel
+    {
+        get { ThrowIfDisposed(); return _eventChannel.Value; }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(AxonServerConnection));
+    }
+    
+    public Task CloseAsync() => DisposeAsync().AsTask();
+    
     public async ValueTask DisposeAsync()
     {
-        _controlChannel.Connected -= _onConnectedHandler;
+        if (_disposed) return;
+        
         await _controlChannel.DisposeAsync().ConfigureAwait(false);
         if (_commandChannel.IsValueCreated)
         {
@@ -417,5 +482,21 @@ public class AxonServerConnection : IAxonServerConnection
         }
 
         await _actor.DisposeAsync().ConfigureAwait(false);
+        if (_actor.State is State.Connected connected)
+        {
+            try
+            {
+                await connected.Channel.ShutdownAsync().ConfigureAwait(false);
+                connected.Channel.Dispose();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogCritical(exception, "Failed to shut down and dispose gRPC channel");
+            }
+        }
+
+        _factory.TryRemoveConnection(_context, this);
+
+        _disposed = true;
     }
 }

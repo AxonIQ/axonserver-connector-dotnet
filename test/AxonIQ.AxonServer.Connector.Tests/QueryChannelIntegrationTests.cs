@@ -40,7 +40,7 @@ public class QueryChannelIntegrationTests
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
-        return factory.Connect(Context.Default);
+        return factory.ConnectAsync(Context.Default);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class QueryChannelIntegrationTests
     public async Task RegisterQueryHandlerWhileConnectedHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnected();
+        await connection.WaitUntilConnectedAsync();
         
         var sut = connection.QueryChannel;
     
@@ -102,7 +102,7 @@ public class QueryChannelIntegrationTests
     public async Task UnregisterQueryHandlerWhileConnectedHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnected();
+        await connection.WaitUntilConnectedAsync();
         
         var sut = connection.QueryChannel;
     
@@ -137,7 +137,7 @@ public class QueryChannelIntegrationTests
     public async Task QueryWithManyResponsesHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnected();
+        await connection.WaitUntilConnectedAsync();
         
         var sut = connection.QueryChannel;
     
@@ -170,7 +170,7 @@ public class QueryChannelIntegrationTests
     public async Task SubscriptionQueryWaitForInitialResultHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnected();
+        await connection.WaitUntilConnectedAsync();
         
         var sut = connection.QueryChannel;
     
@@ -204,7 +204,7 @@ public class QueryChannelIntegrationTests
     public async Task SubscriptionQueryWaitForUpdatesHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnected();
+        await connection.WaitUntilConnectedAsync();
         
         var sut = connection.QueryChannel;
     

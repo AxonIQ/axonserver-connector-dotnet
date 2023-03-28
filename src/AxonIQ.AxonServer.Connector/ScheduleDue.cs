@@ -2,7 +2,7 @@ using Grpc.Core;
 
 namespace AxonIQ.AxonServer.Connector;
 
-internal static class ReconnectAfterPolicy
+internal static class ScheduleDue
 {
     public static TimeSpan FromException(Exception exception)
     {

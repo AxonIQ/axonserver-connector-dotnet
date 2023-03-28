@@ -5,13 +5,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposable
 {
-    private static class Ignore
-    {
-        public static readonly AxonActorStateChanged<TState> StateChanged = (_,_) => ValueTask.CompletedTask;
-    }
-    
     private readonly Func<TMessage, TState, CancellationToken, Task<TState>> _receiver;
-    private readonly AxonActorStateChanged<TState> _onStateChanged;
     private readonly IScheduler _scheduler;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _inboxCancellation;
@@ -19,25 +13,15 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
     private readonly Task _consumer;
     
     private TState _state;
+    private bool _disposed;
 
     public AxonActor(
         Func<TMessage, TState, CancellationToken, Task<TState>> receiver, 
         TState initialState,
         IScheduler scheduler, 
         ILogger logger)
-        : this(receiver, Ignore.StateChanged,  initialState, scheduler, logger)
-    {
-    }
-    
-    public AxonActor(
-        Func<TMessage, TState, CancellationToken, Task<TState>> receiver,
-        AxonActorStateChanged<TState> onStateChanged,
-        TState initialState,
-        IScheduler scheduler,
-        ILogger logger)
     {
         _receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
-        _onStateChanged = onStateChanged ?? throw new ArgumentNullException(nameof(onStateChanged));
         _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -58,7 +42,6 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
 
     private async Task ConsumeInbox(CancellationToken ct)
     {
-        var notifyStateChanged = !ReferenceEquals(_onStateChanged, Ignore.StateChanged);
         try
         {
             while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
@@ -72,14 +55,7 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
                         _logger.LogDebug("Received {Message} when {State}", message.ToString(), _state!.ToString());
                     }
 
-                    var before = _state;
-                    var after = await _receiver(message, before, ct);
-                    _state = after;
-                    
-                    if (notifyStateChanged && !ReferenceEquals(before, after))
-                    {
-                        await _onStateChanged(before, after);
-                    }
+                    _state = await _receiver(message, _state, ct);
                     
                     if (_logger.IsEnabled(LogLevel.Debug))
                     {
@@ -112,37 +88,63 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
 
     public TState State => _state;
 
-    public ValueTask ScheduleAsync(TMessage message, TimeSpan due) =>
-        _scheduler.ScheduleTask(() => TellAsync(message), due);
-    
-    public ValueTask ScheduleAsync(TMessage message, TimeSpan due, CancellationToken ct) =>
-        _scheduler.ScheduleTask(() => TellAsync(message, ct), due);
+    public ValueTask ScheduleAsync(TMessage message, TimeSpan due)
+    {
+        ThrowIfDisposed();
+        return _scheduler.ScheduleTask(() => TellAsync(message, _inboxCancellation.Token), due);
+    }
 
-    public ValueTask TellAsync(TMessage message) => TellAsync(message, _inboxCancellation.Token);
-    public ValueTask TellAsync(TMessage message, CancellationToken ct) => _inbox.Writer.WriteAsync(message, ct);
-    
+    public ValueTask ScheduleAsync(TMessage message, TimeSpan due, CancellationToken ct)
+    {
+        ThrowIfDisposed();
+        return _scheduler.ScheduleTask(() => TellAsync(message, ct), due);
+    }
+
+    public ValueTask TellAsync(TMessage message)
+    {
+        ThrowIfDisposed();
+        return TellAsync(message, _inboxCancellation.Token);
+    }
+
+    public ValueTask TellAsync(TMessage message, CancellationToken ct)
+    {
+        ThrowIfDisposed();
+        return _inbox.Writer.WriteAsync(message, ct);
+    }
+
     public async ValueTask TellAsync(IReadOnlyCollection<TMessage> messages)
     {
         if (messages == null) throw new ArgumentNullException(nameof(messages));
+        ThrowIfDisposed();
+        
         foreach (var message in messages)
         {
-            await TellAsync(message);
+            await TellAsync(message, _inboxCancellation.Token);
         }
     }
 
     public async ValueTask TellAsync(IReadOnlyCollection<TMessage> messages, CancellationToken ct)
     {
         if (messages == null) throw new ArgumentNullException(nameof(messages));
+        ThrowIfDisposed();
+
         foreach (var message in messages)
         {
             await TellAsync(message, ct);
         }
     }
 
-    public bool IsCancellationRequested => _inboxCancellation.IsCancellationRequested;
+    public CancellationToken CancellationToken => _inboxCancellation.Token; 
 
+    private void ThrowIfDisposed()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(AxonServerConnection));
+    }
+    
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
+        
         if (_logger.IsEnabled(LogLevel.Debug))
         {
             _logger.LogDebug("Disposing actor");
@@ -158,5 +160,7 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
         {
             _logger.LogDebug("Disposed actor");
         }
+
+        _disposed = true;
     }
 }

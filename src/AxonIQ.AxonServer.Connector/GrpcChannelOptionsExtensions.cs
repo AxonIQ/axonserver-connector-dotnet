@@ -30,6 +30,7 @@ internal static class GrpcChannelOptionsExtensions
     public static GrpcChannelOptions ConfigureAxonOptions(this GrpcChannelOptions options)
     {
         options.ThrowOperationCanceledOnCancellation = false;
+        options.HttpHandler = new SocketsHttpHandler();
         return options;
     }
 }

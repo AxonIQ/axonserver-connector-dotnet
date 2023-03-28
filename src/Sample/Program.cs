@@ -46,11 +46,11 @@ try
             .WithLoggerFactory(host.Services.GetRequiredService<ILoggerFactory>())
             .Build());
 
-        var connection1 = await instance1.Connect(context);
-        await connection1.WaitUntilConnected();
+        var connection1 = await instance1.ConnectAsync(context);
+        await connection1.WaitUntilConnectedAsync();
 
-        var connection2 = await instance2.Connect(context);
-        await connection2.WaitUntilConnected();
+        var connection2 = await instance2.ConnectAsync(context);
+        await connection2.WaitUntilConnectedAsync();
 
         var registration =
             await connection1.CommandChannel.RegisterCommandHandler(

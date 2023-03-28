@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc;
@@ -6,75 +5,48 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-[SuppressMessage("ReSharper", "MethodSupportsCancellation")]
-public class ControlChannel : IControlChannel, IAsyncDisposable
+internal class ControlChannel : IControlChannel, IAsyncDisposable
 {
-    private readonly AxonActor<Message, State> _actor;
-    private readonly Context _context;
+    private readonly AxonServerConnection _connection;
     private readonly TimeSpan _eventProcessorUpdateFrequency;
     private readonly ILogger<ControlChannel> _logger;
+    private readonly AxonActor<Message, State> _actor;
 
     public ControlChannel(
-        ClientIdentity clientIdentity,
-        Context context,
-        CallInvoker callInvoker,
-        RequestReconnect requestReconnect,
+        AxonServerConnection connection,
         IScheduler scheduler,
         TimeSpan eventProcessorUpdateFrequency,
         ILoggerFactory loggerFactory)
     {
-        if (clientIdentity == null) throw new ArgumentNullException(nameof(clientIdentity));
-        if (callInvoker == null) throw new ArgumentNullException(nameof(callInvoker));
-        if (requestReconnect == null) throw new ArgumentNullException(nameof(requestReconnect));
+        if (connection == null) throw new ArgumentNullException(nameof(connection));
         if (scheduler == null) throw new ArgumentNullException(nameof(scheduler));
         if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
-        ClientIdentity = clientIdentity;
-        CallInvoker = callInvoker;
-        RequestReconnect = requestReconnect;
-        Service = new PlatformService.PlatformServiceClient(callInvoker);
-
-        _context = context;
+        _connection = connection;
         _eventProcessorUpdateFrequency = eventProcessorUpdateFrequency;
         _logger = loggerFactory.CreateLogger<ControlChannel>();
+        
+        Service = new PlatformService.PlatformServiceClient(connection.CallInvoker);
+        
         _actor = new AxonActor<Message, State>(
             Receive,
-            (before, after) =>
-            {
-                if (before is not State.Connected && after is State.Connected)
-                {
-                    OnConnected();
-                }
-
-                if (before is not State.Disconnected && after is State.Disconnected)
-                {
-                    OnDisconnected();
-                }
-                
-                return ValueTask.CompletedTask;
-            },
             new State.Disconnected(new EventProcessorCollection()),
             scheduler,
             _logger
         );
         HeartbeatChannel = new HeartbeatChannel(
             instruction => _actor.TellAsync(new Message.SendPlatformInboundInstruction(instruction), CancellationToken.None),
-            () => RequestReconnect(),
+            connection.ReconnectAsync,
             scheduler,
             loggerFactory.CreateLogger<HeartbeatChannel>()
         );
     }
 
-    public ClientIdentity ClientIdentity { get; }
-
-    public CallInvoker CallInvoker { get; }
-
-    public RequestReconnect RequestReconnect { get; }
-
     public PlatformService.PlatformServiceClient Service { get; }
 
     public HeartbeatChannel HeartbeatChannel { get; }
 
+#pragma warning disable CA2016
 #pragma warning disable CS4014
     private async Task<State> Receive(Message message, State state, CancellationToken ct)
     {
@@ -86,19 +58,26 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                 state = new State.Connecting.StreamClosed(disconnected.EventProcessors);
                 break;
             case (State.Disconnected disconnected, Message.Reconnect):
-                await _actor.TellAsync(new Message[]
-                {
-                    new Message.OpenStream(), 
-                    new Message.PauseHeartbeats()
-                }, ct);
+                await _actor.TellAsync(new Message.OpenStream(), ct);
 
-                state = new State.Reconnecting.StreamClosed(disconnected.EventProcessors);
+                state = new State.Connecting.StreamClosed(disconnected.EventProcessors);
                 break;
-            case (State.Reconnecting.StreamClosed, Message.OpenStream):
-                _actor.TellAsync(
-                    () => Service.OpenStream(cancellationToken: ct),
-                    result => new Message.StreamOpened(result),
-                    ct);
+            case (_, Message.PauseHeartbeats):
+                await HeartbeatChannel.Pause().ConfigureAwait(false);
+                break;
+            case (State.Reconnecting.StreamClosed, Message.OpenStream open):
+                if (_connection.ConnectivityState != ConnectivityState.Ready)
+                {
+                    await _actor.ScheduleAsync(open, TimeSpan.FromMilliseconds(500), ct);
+                }
+                else
+                {
+                    await _actor.TellAsync(
+                        () => Service.OpenStream(cancellationToken: ct),
+                        result => new Message.StreamOpened(result),
+                        ct);    
+                }
+                
                 break;
             case (State.Reconnecting.StreamClosed closed, Message.StreamOpened opened):
                 switch (opened.Result)
@@ -110,7 +89,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                         
                         break;
                     case TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>.Error error:
-                        var due = ReconnectAfterPolicy.FromException(error.Exception);
+                        var due = ScheduleDue.FromException(error.Exception);
                         
                         _logger.LogError(error.Exception, "Failed to open stream. Retrying in {Due}ms", due.TotalMilliseconds);
                         
@@ -123,7 +102,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             case (State.Reconnecting.StreamOpened opened, Message.AnnounceClient):
                 opened.Call.RequestStream.WriteAsync(new PlatformInboundInstruction
                 {
-                    Register = ClientIdentity.ToClientIdentification()
+                    Register = _connection.ClientIdentity.ToClientIdentification()
                 }).TellToAsync(
                     _actor,
                     result => new Message.ClientAnnounced(result),
@@ -149,11 +128,18 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                 _logger,
                                 consumerTokenSource.Token);
 
-                        state = new State.Connected(opened.Call, consumer, consumerTokenSource, opened.EventProcessors);
+                        await _actor.TellAsync(new Message.OnConnected(), ct);
+                        
+                        state = new State.Connected(
+                            opened.Call, 
+                            consumer, 
+                            consumerTokenSource, 
+                            new Dictionary<InstructionId, TaskCompletionSource>(), 
+                            opened.EventProcessors);
                         
                         break;
                     case TaskResult.Error error:
-                        var due = ReconnectAfterPolicy.FromException(error.Exception);
+                        var due = ScheduleDue.FromException(error.Exception);
                         
                         _logger.LogError(error.Exception, "Failed to announce client. Retrying in {Due}ms", due.TotalMilliseconds);
                         
@@ -172,11 +158,19 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                         break;
                 }
                 break;
-            case (State.Connecting.StreamClosed, Message.OpenStream):
-                _actor.TellAsync(
-                    () => Service.OpenStream(cancellationToken: ct),
-                    result => new Message.StreamOpened(result),
-                    ct);
+            case (State.Connecting.StreamClosed, Message.OpenStream open):
+                if (_connection.ConnectivityState != ConnectivityState.Ready)
+                {
+                    await _actor.ScheduleAsync(open, TimeSpan.FromMilliseconds(500), ct);
+                }
+                else
+                {
+                    await _actor.TellAsync(
+                        () => Service.OpenStream(cancellationToken: ct),
+                        result => new Message.StreamOpened(result),
+                        ct);
+                }
+
                 break;
             case (State.Connecting.StreamClosed closed, Message.StreamOpened opened):
                 switch (opened.Result)
@@ -188,7 +182,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                         
                         break;
                     case TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>.Error error:
-                        var due = ReconnectAfterPolicy.FromException(error.Exception);
+                        var due = ScheduleDue.FromException(error.Exception);
                         
                         _logger.LogError(error.Exception, "Failed to open stream. Retrying in {Due}ms", due.TotalMilliseconds);
                         
@@ -201,7 +195,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             case (State.Connecting.StreamOpened opened, Message.AnnounceClient):
                 opened.Call.RequestStream.WriteAsync(new PlatformInboundInstruction
                 {
-                    Register = ClientIdentity.ToClientIdentification()
+                    Register = _connection.ClientIdentity.ToClientIdentification()
                 }).TellToAsync(
                     _actor,
                     result => new Message.ClientAnnounced(result),
@@ -226,12 +220,19 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                 result => new Message.ReceivePlatformOutboundInstruction(result),
                                 _logger,
                                 consumerTokenSource.Token);
+                        
+                        await _actor.TellAsync(new Message.OnConnected(), ct);
 
-                        state = new State.Connected(opened.Call, consumer, consumerTokenSource, opened.EventProcessors);
+                        state = new State.Connected(
+                            opened.Call, 
+                            consumer, 
+                            consumerTokenSource,
+                            new Dictionary<InstructionId, TaskCompletionSource>(),
+                            opened.EventProcessors);
                         
                         break;
                     case TaskResult.Error error:
-                        var due = ReconnectAfterPolicy.FromException(error.Exception);
+                        var due = ScheduleDue.FromException(error.Exception);
                         
                         _logger.LogError(error.Exception, "Failed to announce client. Retrying in {Due}ms", due.TotalMilliseconds);
                         
@@ -336,7 +337,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             _logger.LogWarning(
                                 "Not sending processor info {Name} for context '{Context}'",
                                 gotten.Name.ToString(),
-                                _context.ToString());
+                                _connection.Context.ToString());
                         }
                         break;
                     case TaskResult<EventProcessorInfo?>.Error error:
@@ -344,7 +345,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             error.Exception,
                             "Not sending processor info {Name} for context '{Context}'",
                             gotten.Name.ToString(),
-                            _context.ToString());
+                            _connection.Context.ToString());
                         break;
                 }
                 break;
@@ -367,7 +368,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
 
             case (State.Connected, Message.SendPlatformInboundInstructionFaulted faulted):
             {
-                var due = ReconnectAfterPolicy.FromException(faulted.Exception);
+                var due = ScheduleDue.FromException(faulted.Exception);
 
                 _logger.LogError(
                     faulted.Exception,
@@ -379,10 +380,17 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             }
                 break;
             case (State.Connected connected, Message.SendAwaitablePlatformInboundInstruction send):
+                if (!string.IsNullOrEmpty(send.Instruction.InstructionId))
+                {
+                    connected.AwaitedInstructions.Add(new InstructionId(send.Instruction.InstructionId), send.Completion);
+                }
                 try
                 {
                     await connected.Call.RequestStream.WriteAsync(send.Instruction).ConfigureAwait(false);
-                    send.Completion.SetResult();
+                    if (string.IsNullOrEmpty(send.Instruction.InstructionId))
+                    {
+                        send.Completion.SetResult();
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -393,7 +401,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                     
                     send.Completion.SetException(
                         new AxonServerException(
-                            ClientIdentity,
+                            _connection.ClientIdentity,
                             ErrorCategory.InstructionAckError,
                             "Unable to send instruction: AxonServer unavailable"));
                 }
@@ -401,7 +409,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             case (_, Message.SendAwaitablePlatformInboundInstruction send):
                 send.Completion.SetException(
                     new AxonServerException(
-                        ClientIdentity,
+                        _connection.ClientIdentity,
                         ErrorCategory.InstructionAckError,
                         "Unable to send instruction: no connection to AxonServer"));
                 break;
@@ -416,7 +424,8 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             // case PlatformOutboundInstruction.RequestOneofCase.NodeNotification:
                             //     break;
                             case PlatformOutboundInstruction.RequestOneofCase.RequestReconnect:
-                                await RequestReconnect().ConfigureAwait(false);
+                                _logger.LogInformation("AxonServer requested reconnect for context '{Context}'", _connection.Context);
+                                await _connection.ReconnectAsync().ConfigureAwait(false);
                                 break;
                             case PlatformOutboundInstruction.RequestOneofCase.PauseEventProcessor:
                                 await ExecuteEventProcessorInstruction(
@@ -496,13 +505,53 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                     }), ct).ConfigureAwait(false);
                                 break;
                             case PlatformOutboundInstruction.RequestOneofCase.Ack:
-                                await HeartbeatChannel.ReceiveClientHeartbeatAcknowledgement(ok.Value.Ack).ConfigureAwait(false);
+                                if (!string.IsNullOrEmpty(ok.Value.Ack.InstructionId))
+                                {
+                                    var instruction = new InstructionId(ok.Value.Ack.InstructionId);
+                                    if (connected.AwaitedInstructions.TryGetValue(instruction, out var completion))
+                                    {
+                                        connected.AwaitedInstructions.Remove(instruction);
+                                        if (ok.Value.Ack.Success)
+                                        {
+                                            completion.SetResult();
+                                        }
+                                        else
+                                        {
+                                            completion.SetException(
+                                                AxonServerException.FromErrorMessage(
+                                                    _connection.ClientIdentity,
+                                                    ok.Value.Ack.Error));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        await HeartbeatChannel
+                                            .ReceiveClientHeartbeatAcknowledgement(ok.Value.Ack)
+                                            .ConfigureAwait(false);
+                                    }
+                                }
                                 
                                 break;
                         }
                         break;
                     case TaskResult<PlatformOutboundInstruction>.Error error:
-                        var due = ReconnectAfterPolicy.FromException(error.Exception);
+                        if (error.Exception is RpcException rpcException)
+                        {
+                            if (rpcException.StatusCode == StatusCode.Unavailable &&
+                                _connection.ConnectivityState == ConnectivityState.Ready)
+                            {
+                                _logger.LogInformation("Upstream unavailable. Forcing new connection");
+                                await _connection.ReconnectAsync().ConfigureAwait(false);
+                            }
+                        }
+                        
+                        foreach (var completion in connected.AwaitedInstructions.Values)
+                        {
+                            completion.SetException(error.Exception);
+                        }
+                        connected.AwaitedInstructions.Clear();
+                        
+                        var due = ScheduleDue.FromException(error.Exception);
                         
                         _logger.LogError(error.Exception, "Failed to receive platform outbound instructions. Reconnecting in {Due}ms", due.TotalMilliseconds);
 
@@ -550,15 +599,20 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Failed to clean up platform instructions streaming call resources");
+                    _logger.LogError(exception, "Failed to clean up call resources");
                 }
-
+                
                 await _actor.TellAsync(new Message[]
                 {
                     new Message.PauseHeartbeats(),
                     new Message.OpenStream()
                 }, ct);
+                
+                state = new State.Reconnecting.StreamClosed(connected.EventProcessors);
 
+                break;
+            case (State.Connected, Message.OnConnected):
+                await _connection.CheckReadinessAsync();
                 break;
         }
 
@@ -598,7 +652,8 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                                     ErrorCode = ErrorCategory
                                         .InstructionExecutionError
                                         .ToString(),
-                                    Location = ClientIdentity
+                                    Location = _connection
+                                        .ClientIdentity
                                         .ClientInstanceId
                                         .ToString(),
                                     Message = exception.Message,
@@ -625,7 +680,8 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
                             ErrorCode = ErrorCategory
                                 .InstructionExecutionError
                                 .ToString(),
-                            Location = ClientIdentity
+                            Location = _connection
+                                .ClientIdentity
                                 .ClientInstanceId
                                 .ToString(),
                             Message = "Unknown processor"
@@ -635,6 +691,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         }
     }
 #pragma warning restore CS4014
+#pragma warning restore CA2016
 
     private abstract record Message
     {
@@ -648,7 +705,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>
                 Result) : Message;
 
-        public record AnnounceClient() : Message;
+        public record AnnounceClient : Message;
 
         public record ClientAnnounced(TaskResult Result) : Message;
 
@@ -669,16 +726,17 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
         
         public record SendAwaitablePlatformInboundInstruction(PlatformInboundInstruction Instruction, TaskCompletionSource Completion) : Message;
 
-        public record PlatformInboundInstructionSent(PlatformInboundInstruction Instruction, TaskResult Result) : Message;
-        
         public record SendPlatformInboundInstructionFaulted(PlatformInboundInstruction Instruction, Exception Exception) : Message;
 
         public record SendAllEventProcessorInfo : Message;
-        public record SendEventProcessorInfo(EventProcessorName Name, TaskResult<EventProcessorInfo> Result) : Message;
+        
         public record Reconnect : Message;
 
         public record PauseHeartbeats : Message;
+
+        public record OnConnected : Message;
     } 
+    
     private abstract record State(EventProcessorCollection EventProcessors)
     {
         public record Disconnected(EventProcessorCollection EventProcessors) : State(EventProcessors);
@@ -699,6 +757,7 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
             AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction> Call,
             Task ConsumePlatformOutboundInstructions,
             CancellationTokenSource ConsumePlatformOutboundInstructionsCancellationTokenSource,
+            Dictionary<InstructionId, TaskCompletionSource> AwaitedInstructions,
             EventProcessorCollection EventProcessors) : State(EventProcessors);
     }
     
@@ -726,22 +785,22 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
 
     public async Task<IEventProcessorRegistration> RegisterEventProcessor(
         EventProcessorName name,
-        Func<Task<EventProcessorInfo>> infoSupplier,
+        Func<Task<EventProcessorInfo?>> supplier,
         IEventProcessorInstructionHandler handler)
     {
-        if (infoSupplier == null) throw new ArgumentNullException(nameof(infoSupplier));
+        if (supplier == null) throw new ArgumentNullException(nameof(supplier));
         if (handler == null) throw new ArgumentNullException(nameof(handler));
         var registerCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await _actor.TellAsync(new Message.RegisterEventProcessor(
             name,
-            infoSupplier,
+            supplier,
             handler,
             registerCompletionSource), CancellationToken.None).ConfigureAwait(false);
         return new EventProcessorRegistration(registerCompletionSource.Task, async () =>
         {
             var unsubscribeCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             await _actor
-                .TellAsync(new Message.UnregisterEventProcessor(name, infoSupplier, handler, unsubscribeCompletionSource))
+                .TellAsync(new Message.UnregisterEventProcessor(name, supplier, handler, unsubscribeCompletionSource))
                 .ConfigureAwait(false);
             await unsubscribeCompletionSource.Task.ConfigureAwait(false);
         });
@@ -766,20 +825,6 @@ public class ControlChannel : IControlChannel, IAsyncDisposable
     public Task DisableHeartbeat()
     {
         return HeartbeatChannel.Disable();
-    }
-
-    public event EventHandler? Connected;
-
-    protected virtual void OnConnected()
-    {
-        Connected?.Invoke(this, EventArgs.Empty);
-    }
-
-    public event EventHandler? Disconnected;
-
-    protected virtual void OnDisconnected()
-    {
-        Disconnected?.Invoke(this, EventArgs.Empty);
     }
 
     public bool IsConnected => _actor.State is State.Connected;

@@ -39,7 +39,110 @@ public class AxonServerConnectionIntegrationTests
         configure?.Invoke(builder);
         var options = builder.Build();
         var factory = new AxonServerConnectionFactory(options);
-        return factory.Connect(Context.Default);
+        return factory.ConnectAsync(Context.Default);
+    }
+
+    private async Task<IAxonServerConnection> CreateDisposedSystemUnderTest(
+        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+    {
+        var sut = await CreateSystemUnderTest(configure);
+        await sut.DisposeAsync().ConfigureAwait(false);
+        return sut;
+    }
+
+    [Fact]
+    public async Task WhenDisposingWaitUntilConnectedAsyncReturnsExpectedResult()
+    {
+        var sut = await CreateSystemUnderTest();
+        var wait = sut.WaitUntilConnectedAsync().ConfigureAwait(false);
+        await sut.DisposeAsync().ConfigureAwait(false);
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task WhenDisposingWaitUntilReadyAsyncReturnsExpectedResult()
+    {
+        var sut = await CreateSystemUnderTest();
+        var wait = sut.WaitUntilReadyAsync().ConfigureAwait(false);
+        await sut.DisposeAsync().ConfigureAwait(false);
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedIsConnectedReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.False(sut.IsConnected);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedIsClosedReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.True(sut.IsClosed);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedIsReadyReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.False(sut.IsReady);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedWaitUntilConnectedAsyncReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await sut.WaitUntilConnectedAsync().ConfigureAwait(false)).ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedWaitUntilReadyAsyncReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await sut.WaitUntilReadyAsync().ConfigureAwait(false)).ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedCloseAsyncReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        await sut.CloseAsync().ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedAdminChannelReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.Throws<ObjectDisposedException>(() => sut.AdminChannel);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedControlChannelReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.Throws<ObjectDisposedException>(() => sut.ControlChannel);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedCommandChannelReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.Throws<ObjectDisposedException>(() => sut.CommandChannel);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedQueryChannelReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.Throws<ObjectDisposedException>(() => sut.QueryChannel);
+    }
+    
+    [Fact]
+    public async Task WhenDisposedEventChannelReturnsExpectedResult()
+    {
+        await using var sut = await CreateDisposedSystemUnderTest();
+        Assert.Throws<ObjectDisposedException>(() => sut.EventChannel);
     }
     
     [Fact]
@@ -51,7 +154,7 @@ public class AxonServerConnectionIntegrationTests
                 HttpHandler = new DelayedHandler
                 {
                     ResponseDelay = TimeSpan.FromSeconds(1),
-                    InnerHandler = new HttpClientHandler()
+                    InnerHandler = new SocketsHttpHandler()
                 },
                 DisposeHttpClient = true
             }));
@@ -63,32 +166,63 @@ public class AxonServerConnectionIntegrationTests
         Assert.True(sut.IsConnected);
     }
     
-    [Fact]
-    public async Task ConnectedEventIsFiredOnceConnectionIsEstablished()
-    {
-        await using var sut = await CreateSystemUnderTest();
-
-        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
-        sut.Connected += (_, _) =>
-        {
-            source.TrySetResult();
-        };
-        source.Task.Wait(TimeSpan.FromSeconds(10));
-    }
+    // [Fact]
+    // public async Task WaitUntilConnectedEventIsFiredOnceConnectionIsEstablished()
+    // {
+    //     await using var sut = await CreateSystemUnderTest();
+    //
+    //     var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
+    //     sut.Connected += (_, _) =>
+    //     {
+    //         source.TrySetResult();
+    //     };
+    //     source.Task.Wait(TimeSpan.FromSeconds(10));
+    // }
     
-    [Fact]
-    public async Task IsConnectedReturnsExpectedResultOnceConnectionIsEstablished()
-    {
-        await using var sut = await CreateSystemUnderTest();
-
-        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
-        sut.Connected += (_, _) =>
-        {
-            source.TrySetResult();
-        };
-        source.Task.Wait(TimeSpan.FromSeconds(10));
-        Assert.True(sut.IsConnected);
-    }
+    // [Fact]
+    // public async Task DisconnectedEventIsFiredOnceConnectionIsShutdown()
+    // {
+    //     await using var sut = await CreateSystemUnderTest();
+    //
+    //     var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
+    //     sut.Disconnected += (_, _) =>
+    //     {
+    //         source.TrySetResult();
+    //     };
+    //
+    //     await sut.Disconnect();
+    //     
+    //     source.Task.Wait(TimeSpan.FromSeconds(10));
+    // }
+    
+    // [Fact]
+    // public async Task IsDisconnectedReturnsExpectedResultOnceConnectionIsShutdown()
+    // {
+    //     await using var sut = await CreateSystemUnderTest();
+    //
+    //     var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
+    //     sut.Disconnected += (_, _) =>
+    //     {
+    //         source.TrySetResult();
+    //     };
+    //     await sut.Disconnect();
+    //     source.Task.Wait(TimeSpan.FromSeconds(10));
+    //     Assert.True(sut.IsDisconnected);
+    // }
+    
+    // [Fact]
+    // public async Task IsConnectedReturnsExpectedResultOnceConnectionIsEstablished()
+    // {
+    //     await using var sut = await CreateSystemUnderTest();
+    //
+    //     var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
+    //     sut.Connected += (_, _) =>
+    //     {
+    //         source.TrySetResult();
+    //     };
+    //     source.Task.Wait(TimeSpan.FromSeconds(10));
+    //     Assert.True(sut.IsConnected);
+    // }
     
     [Fact]
     public async Task IsReadyReturnsExpectedResult()
@@ -111,21 +245,21 @@ public class AxonServerConnectionIntegrationTests
         Assert.True(sut.IsReady);
     }
     
-    [Fact]
-    public async Task IsReadyReturnsExpectedResultOnceControlChannelIsConnected()
-    {
-        await using var sut = await CreateSystemUnderTest();
-
-        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
-        sut.Ready += (_, _) =>
-        {
-            source.TrySetResult();
-        };
-        source.Task.Wait(TimeSpan.FromSeconds(10));
-        Assert.True(sut.IsConnected, "Connection not connected");
-        Assert.True(((ControlChannel)sut.ControlChannel).IsConnected, "ControlChannel not connected");
-        Assert.True(sut.IsReady, "Connection not ready");
-    }
+    // [Fact]
+    // public async Task IsReadyReturnsExpectedResultOnceControlChannelIsConnected()
+    // {
+    //     await using var sut = await CreateSystemUnderTest();
+    //
+    //     var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
+    //     sut.Ready += (_, _) =>
+    //     {
+    //         source.TrySetResult();
+    //     };
+    //     source.Task.Wait(TimeSpan.FromSeconds(10));
+    //     Assert.True(sut.IsConnected, "Connection not connected");
+    //     Assert.True(((ControlChannel)sut.ControlChannel).IsConnected, "ControlChannel not connected");
+    //     Assert.True(sut.IsReady, "Connection not ready");
+    // }
 
     [Fact(Skip = "Just to get a sense of the message flow - for manual testing only")]
     public async Task ShowTheFlow()
@@ -137,45 +271,45 @@ public class AxonServerConnectionIntegrationTests
         await Task.Delay(TimeSpan.FromSeconds(20));
     }
 
-    [Fact(Skip = "Needs work")]
-    public async Task IsConnectedReturnsExpectedResultWhenConnectionIsRecoveredByHeartbeat()
-    {
-        var handler = new DelayedHandler
-        {
-            ResponseDelay = TimeSpan.FromSeconds(1),
-            InnerHandler = new HttpClientHandler()
-        };
-        await using var sut = await CreateSystemUnderTest(
-            configure =>
-            {
-                configure.WithGrpcChannelOptions(new GrpcChannelOptions
-                {
-                    HttpHandler = handler,
-                    DisposeHttpClient = true
-                });
-            });
-        await sut.ControlChannel.EnableHeartbeat(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
-        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
-        sut.Connected += (_, _) =>
-        {
-            source.TrySetResult();
-        };
-        source.Task.Wait(TimeSpan.FromSeconds(10));
-        Assert.True(sut.IsConnected);
-        
-        _logger.LogDebug("Connection status is READY");
-        
-        var maximumWaitTimeForHeartbeatToStabilize = TimeSpan.FromSeconds(2);
-        var totalWaitTimeForHeartbeatToStabilize = TimeSpan.Zero;
-        var waitTimeBetweenPollingIsConnected = TimeSpan.FromMilliseconds(100);
-        while (totalWaitTimeForHeartbeatToStabilize < maximumWaitTimeForHeartbeatToStabilize)
-        {
-            Assert.True(sut.IsConnected);
-            await Task.Delay(waitTimeBetweenPollingIsConnected);
-            totalWaitTimeForHeartbeatToStabilize += waitTimeBetweenPollingIsConnected;
-        }
-        
-        _logger.LogDebug("Simulating bad connection");
-        
-    }
+    // [Fact(Skip = "Needs work")]
+    // public async Task IsConnectedReturnsExpectedResultWhenConnectionIsRecoveredByHeartbeat()
+    // {
+    //     var handler = new DelayedHandler
+    //     {
+    //         ResponseDelay = TimeSpan.FromSeconds(1),
+    //         InnerHandler = new HttpClientHandler()
+    //     };
+    //     await using var sut = await CreateSystemUnderTest(
+    //         configure =>
+    //         {
+    //             configure.WithGrpcChannelOptions(new GrpcChannelOptions
+    //             {
+    //                 HttpHandler = handler,
+    //                 DisposeHttpClient = true
+    //             });
+    //         });
+    //     await sut.ControlChannel.EnableHeartbeat(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
+    //     var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); 
+    //     sut.Connected += (_, _) =>
+    //     {
+    //         source.TrySetResult();
+    //     };
+    //     source.Task.Wait(TimeSpan.FromSeconds(10));
+    //     Assert.True(sut.IsConnected);
+    //     
+    //     _logger.LogDebug("Connection status is READY");
+    //     
+    //     var maximumWaitTimeForHeartbeatToStabilize = TimeSpan.FromSeconds(2);
+    //     var totalWaitTimeForHeartbeatToStabilize = TimeSpan.Zero;
+    //     var waitTimeBetweenPollingIsConnected = TimeSpan.FromMilliseconds(100);
+    //     while (totalWaitTimeForHeartbeatToStabilize < maximumWaitTimeForHeartbeatToStabilize)
+    //     {
+    //         Assert.True(sut.IsConnected);
+    //         await Task.Delay(waitTimeBetweenPollingIsConnected);
+    //         totalWaitTimeForHeartbeatToStabilize += waitTimeBetweenPollingIsConnected;
+    //     }
+    //     
+    //     _logger.LogDebug("Simulating bad connection");
+    //     
+    // }
 }
