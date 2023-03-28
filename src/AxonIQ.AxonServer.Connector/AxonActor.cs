@@ -138,7 +138,7 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
 
     private void ThrowIfDisposed()
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(AxonServerConnection));
+        if (_disposed) throw new ObjectDisposedException(nameof(AxonActor<TMessage, TState>));
     }
     
     public async ValueTask DisposeAsync()
