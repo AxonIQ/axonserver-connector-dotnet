@@ -1,5 +1,7 @@
 using AutoFixture;
-using AxonIQ.AxonServer.Connector.Tests.Containerization;
+using AxonIQ.AxonClusterIntegrationTests.Containerization;
+using AxonIQ.AxonServer.Connector;
+using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
 using Grpc.Core;
@@ -8,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.Tests;
+namespace AxonIQ.AxonClusterIntegrationTests;
 
 [Collection(nameof(AxonClusterWithAccessControlDisabledCollection))]
 public class AxonClusterAdminChannelIntegrationTests
@@ -458,6 +460,7 @@ public class AxonClusterAdminChannelIntegrationTests
             Assert.Contains(actual, overview => overview.NodeName == name);    
         }
     }
+    
     // [Fact]
     // public async Task AddNodeToReplicationGroupHasExpectedResult()
     // {

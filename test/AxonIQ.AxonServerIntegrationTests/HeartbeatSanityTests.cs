@@ -1,18 +1,18 @@
-using AxonIQ.AxonServer.Connector.Tests.Containerization;
+using AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
 using AxonIQ.AxonServer.Embedded;
-using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Xunit;
 
-namespace AxonIQ.AxonServer.Connector.Tests;
+namespace AxonIQ.AxonServer.Connector.IntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
-public class HeartbeatSanityTests
+public class HeartbeatSanityCheckTests
 {
     private readonly IAxonServer _container;
 
-    public HeartbeatSanityTests(AxonServerWithAccessControlDisabled container)
+    public HeartbeatSanityCheckTests(AxonServerWithAccessControlDisabled container)
     {
         _container = container ?? throw new ArgumentNullException(nameof(container));
     }

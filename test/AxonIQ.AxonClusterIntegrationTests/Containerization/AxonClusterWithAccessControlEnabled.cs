@@ -4,20 +4,20 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
+namespace AxonIQ.AxonClusterIntegrationTests.Containerization;
 
-public class AxonClusterWithAccessControlDisabled : AxonCluster, IAsyncLifetime
+public class AxonClusterWithAccessControlEnabled : AxonCluster, IAsyncLifetime
 {
-    public AxonClusterWithAccessControlDisabled(IMessageSink sink)
+    public AxonClusterWithAccessControlEnabled(IMessageSink sink)
     {
         if (sink == null) throw new ArgumentNullException(nameof(sink));
         var logger = new MessageSinkLogger<EmbeddedAxonCluster>(sink);
-        logger.LogDebug("Using Embedded Axon Cluster with access control disabled");
-        Cluster = EmbeddedAxonCluster.WithAccessControlDisabled(logger);
+        logger.LogDebug("Using Embedded Axon Cluster with access control enabled");
+        Cluster = EmbeddedAxonCluster.WithAccessControlEnabled(logger);
     }
 
     protected override IAxonCluster Cluster { get; }
-
+    
     async Task IAsyncLifetime.InitializeAsync()
     {
         await Cluster.InitializeAsync();

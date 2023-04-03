@@ -1,12 +1,13 @@
 using AutoFixture;
-using AxonIQ.AxonServer.Connector.Tests.Containerization;
+using AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
+using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.Tests;
+namespace AxonIQ.AxonServer.Connector.IntegrationTests;
 
 [Collection(nameof(ToxicAxonServerWithAccessControlDisabledCollection))]
 public class ControlChannelConnectivityIntegrationTests

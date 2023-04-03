@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
+namespace AxonIQ.AxonClusterIntegrationTests.Containerization;
 
 [CollectionDefinition(nameof(AxonClusterWithAccessControlEnabledCollection))]
 public class AxonClusterWithAccessControlEnabledCollection : ICollectionFixture<AxonClusterWithAccessControlEnabled>

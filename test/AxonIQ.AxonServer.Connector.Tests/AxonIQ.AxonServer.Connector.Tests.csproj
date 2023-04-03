@@ -5,7 +5,6 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>AxonIQ.AxonServer.Connector.Tests</RootNamespace>
-      <UserSecretsId>633c5eac-a5c9-478c-ae4b-c9fdb8da37ea</UserSecretsId>
   </PropertyGroup>
 
     <ItemGroup>
@@ -22,8 +21,6 @@
         <PackageReference Include="AutoFixture" Version="4.17.0" />
         <PackageReference Include="AutoFixture.Idioms" Version="4.17.0" />
         <PackageReference Include="AutoFixture.Xunit2" Version="4.17.0" />
-        <PackageReference Include="Ductus.FluentDocker" Version="2.10.59" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.1" />
         <PackageReference Include="NodaTime" Version="3.1.6" />
         <PackageReference Include="NodaTime.Testing" Version="3.1.6" />
@@ -38,6 +35,5 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="YamlDotNet" Version="12.3.1" />
     </ItemGroup>
 </Project>

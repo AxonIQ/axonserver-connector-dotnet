@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.Tests.Containerization;
+namespace AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
 
 public class AxonServerWithAccessControlEnabled : Embedded.AxonServer, IAsyncLifetime
 {

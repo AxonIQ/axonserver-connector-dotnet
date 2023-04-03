@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <UserSecretsId>633c5eac-a5c9-478c-ae4b-c9fdb8da37ea</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\AxonIQ.AxonServer.Connector\AxonIQ.AxonServer.Connector.csproj" />
+      <ProjectReference Include="..\..\src\AxonIQ.AxonServer.Embedded\AxonIQ.AxonServer.Embedded.csproj" />
+      <ProjectReference Include="..\AxonIQ.AxonServer.Connector.Tests\AxonIQ.AxonServer.Connector.Tests.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="AutoFixture" Version="4.18.0" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />  
+      <PackageReference Include="Xunit" Version="2.4.2" />
+      <PackageReference Include="Xunit.Runner.Console" Version="2.4.2">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+      <PackageReference Include="Xunit.Runner.VisualStudio" Version="2.4.5">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.1" />
+    </ItemGroup>
+
+</Project>
