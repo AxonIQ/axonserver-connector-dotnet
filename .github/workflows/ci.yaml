@@ -23,8 +23,12 @@ jobs:
         run: make ci
         env:
           AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
+      # run the CD build (on master only)
+      - name: make cd
+        if: ${{ vars.GITHUB_REF == 'refs/heads/master' }}
+        run: make cd
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_BASE_REF: ${{ vars.GITHUB_BASE_REF }}
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:
