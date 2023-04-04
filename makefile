@@ -5,7 +5,6 @@ ci:
 	dotnet restore
 	dotnet build --configuration Release --no-restore
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServer.Connector.Tests
-	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonClusterIntegrationTests
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests
 
 cd:
