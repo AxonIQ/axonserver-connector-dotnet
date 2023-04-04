@@ -33,7 +33,6 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
 
         _network = new Builder()
             .UseNetwork($"axon-network-{AxonNetworkCounter.Next()}")
-            .ReuseIfExist()
             .Build();
 
         await _server.StartAsync(_network);
