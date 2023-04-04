@@ -53,7 +53,7 @@ public class EmbeddedAxonCluster : IAxonCluster
     {
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being initialized", _id);
 
-        _network = new Builder().UseNetwork($"axoniq-dotnet-{_id}").ReuseIfExist().Build();
+        _network = new Builder().UseNetwork($"axoniq-dotnet-{_id}").Build();
 
         foreach (var node in _nodes)
         {

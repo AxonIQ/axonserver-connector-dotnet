@@ -39,14 +39,6 @@ public class AxonServerConnectionFactoryDefaultsTests
 
         Assert.Same(AxonServerAuthentication.None, result);
     }
-
-    [Fact]
-    public void ConnectTimeoutReturnsExpectedResult()
-    {
-        var result = AxonServerConnectionFactoryDefaults.ConnectTimeout;
-
-        Assert.Equal(TimeSpan.FromMilliseconds(10_000), result);
-    }
     
     [Fact]
     public void MinimumCommandPermitsReturnsExpectedResult()
@@ -78,5 +70,16 @@ public class AxonServerConnectionFactoryDefaultsTests
         var result = AxonServerConnectionFactoryDefaults.DefaultQueryPermits;
 
         Assert.Equal(new PermitCount(5_000), result);
+    }
+
+    [Fact]
+    public void DefaultReconnectOptions()
+    {
+        var result = AxonServerConnectionFactoryDefaults.DefaultReconnectOptions;
+        
+        Assert.Equal(new ReconnectOptions(
+            TimeSpan.FromMilliseconds(10000),
+            TimeSpan.FromMilliseconds(2000),
+            true), result);
     }
 }

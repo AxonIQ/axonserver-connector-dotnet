@@ -95,4 +95,15 @@ public static class FixtureExtensions
                 .FromFactory<int>(value => new SegmentId(Math.Abs(value)))
                 .OmitAutoProperties());
     }
+    
+    public static void CustomizeReconnectOptions(this IFixture fixture)
+    {
+        fixture.Customize<ReconnectOptions>(composer =>
+            composer
+                .FromFactory((Random random) => new ReconnectOptions(
+                    TimeSpan.FromMilliseconds(random.Next(100,1000)),
+                    TimeSpan.FromMilliseconds(random.Next(100,1000)),
+                    random.Next() % 2 == 0))
+                .OmitAutoProperties());
+    }
 }

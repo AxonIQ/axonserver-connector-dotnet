@@ -1,6 +1,3 @@
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Threading.Channels;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc;
@@ -8,979 +5,833 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-[SuppressMessage("ReSharper", "MethodSupportsCancellation")]
-public class ControlChannel : IControlChannel, IAsyncDisposable
+internal class ControlChannel : IControlChannel, IAsyncDisposable
 {
-    private State _state;
-    
-    private readonly Channel<Protocol> _inbox;
-    private readonly CancellationTokenSource _inboxCancellation;
-    private readonly Task _protocol;
-    
-    private readonly Context _context;
-    private readonly IScheduler _scheduler;
+    private readonly AxonServerConnection _connection;
     private readonly TimeSpan _eventProcessorUpdateFrequency;
     private readonly ILogger<ControlChannel> _logger;
-    private readonly EventHandler _onHeartbeatMissedHandler;
+    private readonly AxonActor<Message, State> _actor;
 
     public ControlChannel(
-        ClientIdentity clientIdentity, 
-        Context context, 
-        CallInvoker callInvoker,
-        RequestReconnect requestReconnect,
+        AxonServerConnection connection,
         IScheduler scheduler,
         TimeSpan eventProcessorUpdateFrequency,
         ILoggerFactory loggerFactory)
     {
-        if (clientIdentity == null) throw new ArgumentNullException(nameof(clientIdentity));
-        if (callInvoker == null) throw new ArgumentNullException(nameof(callInvoker));
-        if (requestReconnect == null) throw new ArgumentNullException(nameof(requestReconnect));
+        if (connection == null) throw new ArgumentNullException(nameof(connection));
         if (scheduler == null) throw new ArgumentNullException(nameof(scheduler));
         if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
-        ClientIdentity = clientIdentity;
-        CallInvoker = callInvoker;
-        RequestReconnect = requestReconnect;
-        Service = new PlatformService.PlatformServiceClient(callInvoker);
-        
-        _context = context;
-        _scheduler = scheduler;
+        _connection = connection;
         _eventProcessorUpdateFrequency = eventProcessorUpdateFrequency;
         _logger = loggerFactory.CreateLogger<ControlChannel>();
-        _state = new State.Disconnected(new EventProcessorCollection(), new TaskRunCache(), new TaskRunCache());
-        _inbox = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false
-        });
-        _inboxCancellation = new CancellationTokenSource();
         
-        InstructionStreamProxy =
-            new AsyncDuplexStreamingCallProxy<PlatformInboundInstruction, PlatformOutboundInstruction>(
-                () => _state.InstructionStream
-            );
+        Service = new PlatformService.PlatformServiceClient(connection.CallInvoker);
+        
+        _actor = new AxonActor<Message, State>(
+            Receive,
+            new State.Disconnected(new EventProcessorCollection()),
+            scheduler,
+            _logger
+        );
         HeartbeatChannel = new HeartbeatChannel(
-            scheduler.Clock,
-            instruction => _inbox.Writer.WriteAsync(new Protocol.SendPlatformInboundInstruction(instruction)),
+            instruction => _actor.TellAsync(new Message.SendPlatformInboundInstruction(instruction), CancellationToken.None),
+            connection.ReconnectAsync,
+            scheduler,
             loggerFactory.CreateLogger<HeartbeatChannel>()
         );
-        HeartbeatMonitor = new HeartbeatMonitor(
-            (responder, timeout) => HeartbeatChannel.Send(responder, timeout),
-            scheduler.Clock,
-            loggerFactory.CreateLogger<HeartbeatMonitor>()
-        );
-        _onHeartbeatMissedHandler = (_, _) => OnHeartbeatMissed();
-        HeartbeatMonitor.HeartbeatMissed += _onHeartbeatMissedHandler;
-        _protocol = RunChannelProtocol(_inboxCancellation.Token);
     }
-
-    public ClientIdentity ClientIdentity { get; }
-    
-    public CallInvoker CallInvoker { get; }
-    
-    public RequestReconnect RequestReconnect { get; }
 
     public PlatformService.PlatformServiceClient Service { get; }
-    
-    public AsyncDuplexStreamingCallProxy<PlatformInboundInstruction,PlatformOutboundInstruction> InstructionStreamProxy
-    {
-        get;
-    }
-    
+
     public HeartbeatChannel HeartbeatChannel { get; }
-    
-    public HeartbeatMonitor HeartbeatMonitor { get; }
 
-    private State CurrentState
+#pragma warning disable CA2016
+#pragma warning disable CS4014
+    private async Task<State> Receive(Message message, State state, CancellationToken ct)
     {
-        get => _state;
-        set
+        switch (state, message)
         {
-            var connected = _state is not State.Connected && value is State.Connected;
-            _state = value;
-            if (connected) OnConnected();
-        }
-    }
+            case (State.Disconnected disconnected, Message.Connect):
+                await _actor.TellAsync(new Message.OpenStream(), ct);
 
-    private async Task ConsumeResponseStream(IAsyncStreamReader<PlatformOutboundInstruction> reader, CancellationToken ct)
-    {
-        try
-        {
-            await foreach (var response in reader.ReadAllAsync(ct).ConfigureAwait(false))
-            {
-                await _inbox.Writer.WriteAsync(new Protocol.ReceivePlatformOutboundInstruction(response), ct).ConfigureAwait(false);
-            }
-        }
-        catch (ObjectDisposedException exception)
-        {
-            _logger.LogDebug(exception, "The instruction stream is no longer being read because an object got disposed");
-        }
-        catch (TaskCanceledException exception)
-        {
-            _logger.LogDebug(exception, "The instruction stream is no longer being read because a task was cancelled");
-        }
-        catch (OperationCanceledException exception)
-        {
-            _logger.LogDebug(exception, "The instruction stream is no longer being read because an operation was cancelled");
-        }
-    }
+                state = new State.Connecting.StreamClosed(disconnected.EventProcessors);
+                break;
+            case (State.Disconnected disconnected, Message.Reconnect):
+                await _actor.TellAsync(new Message.OpenStream(), ct);
 
-    private async Task RunChannelProtocol(CancellationToken ct)
-    {
-        try
-        {
-            while (await _inbox.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
-            {
-                while (_inbox.Reader.TryRead(out var message))
+                state = new State.Connecting.StreamClosed(disconnected.EventProcessors);
+                break;
+            case (_, Message.PauseHeartbeats):
+                await HeartbeatChannel.Pause().ConfigureAwait(false);
+                break;
+            case (State.Reconnecting.StreamClosed, Message.OpenStream open):
+                if (_connection.ConnectivityState != ConnectivityState.Ready)
                 {
-                    _logger.LogDebug("Began {Message} when {State}", message.ToString(), CurrentState.ToString());
-                    switch (message)
-                    {
-                        case Protocol.Connect:
-                            switch (CurrentState)
-                            {
-                                case State.Paused paused:
-                                {
-                                    var instructionStream = Service.OpenStream(cancellationToken: ct);
-                                    if (instructionStream != null)
-                                    {
-                                        _logger.LogInformation(
-                                            "Connected instruction stream for context '{Context}'. Sending client identification",
-                                            _context);
-                                        await instructionStream.RequestStream.WriteAsync(new PlatformInboundInstruction
-                                        {
-                                            Register = ClientIdentity.ToClientIdentification()
-                                        }).ConfigureAwait(false);
-                                        //TODO: Handle Exceptions
-                                        await HeartbeatMonitor.Resume().ConfigureAwait(false);
-
-                                        CurrentState = new State.Connected(instructionStream,
-                                            ConsumeResponseStream(instructionStream.ResponseStream, ct),
-                                            paused.EventProcessors,
-                                            paused.InstructionTasks,
-                                            paused.EventProcessorInfoTasks
-                                        );
-                                    }
-                                    else
-                                    {
-                                        _logger.LogWarning(
-                                            "Could not open instruction stream for context '{Context}'",
-                                            _context);
-                                    }
-                                }
-                                    break;
-                                case State.Disconnected disconnected:
-                                {
-                                    var instructionStream = Service.OpenStream(cancellationToken: ct);
-                                    if (instructionStream != null)
-                                    {
-                                        _logger.LogInformation(
-                                            "Connected instruction stream for context '{Context}'. Sending client identification",
-                                            _context);
-                                        await instructionStream.RequestStream.WriteAsync(new PlatformInboundInstruction
-                                        {
-                                            Register = ClientIdentity.ToClientIdentification()
-                                        }).ConfigureAwait(false);
-                                        //TODO: Handle Exceptions
-                                        await HeartbeatMonitor.Resume().ConfigureAwait(false);
-
-                                        CurrentState = new State.Connected(instructionStream,
-                                            ConsumeResponseStream(instructionStream.ResponseStream, ct),
-                                            disconnected.EventProcessors,
-                                            disconnected.InstructionTasks,
-                                            disconnected.EventProcessorInfoTasks
-                                        );
-                                    }
-                                    else
-                                    {
-                                        _logger.LogWarning(
-                                            "Could not open instruction stream for context '{Context}'",
-                                            _context);
-                                    }
-                                }
-                                    break;
-
-                                case State.Connected:
-                                    _logger.LogInformation(
-                                        "ControlChannel for context '{Context}' is already connected",
-                                        _context.ToString());
-                                    break;
-                            }
-
-                            break;
-                        case Protocol.Disconnect:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    await HeartbeatMonitor.Pause().ConfigureAwait(false);
-
-                                    connected.InstructionStream?.Dispose();
-                                    await connected.ConsumeResponseStreamLoop.ConfigureAwait(false);
-
-                                    CurrentState = new State.Disconnected(connected.EventProcessors, connected.InstructionTasks, connected.EventProcessorInfoTasks);
-                                    break;
-                            }
-
-                            break;
-                        case Protocol.Reconnect:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    await HeartbeatMonitor.Pause().ConfigureAwait(false);
-
-                                    connected.InstructionStream?.Dispose();
-                                    await connected.ConsumeResponseStreamLoop.ConfigureAwait(false);
-
-                                    CurrentState = new State.Paused(connected.EventProcessors, connected.InstructionTasks, connected.EventProcessorInfoTasks);
-                                    break;
-                            }
-
-                            break;
-                        case Protocol.RegisterEventProcessor register:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    connected.EventProcessors.AddEventProcessorInstructionHandler(register.Name, register.Handler);
-                                    if (connected.EventProcessors.AddEventProcessorInfoSupplier(register.Name,
-                                            register.InfoSupplier))
-                                    {
-                                        await _scheduler.ScheduleTask(
-                                            () => _inbox.Writer.WriteAsync(new Protocol.SendAllEventProcessorInfo(), ct),
-                                            _scheduler.Clock().Add(_eventProcessorUpdateFrequency));
-                                    }
-                                    
-                                    var token = connected.EventProcessorInfoTasks.NextToken();
-                                    connected.EventProcessorInfoTasks.Add(token, Task.Run(async () =>
-                                    {
-                                        try
-                                        {
-
-                                            var info = await register.InfoSupplier();
-                                            if (info != null)
-                                            {
-                                                await _inbox.Writer.WriteAsync(
-                                                    new Protocol.SendEventProcessorInfo
-                                                    (token,
-                                                        new PlatformInboundInstruction
-                                                        {
-                                                            EventProcessorInfo = info
-                                                        })).ConfigureAwait(false);
-                                            }
-                                            else
-                                            {
-                                                _logger.LogWarning(
-                                                    "Not sending processor info {Name} for context '{Context}'.",
-                                                    register.Name.ToString(),
-                                                    _context.ToString());
-                                            }
-                                        }
-                                        catch (Exception exception)
-                                        {
-                                            _logger.LogError(exception,
-                                                "Not sending processor info for context '{Context}'.",
-                                                _context.ToString());
-                                        }
-                                    }, ct));
-                                    
-                                    break;
-                                case State.Paused paused:
-                                    //TODO: We should schedule sending all event processor info as soon as we reconnect 
-                                    paused.EventProcessors.AddEventProcessorInstructionHandler(register.Name, register.Handler);
-                                    paused.EventProcessors.AddEventProcessorInfoSupplier(register.Name,
-                                        register.InfoSupplier);
-                                    break;
-                                case State.Disconnected disconnected:
-                                    //TODO: We should schedule sending all event processor info as soon as we reconnect
-                                    disconnected.EventProcessors.AddEventProcessorInstructionHandler(register.Name, register.Handler);
-                                    disconnected.EventProcessors.AddEventProcessorInfoSupplier(register.Name, register.InfoSupplier);
-                                    break;
-                            }
-                            register.CompletionSource.SetResult();
-                            break;
-                        case Protocol.UnregisterEventProcessor unregister:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    connected.EventProcessors.RemoveEventProcessorInfoSupplier(unregister.Name, unregister.InfoSupplier);
-                                    connected.EventProcessors.RemoveEventProcessorInstructionHandler(unregister.Name, unregister.Handler);
-                                    break;
-                                case State.Paused paused:
-                                    paused.EventProcessors.RemoveEventProcessorInfoSupplier(unregister.Name, unregister.InfoSupplier);
-                                    paused.EventProcessors.RemoveEventProcessorInstructionHandler(unregister.Name, unregister.Handler);
-                                    break;
-                                case State.Disconnected disconnected:
-                                    disconnected.EventProcessors.RemoveEventProcessorInfoSupplier(unregister.Name, unregister.InfoSupplier);
-                                    disconnected.EventProcessors.RemoveEventProcessorInstructionHandler(unregister.Name, unregister.Handler);
-                                    break;
-                            }
-                            unregister.CompletionSource.SetResult();
-                            break;
-                        case Protocol.SendAllEventProcessorInfo:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    foreach (var (name, supplier) in connected.EventProcessors
-                                                 .GetAllEventProcessorInfoSuppliers())
-                                    {
-                                        var token = connected.EventProcessorInfoTasks.NextToken();
-                                        connected.EventProcessorInfoTasks.Add(token,
-                                            Task.Run(async () =>
-                                            {
-                                                try
-                                                {
-                                                    var info = await supplier().ConfigureAwait(false);
-                                                    if (info != null)
-                                                    {
-                                                        await _inbox.Writer.WriteAsync(
-                                                            new Protocol.SendEventProcessorInfo(
-                                                                token,
-                                                                new PlatformInboundInstruction
-                                                                {
-                                                                    EventProcessorInfo = info
-                                                                }), ct).ConfigureAwait(false);
-                                                    }
-                                                    else
-                                                    {
-                                                        _logger.LogWarning(
-                                                            "Not sending processor info {Name} for context '{Context}'.",
-                                                            name.ToString(),
-                                                            _context.ToString());
-                                                    }
-                                                }
-                                                catch (Exception exception)
-                                                {
-                                                    _logger.LogError(exception,
-                                                        "Not sending processor info for context '{Context}'.",
-                                                        _context.ToString());
-                                                }
-                                            }, ct));
-                                    }
-                                    
-                                    // Schedule the next poll
-                                    await _scheduler.ScheduleTask(
-                                        () => _inbox.Writer.WriteAsync(new Protocol.SendAllEventProcessorInfo(), ct),
-                                        _scheduler.Clock().Add(_eventProcessorUpdateFrequency));
-                                    
-                                    break;
-                                case State.Paused:
-                                case State.Disconnected:
-                                    _logger.LogWarning("Not sending processor info for context '{Context}'. Channel not ready...", _context.ToString());
-                                    break;
-                            }
-
-                            break;
-                        case Protocol.SendAwaitablePlatformInboundInstruction send:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    try
-                                    {
-                                        await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction)
-                                            .ConfigureAwait(false);
-                                        send.CompletionSource.SetResult();
-                                    }
-                                    catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
-                                    {
-                                        send.CompletionSource.SetException(new AxonServerException(ClientIdentity,
-                                            ErrorCategory.InstructionAckError,
-                                            "Unable to send instruction: AxonServer unavailable"));
-                                    }
-
-                                    break;
-                                case State.Disconnected:
-                                    send.CompletionSource.SetException(new AxonServerException(ClientIdentity,
-                                        ErrorCategory.InstructionAckError,
-                                        "Unable to send instruction: no connection to AxonServer"));
-                                    break;
-                            }
-
-                            break;
-                        case Protocol.SendPlatformInboundInstruction send:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    try
-                                    {
-                                        await connected.InstructionStream!.RequestStream.WriteAsync(send.Instruction)
-                                            .ConfigureAwait(false);
-                                    }
-                                    catch (RpcException exception) when (exception.StatusCode == StatusCode.Unavailable)
-                                    {
-                                        _logger.LogWarning(
-                                            exception,
-                                            "Unable to send instruction {Instruction}: AxonServer unavailable",
-                                            send.Instruction);    
-                                    }
-
-                                    break;
-                                case State.Disconnected:
-                                    _logger.LogWarning(
-                                        "Unable to send instruction {Instruction}: no connection to AxonServer",
-                                        send.Instruction);
-                                    break;
-                            }
-
-                            break;
-                        case Protocol.SendEventProcessorInfo send:
-                            if (CurrentState.EventProcessorInfoTasks.TryRemove(send.Token, out var eventProcessorInfoTask))
-                            {
-                                await eventProcessorInfoTask; //TODO: This may throw, we need to report on it
-                                
-                                switch (CurrentState)
-                                {
-                                    case State.Connected connected:
-                                        try
-                                        {
-                                            await connected.InstructionStream!.RequestStream
-                                                .WriteAsync(send.Instruction)
-                                                .ConfigureAwait(false);
-                                        }
-                                        catch (RpcException exception) when (exception.StatusCode ==
-                                                                             StatusCode.Unavailable)
-                                        {
-                                            _logger.LogWarning(
-                                                exception,
-                                                "Unable to send instruction {Instruction}: AxonServer unavailable",
-                                                send.Instruction);
-                                        }   
-
-                                        break;
-                                    case State.Disconnected:
-                                        _logger.LogWarning(
-                                            "Unable to send instruction {Instruction}: no connection to AxonServer",
-                                            send.Instruction);
-                                        break;
-                                }
-                            }
-                            break;
-                        case Protocol.SendPlatformOutboundInstructionResponse response:
-                            if (CurrentState.InstructionTasks.TryRemove(response.Token, out var instructionTask))
-                            {
-                                await instructionTask; //TODO: This may throw, we need to report on it
-                                
-                                switch (CurrentState)
-                                {
-                                    case State.Connected connected:
-                                        try
-                                        {
-                                            await connected.InstructionStream!.RequestStream
-                                                .WriteAsync(response.Instruction)
-                                                .ConfigureAwait(false);
-                                        }
-                                        catch (RpcException exception) when (exception.StatusCode ==
-                                                                             StatusCode.Unavailable)
-                                        {
-                                            _logger.LogWarning(
-                                                exception,
-                                                "Unable to send instruction {Instruction}: AxonServer unavailable",
-                                                response.Instruction);
-                                        }   
-
-                                        break;
-                                    case State.Disconnected:
-                                        _logger.LogWarning(
-                                            "Unable to send instruction {Instruction}: no connection to AxonServer",
-                                            response.Instruction);
-                                        break;
-                                }
-                            }
-                            break;
-                        case Protocol.ReceivePlatformOutboundInstruction received:
-                            switch (CurrentState)
-                            {
-                                case State.Connected connected:
-                                    switch (received.Instruction.RequestCase)
-                                    {
-                                        // case PlatformOutboundInstruction.RequestOneofCase.None:
-                                        //     break;
-                                        // case PlatformOutboundInstruction.RequestOneofCase.NodeNotification:
-                                        //     break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.RequestReconnect:
-                                            await RequestReconnect().ConfigureAwait(false);
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.PauseEventProcessor:
-                                            await ExecuteEventProcessorInstruction(
-                                                new EventProcessorName(received.Instruction.PauseEventProcessor.ProcessorName),
-                                                received.Instruction,
-                                                connected.EventProcessors, 
-                                                connected.InstructionTasks,
-                                                async handler =>
-                                                {
-                                                    await handler.Pause();
-                                                    return true;
-                                                }, 
-                                                ct);
-
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.StartEventProcessor:
-                                            await ExecuteEventProcessorInstruction(
-                                                new EventProcessorName(received.Instruction.StartEventProcessor.ProcessorName),
-                                                received.Instruction,
-                                                connected.EventProcessors, 
-                                                connected.InstructionTasks,
-                                                async handler =>
-                                                {
-                                                    await handler.Start();
-                                                    return true;
-                                                }, 
-                                                ct);
-                                        
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.ReleaseSegment:
-                                            await ExecuteEventProcessorInstruction(
-                                                new EventProcessorName(received.Instruction.ReleaseSegment.ProcessorName),
-                                                received.Instruction,
-                                                connected.EventProcessors, 
-                                                connected.InstructionTasks,
-                                                handler => handler.ReleaseSegment(new SegmentId(received.Instruction.ReleaseSegment.SegmentIdentifier)), 
-                                                ct);
-                                        
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.RequestEventProcessorInfo:
-                                            var name = new EventProcessorName(
-                                                received.Instruction.RequestEventProcessorInfo.ProcessorName);
-                                            var supplier =
-                                                connected.EventProcessors.GetEventProcessorInfoSupplier(name);
-                                            if (supplier != null)
-                                            {
-                                                var token = connected.InstructionTasks.NextToken();
-                                                connected.InstructionTasks.Add(token, Task.Run(async () =>
-                                                {
-                                                    try
-                                                    {
-
-                                                        var info = await supplier();
-                                                        if (info != null)
-                                                        {
-                                                            await _inbox.Writer.WriteAsync(
-                                                                new Protocol.SendPlatformOutboundInstructionResponse
-                                                                (token,
-                                                                    new PlatformInboundInstruction
-                                                                    {
-                                                                        InstructionId =
-                                                                            received.Instruction.InstructionId,
-                                                                        EventProcessorInfo = info
-                                                                    })).ConfigureAwait(false);
-                                                        }
-                                                        else
-                                                        {
-                                                            await _inbox.Writer.WriteAsync(
-                                                                new Protocol.SendPlatformInboundInstruction(
-                                                                    new PlatformInboundInstruction
-                                                                    {
-                                                                        Result = new InstructionResult
-                                                                        {
-                                                                            InstructionId = received.Instruction
-                                                                                .InstructionId,
-                                                                            Success = false,
-                                                                            Error = new ErrorMessage
-                                                                            {
-                                                                                ErrorCode = ErrorCategory
-                                                                                    .InstructionExecutionError
-                                                                                    .ToString(),
-                                                                                Location =
-                                                                                    ClientIdentity.ClientInstanceId
-                                                                                        .ToString(),
-                                                                                Message = "Unknown processor"
-                                                                            }
-                                                                        }
-
-                                                                    })).ConfigureAwait(false);
-                                                        }
-                                                    }
-                                                    catch (Exception exception)
-                                                    {
-                                                        await _inbox.Writer.WriteAsync(
-                                                            new Protocol.SendPlatformOutboundInstructionResponse
-                                                            (token,
-                                                                new PlatformInboundInstruction
-                                                                {
-                                                                    Result = new InstructionResult
-                                                                    {
-                                                                        InstructionId = received.Instruction
-                                                                            .InstructionId,
-                                                                        Success = false,
-                                                                        Error = new ErrorMessage
-                                                                        {
-                                                                            ErrorCode = ErrorCategory
-                                                                                .InstructionExecutionError
-                                                                                .ToString(),
-                                                                            Location = ClientIdentity
-                                                                                .ClientInstanceId
-                                                                                .ToString(),
-                                                                            Message = exception.Message,
-                                                                            Details =
-                                                                            {
-                                                                                exception.ToString()
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                })).ConfigureAwait(false);
-                                                    }
-                                                }, ct));
-                                            }
-                                            else
-                                            {
-                                                await _inbox.Writer.WriteAsync(
-                                                    new Protocol.SendPlatformInboundInstruction(
-                                                        new PlatformInboundInstruction
-                                                        {
-                                                            Result = new InstructionResult
-                                                            {
-                                                                InstructionId = received.Instruction.InstructionId,
-                                                                Success = false,
-                                                                Error = new ErrorMessage
-                                                                {
-                                                                    ErrorCode = ErrorCategory.InstructionExecutionError
-                                                                        .ToString(),
-                                                                    Location =
-                                                                        ClientIdentity.ClientInstanceId.ToString(),
-                                                                    Message = "Unknown processor"
-                                                                }
-                                                            }
-
-                                                        })).ConfigureAwait(false);
-                                            }
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.SplitEventProcessorSegment:
-                                            await ExecuteEventProcessorInstruction(
-                                                new EventProcessorName(received.Instruction.SplitEventProcessorSegment.ProcessorName),
-                                                received.Instruction,
-                                                connected.EventProcessors, 
-                                                connected.InstructionTasks,
-                                                handler => handler.SplitSegment(new SegmentId(received.Instruction.SplitEventProcessorSegment.SegmentIdentifier)), 
-                                                ct);
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.MergeEventProcessorSegment:
-                                            await ExecuteEventProcessorInstruction(
-                                                new EventProcessorName(received.Instruction.MergeEventProcessorSegment.ProcessorName),
-                                                received.Instruction,
-                                                connected.EventProcessors, 
-                                                connected.InstructionTasks,
-                                                handler => handler.MergeSegment(new SegmentId(received.Instruction.MergeEventProcessorSegment.SegmentIdentifier)), 
-                                                ct);
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.Heartbeat:
-                                            await HeartbeatMonitor.ReceiveServerHeartbeat().ConfigureAwait(false);
-                                            await _inbox.Writer.WriteAsync(new Protocol.SendPlatformInboundInstruction(
-                                                new PlatformInboundInstruction
-                                                {
-                                                    Heartbeat = new Heartbeat()
-                                                })).ConfigureAwait(false);
-                                            break;
-                                        case PlatformOutboundInstruction.RequestOneofCase.Ack:
-                                            //NOTE: This COULD be an ack for a heartbeat but is not required to be one.
-                                            await HeartbeatChannel.Receive(received.Instruction.Ack).ConfigureAwait(false);
-                                            break;
-                                    }
-
-                                    break;
-                            }
-
-                            break;
-                    }
-
-                    _logger.LogDebug("Completed {Message} with {State}", message.ToString(), CurrentState.ToString());
+                    await _actor.ScheduleAsync(open, TimeSpan.FromMilliseconds(500), ct);
                 }
+                else
+                {
+                    await _actor.TellAsync(
+                        () => Service.OpenStream(cancellationToken: ct),
+                        result => new Message.StreamOpened(result),
+                        ct);    
+                }
+                
+                break;
+            case (State.Reconnecting.StreamClosed closed, Message.StreamOpened opened):
+                switch (opened.Result)
+                {
+                    case TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>.Ok ok:
+                        await _actor.TellAsync(new Message.AnnounceClient(), ct);
+
+                        state = new State.Reconnecting.StreamOpened(ok.Value, closed.EventProcessors);
+                        
+                        break;
+                    case TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>.Error error:
+                        var due = ScheduleDue.FromException(error.Exception);
+                        
+                        _logger.LogError(error.Exception, "Failed to open stream. Retrying in {Due}ms", due.TotalMilliseconds);
+                        
+                        await _actor.ScheduleAsync(new Message.OpenStream(), due, ct);
+                        
+                        break;
+                }
+
+                break;
+            case (State.Reconnecting.StreamOpened opened, Message.AnnounceClient):
+                opened.Call.RequestStream.WriteAsync(new PlatformInboundInstruction
+                {
+                    Register = _connection.ClientIdentity.ToClientIdentification()
+                }).TellToAsync(
+                    _actor,
+                    result => new Message.ClientAnnounced(result),
+                    ct);
+
+                break;
+            case (State.Reconnecting.StreamOpened opened, Message.ClientAnnounced announced):
+                switch (announced.Result)
+                {
+                    case TaskResult.Ok:
+                        await _actor.TellAsync(new Message[]
+                        {
+                            new Message.ResumeHeartbeats(), 
+                            new Message.ResumeEventProcessors()
+                        }, ct);
+                        
+                        var consumerTokenSource = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        var consumer = opened.Call
+                            .ResponseStream
+                            .TellToAsync(
+                                _actor,
+                                result => new Message.ReceivePlatformOutboundInstruction(result),
+                                _logger,
+                                consumerTokenSource.Token);
+
+                        await _actor.TellAsync(new Message.OnConnected(), ct);
+                        
+                        state = new State.Connected(
+                            opened.Call, 
+                            consumer, 
+                            consumerTokenSource, 
+                            new Dictionary<InstructionId, TaskCompletionSource>(), 
+                            opened.EventProcessors);
+                        
+                        break;
+                    case TaskResult.Error error:
+                        var due = ScheduleDue.FromException(error.Exception);
+                        
+                        _logger.LogError(error.Exception, "Failed to announce client. Retrying in {Due}ms", due.TotalMilliseconds);
+                        
+                        try
+                        {
+                            opened.Call.Dispose();
+                        }
+                        catch (Exception exception)
+                        {
+                            _logger.LogError(exception, "Failed to clean up platform instructions streaming call resources");
+                        }
+
+                        await _actor.ScheduleAsync(new Message.OpenStream(), due, ct);
+
+                        state = new State.Reconnecting.StreamClosed(opened.EventProcessors);
+                        break;
+                }
+                break;
+            case (State.Connecting.StreamClosed, Message.OpenStream open):
+                if (_connection.ConnectivityState != ConnectivityState.Ready)
+                {
+                    await _actor.ScheduleAsync(open, TimeSpan.FromMilliseconds(500), ct);
+                }
+                else
+                {
+                    await _actor.TellAsync(
+                        () => Service.OpenStream(cancellationToken: ct),
+                        result => new Message.StreamOpened(result),
+                        ct);
+                }
+
+                break;
+            case (State.Connecting.StreamClosed closed, Message.StreamOpened opened):
+                switch (opened.Result)
+                {
+                    case TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>.Ok ok:
+                        await _actor.TellAsync(new Message.AnnounceClient(), ct);
+
+                        state = new State.Connecting.StreamOpened(ok.Value, closed.EventProcessors);
+                        
+                        break;
+                    case TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>.Error error:
+                        var due = ScheduleDue.FromException(error.Exception);
+                        
+                        _logger.LogError(error.Exception, "Failed to open stream. Retrying in {Due}ms", due.TotalMilliseconds);
+                        
+                        await _actor.ScheduleAsync(new Message.OpenStream(), due, ct);
+                        
+                        break;
+                }
+
+                break;
+            case (State.Connecting.StreamOpened opened, Message.AnnounceClient):
+                opened.Call.RequestStream.WriteAsync(new PlatformInboundInstruction
+                {
+                    Register = _connection.ClientIdentity.ToClientIdentification()
+                }).TellToAsync(
+                    _actor,
+                    result => new Message.ClientAnnounced(result),
+                    ct);
+
+                break;
+            case (State.Connecting.StreamOpened opened, Message.ClientAnnounced announced):
+                switch (announced.Result)
+                {
+                    case TaskResult.Ok:
+                        await _actor.TellAsync(new Message[]
+                        {
+                            new Message.ResumeHeartbeats(), 
+                            new Message.ResumeEventProcessors()
+                        }, ct);
+                        
+                        var consumerTokenSource = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        var consumer = opened.Call
+                            .ResponseStream
+                            .TellToAsync(
+                                _actor,
+                                result => new Message.ReceivePlatformOutboundInstruction(result),
+                                _logger,
+                                consumerTokenSource.Token);
+                        
+                        await _actor.TellAsync(new Message.OnConnected(), ct);
+
+                        state = new State.Connected(
+                            opened.Call, 
+                            consumer, 
+                            consumerTokenSource,
+                            new Dictionary<InstructionId, TaskCompletionSource>(),
+                            opened.EventProcessors);
+                        
+                        break;
+                    case TaskResult.Error error:
+                        var due = ScheduleDue.FromException(error.Exception);
+                        
+                        _logger.LogError(error.Exception, "Failed to announce client. Retrying in {Due}ms", due.TotalMilliseconds);
+                        
+                        try
+                        {
+                            opened.Call.Dispose();
+                        }
+                        catch (Exception exception)
+                        {
+                            _logger.LogError(exception, "Failed to clean up platform instructions streaming call resources");
+                        }
+
+                        await _actor.ScheduleAsync(new Message.OpenStream(), due, ct);
+
+                        state = new State.Connecting.StreamClosed(opened.EventProcessors);
+                        break;
+                }
+                break;
+            case (State.Connected connected, Message.Disconnect):
+                try
+                {
+                    connected.Call.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to clean up platform instructions streaming call resources");
+                }
+
+                state = new State.Disconnected(connected.EventProcessors);
+                    
+                break;
+            case (State.Connecting.StreamOpened opened, Message.Disconnect):
+                try
+                {
+                    opened.Call.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to clean up platform instructions streaming call resources");
+                }
+
+                state = new State.Disconnected(opened.EventProcessors);
+                    
+                break;
+            case (State.Reconnecting.StreamOpened opened, Message.Disconnect):
+                try
+                {
+                    opened.Call.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to clean up platform instructions streaming call resources");
+                }
+
+                state = new State.Disconnected(opened.EventProcessors);
+                    
+                break;
+            case (State.Connected, Message.ResumeHeartbeats):
+                await HeartbeatChannel.Resume().ConfigureAwait(false);
+                    
+                break;
+            case (State.Connected connected, Message.ResumeEventProcessors):
+                if (connected.EventProcessors.Count != 0)
+                {
+                    await _actor.TellAsync(new Message.SendAllEventProcessorInfo(), ct);
+                }
+
+                break;
+            case (State.Connected connected, Message.SendAllEventProcessorInfo):
+                var suppliers = connected.EventProcessors.GetAllEventProcessorInfoSuppliers();
+                if (suppliers.Count != 0)
+                {
+                    foreach (var (name, supplier) in suppliers)
+                    {
+                        supplier()
+                            .TellToAsync(
+                                _actor,
+                                result => new Message.GotEventProcessorInfo(name, InstructionId.New(), result),
+                                ct);
+                    }
+                    
+                    await _actor.ScheduleAsync(new Message.SendAllEventProcessorInfo(), _eventProcessorUpdateFrequency, ct);
+                }
+
+                break;
+            case (State.Connected, Message.GotEventProcessorInfo gotten):
+                switch (gotten.Result)
+                {
+                    case TaskResult<EventProcessorInfo?>.Ok ok:
+                        if (ok.Value != null)
+                        {
+                            await _actor.TellAsync(
+                                new Message.SendPlatformInboundInstruction(
+                                    new PlatformInboundInstruction
+                                    {
+                                        EventProcessorInfo = ok.Value 
+                                    })
+                                , ct);
+                        }
+                        else
+                        {
+                            _logger.LogWarning(
+                                "Not sending processor info {Name} for context '{Context}'",
+                                gotten.Name.ToString(),
+                                _connection.Context.ToString());
+                        }
+                        break;
+                    case TaskResult<EventProcessorInfo?>.Error error:
+                        _logger.LogError(
+                            error.Exception,
+                            "Not sending processor info {Name} for context '{Context}'",
+                            gotten.Name.ToString(),
+                            _connection.Context.ToString());
+                        break;
+                }
+                break;
+            case (State.Connected connected, Message.SendPlatformInboundInstruction send):
+                //NOTE: We do want to await here because the write on the request stream must complete before continuing.
+                await connected
+                    .Call
+                    .RequestStream
+                    .WriteAsync(send.Instruction)
+                    .TellToAsync(
+                        _actor,
+                        exception => new Message.SendPlatformInboundInstructionFaulted(send.Instruction, exception),
+                        ct);
+                break;
+            case (_, Message.SendPlatformInboundInstruction send):
+                _logger.LogWarning(
+                    "Unable to send instruction {Instruction}: no connection to AxonServer",
+                    send.Instruction);
+                break;
+
+            case (State.Connected, Message.SendPlatformInboundInstructionFaulted faulted):
+            {
+                var due = ScheduleDue.FromException(faulted.Exception);
+
+                _logger.LogError(
+                    faulted.Exception,
+                    "Unable to send instruction {Instruction}. Reconnecting in {Due}ms",
+                    faulted.Instruction,
+                    due.TotalMilliseconds);
+
+                await _actor.ScheduleAsync(new Message.Reconnect(), due, ct);
             }
+                break;
+            case (State.Connected connected, Message.SendAwaitablePlatformInboundInstruction send):
+                if (!string.IsNullOrEmpty(send.Instruction.InstructionId))
+                {
+                    connected.AwaitedInstructions.Add(new InstructionId(send.Instruction.InstructionId), send.Completion);
+                }
+                try
+                {
+                    await connected.Call.RequestStream.WriteAsync(send.Instruction).ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(send.Instruction.InstructionId))
+                    {
+                        send.Completion.SetResult();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(
+                        exception,
+                        "Unable to send instruction {Instruction}",
+                        send.Instruction);
+                    
+                    send.Completion.SetException(
+                        new AxonServerException(
+                            _connection.ClientIdentity,
+                            ErrorCategory.InstructionAckError,
+                            "Unable to send instruction: AxonServer unavailable"));
+                }
+                break;
+            case (_, Message.SendAwaitablePlatformInboundInstruction send):
+                send.Completion.SetException(
+                    new AxonServerException(
+                        _connection.ClientIdentity,
+                        ErrorCategory.InstructionAckError,
+                        "Unable to send instruction: no connection to AxonServer"));
+                break;
+            case (State.Connected connected, Message.ReceivePlatformOutboundInstruction received):
+                switch (received.Result)
+                {
+                    case TaskResult<PlatformOutboundInstruction>.Ok ok:
+                        switch (ok.Value.RequestCase)
+                        {
+                            // case PlatformOutboundInstruction.RequestOneofCase.None:
+                            //     break;
+                            // case PlatformOutboundInstruction.RequestOneofCase.NodeNotification:
+                            //     break;
+                            case PlatformOutboundInstruction.RequestOneofCase.RequestReconnect:
+                                _logger.LogInformation("AxonServer requested reconnect for context '{Context}'", _connection.Context);
+                                await _connection.ReconnectAsync().ConfigureAwait(false);
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.PauseEventProcessor:
+                                await ExecuteEventProcessorInstruction(
+                                    new EventProcessorName(ok.Value.PauseEventProcessor.ProcessorName),
+                                    async handler =>
+                                    {
+                                        await handler.Pause();
+                                        return true;
+                                    },
+                                    new InstructionId(ok.Value.InstructionId),
+                                    connected.EventProcessors,
+                                    ct
+                                );
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.StartEventProcessor:
+                                await ExecuteEventProcessorInstruction(
+                                    new EventProcessorName(ok.Value.StartEventProcessor.ProcessorName),
+                                    async handler =>
+                                    {
+                                        await handler.Start();
+                                        return true;
+                                    },
+                                    new InstructionId(ok.Value.InstructionId),
+                                    connected.EventProcessors,
+                                    ct
+                                );
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.ReleaseSegment:
+                                await ExecuteEventProcessorInstruction(
+                                    new EventProcessorName(ok.Value.ReleaseSegment.ProcessorName),
+                                    handler => handler.ReleaseSegment(new SegmentId(ok.Value.ReleaseSegment.SegmentIdentifier)),
+                                    new InstructionId(ok.Value.InstructionId),
+                                    connected.EventProcessors,
+                                    ct
+                                );
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.RequestEventProcessorInfo:
+                                var name = new EventProcessorName(ok.Value.RequestEventProcessorInfo.ProcessorName);
+                                if (connected.EventProcessors.TryGetEventProcessorInfoSupplier(name, out var supplier))
+                                {
+                                    supplier?
+                                        .Invoke()
+                                        .TellToAsync(
+                                            _actor,
+                                            result => new Message.GotEventProcessorInfo(
+                                                name,
+                                                new InstructionId(ok.Value.InstructionId),
+                                                result),
+                                            ct
+                                        );
+                                }
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.SplitEventProcessorSegment:
+                                await ExecuteEventProcessorInstruction(
+                                    new EventProcessorName(ok.Value.SplitEventProcessorSegment.ProcessorName),
+                                    handler => handler.SplitSegment(new SegmentId(ok.Value.SplitEventProcessorSegment.SegmentIdentifier)),
+                                    new InstructionId(ok.Value.InstructionId),
+                                    connected.EventProcessors,
+                                    ct
+                                );
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.MergeEventProcessorSegment:
+                                await ExecuteEventProcessorInstruction(
+                                    new EventProcessorName(ok.Value.MergeEventProcessorSegment.ProcessorName),
+                                    handler => handler.MergeSegment(new SegmentId(ok.Value.MergeEventProcessorSegment.SegmentIdentifier)),
+                                    new InstructionId(ok.Value.InstructionId),
+                                    connected.EventProcessors,
+                                    ct
+                                );
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.Heartbeat:
+                                await HeartbeatChannel.ReceiveServerHeartbeat().ConfigureAwait((false));
+                                await _actor.TellAsync(new Message.SendPlatformInboundInstruction(
+                                    new PlatformInboundInstruction
+                                    {
+                                        Heartbeat = new Heartbeat()
+                                    }), ct).ConfigureAwait(false);
+                                break;
+                            case PlatformOutboundInstruction.RequestOneofCase.Ack:
+                                if (!string.IsNullOrEmpty(ok.Value.Ack.InstructionId))
+                                {
+                                    var instruction = new InstructionId(ok.Value.Ack.InstructionId);
+                                    if (connected.AwaitedInstructions.TryGetValue(instruction, out var completion))
+                                    {
+                                        connected.AwaitedInstructions.Remove(instruction);
+                                        if (ok.Value.Ack.Success)
+                                        {
+                                            completion.SetResult();
+                                        }
+                                        else
+                                        {
+                                            completion.SetException(
+                                                AxonServerException.FromErrorMessage(
+                                                    _connection.ClientIdentity,
+                                                    ok.Value.Ack.Error));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        await HeartbeatChannel
+                                            .ReceiveClientHeartbeatAcknowledgement(ok.Value.Ack)
+                                            .ConfigureAwait(false);
+                                    }
+                                }
+                                
+                                break;
+                        }
+                        break;
+                    case TaskResult<PlatformOutboundInstruction>.Error error:
+                        if (error.Exception is RpcException rpcException)
+                        {
+                            if (rpcException.StatusCode == StatusCode.Unavailable &&
+                                _connection.ConnectivityState == ConnectivityState.Ready)
+                            {
+                                _logger.LogInformation("Upstream unavailable. Forcing new connection");
+                                await _connection.ReconnectAsync().ConfigureAwait(false);
+                            }
+                        }
+                        
+                        foreach (var completion in connected.AwaitedInstructions.Values)
+                        {
+                            completion.SetException(error.Exception);
+                        }
+                        connected.AwaitedInstructions.Clear();
+                        
+                        var due = ScheduleDue.FromException(error.Exception);
+                        
+                        _logger.LogError(error.Exception, "Failed to receive platform outbound instructions. Reconnecting in {Due}ms", due.TotalMilliseconds);
+
+                        await _actor.ScheduleAsync(new Message.Reconnect(), due, ct);
+                        
+                        break;
+                }
+                
+                break;
+            case (State.Connected connected, Message.RegisterEventProcessor register):
+                if (connected.EventProcessors.Count == 0)
+                {
+                    await _actor.ScheduleAsync(new Message.SendAllEventProcessorInfo(), _eventProcessorUpdateFrequency, ct);
+                }
+                
+                connected.EventProcessors.RegisterEventProcessor(register.Name, register.Supplier, register.Handler);
+
+                register.Completion.SetResult();
+                
+                register
+                    .Supplier()
+                    .TellToAsync(
+                        _actor,
+                        result => new Message.GotEventProcessorInfo(register.Name, InstructionId.New(),  result),
+                        ct);
+                
+                break;
+            case (_, Message.RegisterEventProcessor register):
+                state.EventProcessors.RegisterEventProcessor(register.Name, register.Supplier, register.Handler);
+
+                register.Completion.SetResult();
+                break;
+            case (_, Message.UnregisterEventProcessor unregister):
+                state.EventProcessors.UnregisterEventProcessor(unregister.Name, unregister.Supplier, unregister.Handler);
+
+                unregister.Completion.SetResult();
+                break;
+            case (State.Connected connected, Message.Reconnect):
+                try
+                {
+                    connected.ConsumePlatformOutboundInstructionsCancellationTokenSource.Cancel();
+                    await connected.ConsumePlatformOutboundInstructions.ConfigureAwait(false);
+                    connected.Call.Dispose();
+                    connected.ConsumePlatformOutboundInstructionsCancellationTokenSource.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to clean up call resources");
+                }
+                
+                await _actor.TellAsync(new Message[]
+                {
+                    new Message.PauseHeartbeats(),
+                    new Message.OpenStream()
+                }, ct);
+                
+                state = new State.Reconnecting.StreamClosed(connected.EventProcessors);
+
+                break;
+            case (State.Connected, Message.OnConnected):
+                await _connection.CheckReadinessAsync();
+                break;
         }
-        catch (RpcException exception) when (exception.Status.StatusCode == StatusCode.Cancelled)
-        {
-            _logger.LogDebug(exception,
-                "Control channel message loop is exciting because an rpc call was cancelled");
-        }
-        catch (TaskCanceledException exception)
-        { 
-            _logger.LogDebug(exception,
-                "Control channel message loop is exciting because a task was cancelled");
-        }
-        catch (OperationCanceledException exception)
-        { 
-            _logger.LogDebug(exception,
-                "Control channel message loop is exciting because an operation was cancelled");
-        }
-        catch (Exception exception)
-        {
-            _logger.LogCritical(
-                exception,
-                "Control channel message pump is exciting because of an unexpected exception");
-        }
+
+        return state;
     }
 
     private async Task ExecuteEventProcessorInstruction(
         EventProcessorName name,
-        PlatformOutboundInstruction instruction, 
+        Func<IEventProcessorInstructionHandler, Task<bool>> execute, 
+        InstructionId requestId,
         EventProcessorCollection eventProcessors,
-        TaskRunCache instructionTasks,
-        Func<IEventProcessorInstructionHandler, Task<bool>> execute,
         CancellationToken ct)
     {
-        var handler = eventProcessors
-            .TryResolveEventProcessorInstructionHandler(name);
-        if (handler != null)
+        if (eventProcessors.TryGetEventProcessorInstructionHandler(name, out var handler) && handler != null)
         {
-            var token = instructionTasks.NextToken();
-            instructionTasks.Add(token,
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        var result = await execute(handler);
-                        if (instruction.InstructionId != null)
-                        {
-                            if (result)
-                            {
-                                await _inbox.Writer.WriteAsync(
-                                    new Protocol.SendPlatformOutboundInstructionResponse
-                                    (token,
-                                        new PlatformInboundInstruction
-                                        {
-                                            Result = new InstructionResult
-                                            {
-                                                InstructionId =
-                                                    instruction.InstructionId,
-                                                Success = true
-                                            }
-                                        })).ConfigureAwait(false);
-                            }
-                            else
-                            {
-                                await _inbox.Writer.WriteAsync(
-                                    new Protocol.SendPlatformOutboundInstructionResponse
-                                    (token,
-                                        new PlatformInboundInstruction
-                                        {
-                                            Result = new InstructionResult
-                                            {
-                                                InstructionId = instruction
-                                                    .InstructionId,
-                                                Success = false,
-                                                Error = new ErrorMessage
-                                                {
-                                                    ErrorCode = ErrorCategory
-                                                        .InstructionExecutionError
-                                                        .ToString(),
-                                                    Location = ClientIdentity
-                                                        .ClientInstanceId
-                                                        .ToString()
-                                                }
-                                            }
-                                        })).ConfigureAwait(false);
-                            }
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        await _inbox.Writer.WriteAsync(
-                            new Protocol.SendPlatformOutboundInstructionResponse
-                            (token,
-                                new PlatformInboundInstruction
-                                {
-                                    Result = new InstructionResult
-                                    {
-                                        InstructionId = instruction
-                                            .InstructionId,
-                                        Success = false,
-                                        Error = new ErrorMessage
-                                        {
-                                            ErrorCode = ErrorCategory
-                                                .InstructionExecutionError
-                                                .ToString(),
-                                            Location = ClientIdentity
-                                                .ClientInstanceId
-                                                .ToString(),
-                                            Message = exception.Message,
-                                            Details =
-                                            {
-                                                exception.ToString()
-                                            }
-                                        }
-                                    }
-                                })).ConfigureAwait(false);
-                    }
-                }, ct));
-        }
-        else
-        {
-            if (instruction.InstructionId != null)
-            {
-                await _inbox.Writer.WriteAsync(
-                    new Protocol.SendPlatformInboundInstruction(
+            execute(handler)
+                .TellToAsync(
+                    _actor,
+                    () => new Message.SendPlatformInboundInstruction(
                         new PlatformInboundInstruction
                         {
                             Result = new InstructionResult
                             {
-                                InstructionId = instruction.InstructionId,
+                                InstructionId = requestId.ToString(),
+                                Success = true
+                            }
+                        }),
+                    exception => new Message.SendPlatformInboundInstruction(
+                        new PlatformInboundInstruction
+                        {
+                            Result = new InstructionResult
+                            {
+                                InstructionId = requestId.ToString(),
                                 Success = false,
                                 Error = new ErrorMessage
                                 {
-                                    ErrorCode = ErrorCategory.InstructionExecutionError
+                                    ErrorCode = ErrorCategory
+                                        .InstructionExecutionError
                                         .ToString(),
-                                    Location =
-                                        ClientIdentity.ClientInstanceId.ToString(),
-                                    Message = "Unknown processor"
+                                    Location = _connection
+                                        .ClientIdentity
+                                        .ClientInstanceId
+                                        .ToString(),
+                                    Message = exception.Message,
+                                    Details =
+                                    {
+                                        exception.ToString()
+                                    }
                                 }
                             }
-
-                        })).ConfigureAwait(false);
-            }
+                        }),
+                    ct);
+        }
+        else
+        {
+            await _actor.TellAsync(new Message.SendPlatformInboundInstruction(
+                new PlatformInboundInstruction
+                {
+                    Result = new InstructionResult
+                    {
+                        InstructionId = requestId.ToString(),
+                        Success = false,
+                        Error = new ErrorMessage
+                        {
+                            ErrorCode = ErrorCategory
+                                .InstructionExecutionError
+                                .ToString(),
+                            Location = _connection
+                                .ClientIdentity
+                                .ClientInstanceId
+                                .ToString(),
+                            Message = "Unknown processor"
+                        }
+                    }
+                }), ct);
         }
     }
+#pragma warning restore CS4014
+#pragma warning restore CA2016
+
+    private abstract record Message
+    {
+        public record Connect : Message;
+        
+        public record Disconnect : Message;
+
+        public record OpenStream : Message;
+
+        public record StreamOpened(
+            TaskResult<AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction>>
+                Result) : Message;
+
+        public record AnnounceClient : Message;
+
+        public record ClientAnnounced(TaskResult Result) : Message;
+
+        public record ResumeHeartbeats : Message;
+
+        public record ResumeEventProcessors : Message;
+
+        public record ReceivePlatformOutboundInstruction(TaskResult<PlatformOutboundInstruction> Result) : Message;
+
+        public record RegisterEventProcessor(EventProcessorName Name, Func<Task<EventProcessorInfo?>> Supplier,
+            IEventProcessorInstructionHandler Handler, TaskCompletionSource Completion) : Message;
+
+        public record UnregisterEventProcessor(EventProcessorName Name, Func<Task<EventProcessorInfo?>> Supplier, IEventProcessorInstructionHandler Handler, TaskCompletionSource Completion) : Message;
+
+        public record GotEventProcessorInfo(EventProcessorName Name, InstructionId RequestId, TaskResult<EventProcessorInfo?> Result) : Message;
+
+        public record SendPlatformInboundInstruction(PlatformInboundInstruction Instruction) : Message;
+        
+        public record SendAwaitablePlatformInboundInstruction(PlatformInboundInstruction Instruction, TaskCompletionSource Completion) : Message;
+
+        public record SendPlatformInboundInstructionFaulted(PlatformInboundInstruction Instruction, Exception Exception) : Message;
+
+        public record SendAllEventProcessorInfo : Message;
+        
+        public record Reconnect : Message;
+
+        public record PauseHeartbeats : Message;
+
+        public record OnConnected : Message;
+    } 
     
-    private record Protocol
+    private abstract record State(EventProcessorCollection EventProcessors)
     {
-        public record Connect : Protocol;
-        
-        public record Disconnect : Protocol;
-        
-        public record Reconnect : Protocol;
+        public record Disconnected(EventProcessorCollection EventProcessors) : State(EventProcessors);
 
-        public record SendPlatformInboundInstruction
-            (PlatformInboundInstruction Instruction) : Protocol;
-        
-        public record SendEventProcessorInfo
-            (long Token, PlatformInboundInstruction Instruction) : Protocol;
-        
-        public record SendAllEventProcessorInfo() : Protocol;
-        
-        public record SendAwaitablePlatformInboundInstruction
-            (PlatformInboundInstruction Instruction, TaskCompletionSource CompletionSource) : Protocol;
-        
-        public record SendPlatformOutboundInstructionResponse
-            (long Token, PlatformInboundInstruction Instruction) : Protocol;
+        public abstract record Connecting(EventProcessorCollection EventProcessors) : State(EventProcessors)
+        {
+            public record StreamOpened(AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction> Call, EventProcessorCollection EventProcessors) : Connecting(EventProcessors);
+            public record StreamClosed(EventProcessorCollection EventProcessors) : Connecting(EventProcessors);
+        }
 
-        public record ReceivePlatformOutboundInstruction(PlatformOutboundInstruction Instruction) : Protocol;
-
-        public record RegisterEventProcessor(EventProcessorName Name, Func<Task<EventProcessorInfo>> InfoSupplier,
-            IEventProcessorInstructionHandler Handler, TaskCompletionSource CompletionSource) : Protocol;
-        public record UnregisterEventProcessor(EventProcessorName Name, Func<Task<EventProcessorInfo>> InfoSupplier,
-            IEventProcessorInstructionHandler Handler, TaskCompletionSource CompletionSource) : Protocol;
-    }
-
-    private record State(
-        AsyncDuplexStreamingCall<PlatformInboundInstruction,PlatformOutboundInstruction>? InstructionStream, 
-        EventProcessorCollection EventProcessors,
-        TaskRunCache InstructionTasks,
-        TaskRunCache EventProcessorInfoTasks)
-    {
-        public record Disconnected(EventProcessorCollection EventProcessors, TaskRunCache InstructionTasks, TaskRunCache EventProcessorInfoTasks) : 
-            State(null, EventProcessors, InstructionTasks, EventProcessorInfoTasks);
+        public abstract record Reconnecting(EventProcessorCollection EventProcessors) : State(EventProcessors)
+        {
+            public record StreamOpened(AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction> Call, EventProcessorCollection EventProcessors) : Reconnecting(EventProcessors);
+            public record StreamClosed(EventProcessorCollection EventProcessors) : Reconnecting(EventProcessors);
+        }
+        
         public record Connected(
-            AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction> InstructionStream,
-            Task ConsumeResponseStreamLoop,
-            EventProcessorCollection EventProcessors, 
-            TaskRunCache InstructionTasks,
-            TaskRunCache EventProcessorInfoTasks) :
-            State(InstructionStream, EventProcessors, InstructionTasks, EventProcessorInfoTasks);
-        
-        public record Paused(EventProcessorCollection EventProcessors, TaskRunCache InstructionTasks,TaskRunCache EventProcessorInfoTasks) : 
-            State(null, EventProcessors, InstructionTasks, EventProcessorInfoTasks);
+            AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction> Call,
+            Task ConsumePlatformOutboundInstructions,
+            CancellationTokenSource ConsumePlatformOutboundInstructionsCancellationTokenSource,
+            Dictionary<InstructionId, TaskCompletionSource> AwaitedInstructions,
+            EventProcessorCollection EventProcessors) : State(EventProcessors);
     }
+    
 
     internal async ValueTask Connect()
     {
-        await _inbox.Writer.WriteAsync(
-            new Protocol.Connect()
+        await _actor.TellAsync(
+            new Message.Connect()
         ).ConfigureAwait(false);
     }
 
     internal async ValueTask Reconnect()
     {
-        await _inbox.Writer.WriteAsync(
-            new Protocol.Reconnect()
+        await _actor.TellAsync(
+            new Message.Reconnect()
         ).ConfigureAwait(false);
     }
-    
+
     internal async ValueTask Disconnect()
     {
-        await _inbox.Writer.WriteAsync(
-            new Protocol.Disconnect()
+        await _actor.TellAsync(
+            new Message.Disconnect()
         ).ConfigureAwait(false);
     }
 
     public async Task<IEventProcessorRegistration> RegisterEventProcessor(
-        EventProcessorName name, 
-        Func<Task<EventProcessorInfo>> infoSupplier,
+        EventProcessorName name,
+        Func<Task<EventProcessorInfo?>> supplier,
         IEventProcessorInstructionHandler handler)
     {
-        if (infoSupplier == null) throw new ArgumentNullException(nameof(infoSupplier));
+        if (supplier == null) throw new ArgumentNullException(nameof(supplier));
         if (handler == null) throw new ArgumentNullException(nameof(handler));
-        var registerCompletionSource = new TaskCompletionSource();
-        await _inbox.Writer.WriteAsync(new Protocol.RegisterEventProcessor(
+        var registerCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _actor.TellAsync(new Message.RegisterEventProcessor(
             name,
-            infoSupplier,
+            supplier,
             handler,
-            registerCompletionSource)).ConfigureAwait(false);
+            registerCompletionSource), CancellationToken.None).ConfigureAwait(false);
         return new EventProcessorRegistration(registerCompletionSource.Task, async () =>
         {
-            var unsubscribeCompletionSource = new TaskCompletionSource();
-            await _inbox.Writer.WriteAsync(
-                new Protocol.UnregisterEventProcessor(name, infoSupplier, handler, unsubscribeCompletionSource)).ConfigureAwait(false);
+            var unsubscribeCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await _actor
+                .TellAsync(new Message.UnregisterEventProcessor(name, supplier, handler, unsubscribeCompletionSource))
+                .ConfigureAwait(false);
             await unsubscribeCompletionSource.Task.ConfigureAwait(false);
         });
     }
-    
-    public Task SendInstruction(PlatformInboundInstruction instruction)
+
+    public async Task SendInstruction(PlatformInboundInstruction instruction)
     {
         if (instruction == null) throw new ArgumentNullException(nameof(instruction));
-        if (string.IsNullOrEmpty(instruction.InstructionId))
+        if (!string.IsNullOrEmpty(instruction.InstructionId))
         {
-            return Task.CompletedTask;
+            var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await _actor.TellAsync(new Message.SendAwaitablePlatformInboundInstruction(instruction, completionSource));
+            await completionSource.Task;
         }
-        var completionSource = new TaskCompletionSource();
-        if (!_inbox.Writer.TryWrite(
-                new Protocol.SendAwaitablePlatformInboundInstruction(instruction, completionSource)))
-        {
-            throw new AxonServerException(
-                ClientIdentity,
-                ErrorCategory.Other,
-                "Unable to send instruction: client could not write to control channel inbox");
-        }
-        return completionSource.Task;
     }
 
     public Task EnableHeartbeat(TimeSpan interval, TimeSpan timeout)
     {
-        return HeartbeatMonitor.Enable(interval, timeout);
+        return HeartbeatChannel.Enable(interval, timeout);
     }
 
     public Task DisableHeartbeat()
     {
-        return HeartbeatMonitor.Disable();
-    }
-    
-    public event EventHandler? Connected;
-    
-    protected virtual void OnConnected()
-    {
-        Connected?.Invoke(this, EventArgs.Empty);
-    }
-    
-    public event EventHandler? Disconnected;
-    
-    protected virtual void OnDisconnected()
-    {
-        Disconnected?.Invoke(this, EventArgs.Empty);
+        return HeartbeatChannel.Disable();
     }
 
-    public event EventHandler? HeartbeatMissed;
-    
-    protected virtual void OnHeartbeatMissed()
-    {
-        HeartbeatMissed?.Invoke(this, EventArgs.Empty);
-    }
+    public bool IsConnected => _actor.State is State.Connected;
 
-    public bool IsConnected => CurrentState is State.Connected;
-    
     public async ValueTask DisposeAsync()
     {
-        _inboxCancellation.Cancel();
-        _inbox.Writer.Complete();
-        await _inbox.Reader.Completion.ConfigureAwait(false);
-        await _protocol.ConfigureAwait(false);
-        HeartbeatMonitor.HeartbeatMissed -= _onHeartbeatMissedHandler;
-        await HeartbeatMonitor.DisposeAsync().ConfigureAwait(false);
-        _inboxCancellation.Dispose();
-        _protocol.Dispose();
+        await HeartbeatChannel.DisposeAsync().ConfigureAwait(false);
+        await _actor.DisposeAsync().ConfigureAwait(false);
     }
 }

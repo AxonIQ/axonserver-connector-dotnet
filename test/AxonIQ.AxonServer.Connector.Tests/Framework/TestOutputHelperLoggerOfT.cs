@@ -14,7 +14,9 @@ public class TestOutputHelperLogger<T> : ILogger<T>
     
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        _output.WriteLine($"[{logLevel.ToString()}]:{typeof(T).FullName}:{formatter(state, exception)}");
+        _output.WriteLine(exception == null
+            ? $"[{logLevel.ToString()}]:{typeof(T).FullName}:{formatter(state, exception)}"
+            : $"[{logLevel.ToString()}]:{typeof(T).FullName}:{formatter(state, exception)}:{exception.ToString()}");
     }
 
     public bool IsEnabled(LogLevel logLevel)

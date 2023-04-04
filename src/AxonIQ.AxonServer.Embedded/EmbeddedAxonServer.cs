@@ -35,7 +35,13 @@ public class EmbeddedAxonServer : IAxonServer
     public async Task InitializeAsync()
     {
         _logger.LogDebug("Embedded Axon Server is being initialized");
-        
+        await StartAsync(null);
+        _logger.LogDebug("Embedded Axon Server got initialized");
+    }
+
+    internal async Task StartAsync(INetworkService? network)
+    {
+        _logger.LogDebug("Embedded Axon Server is being started");
         _serverFiles = new DirectoryInfo(
             Path.Combine(Path.GetTempPath(), shortid.ShortId.Generate(new GenerationOptions(useSpecialCharacters: false))));
         _serverFiles.Create();
@@ -61,10 +67,14 @@ public class EmbeddedAxonServer : IAxonServer
             builder.WithHostName(Properties.NodeSetup.Hostname);
         }
 
+        if (network != null)
+        {
+            builder.UseNetwork(network);
+        }
+
         _container = builder.Build().Start();
         
         _logger.LogDebug("Embedded Axon Server got started");
-        _logger.LogDebug("Embedded Axon Server got initialized");
     }
 
     public async Task WaitUntilAvailableAsync(TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default)
@@ -166,6 +176,23 @@ public class EmbeddedAxonServer : IAxonServer
         }.Uri;
         return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
     }
+    
+    public DnsEndPoint GetContainerGrpcEndpoint()
+    {
+        return new DnsEndPoint(
+            _container?.GetConfiguration(true).NetworkSettings.IPAddress ?? "localhost",
+            8124);
+    }
+
+    public GrpcChannel CreateContainerGrpcChannel(GrpcChannelOptions? options)
+    {
+        var address = new UriBuilder
+        {
+            Host = _container?.GetConfiguration(true).NetworkSettings.IPAddress ?? "localhost",
+            Port = 8124
+        }.Uri;
+        return options == null ? GrpcChannel.ForAddress(address) : GrpcChannel.ForAddress(address, options);
+    }
 
     public Task DisposeAsync()
     {
@@ -190,7 +217,7 @@ public class EmbeddedAxonServer : IAxonServer
         return Task.CompletedTask;
     }
 
-    public static IAxonServer WithAccessControlDisabled(ILogger<EmbeddedAxonServer> logger, bool emitServerLogs = false)
+    public static EmbeddedAxonServer WithAccessControlDisabled(ILogger<EmbeddedAxonServer> logger, bool emitServerLogs = false)
     {
         var suffix = AxonServerCounter.Next();
         var properties = new SystemProperties
@@ -223,7 +250,7 @@ public class EmbeddedAxonServer : IAxonServer
         };
     }
 
-    public static IAxonServer WithAccessControlEnabled(ILogger<EmbeddedAxonServer> logger, bool emitServerLogs = false)
+    public static EmbeddedAxonServer WithAccessControlEnabled(ILogger<EmbeddedAxonServer> logger, bool emitServerLogs = false)
     {
         var suffix = AxonServerCounter.Next();
         var properties = new SystemProperties

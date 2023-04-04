@@ -72,11 +72,11 @@ public class PingPongCommandBenchmark : IBenchmark
             .WithLoggerFactory(new NullLoggerFactory())
             .Build());
         
-        _ping = await _pingFactory.Connect(context);
-        await _ping.WaitUntilConnected();
+        _ping = await _pingFactory.ConnectAsync(context);
+        await _ping.WaitUntilConnectedAsync();
 
-        _pong = await _pongFactory.Connect(context);
-        await _pong.WaitUntilConnected();
+        _pong = await _pongFactory.ConnectAsync(context);
+        await _pong.WaitUntilConnectedAsync();
         
         _handler =
             await _pong.CommandChannel.RegisterCommandHandler(

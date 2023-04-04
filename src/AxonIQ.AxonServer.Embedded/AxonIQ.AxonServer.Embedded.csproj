@@ -8,9 +8,11 @@
 
     <ItemGroup>
         <PackageReference Include="Ductus.FluentDocker" Version="2.10.59" />
+        <PackageReference Include="RestSharp" Version="110.0.0" />
         <PackageReference Include="shortid" Version="4.0.0" />
         <PackageReference Include="System.Linq.Async" Version="6.0.1" />
-        <PackageReference Include="YamlDotNet" Version="12.3.1" />
+        <PackageReference Include="ToxiproxyNetCore" Version="1.0.23" />
+        <PackageReference Include="YamlDotNet" Version="13.0.2" />
     </ItemGroup>
 
     <ItemGroup>

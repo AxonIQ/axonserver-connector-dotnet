@@ -91,8 +91,8 @@ public class PingDotNetPongJavaCommandInteropBenchmark : IBenchmark
             .WithLoggerFactory(_loggerFactory)
             .Build());
         
-        _ping = await _pingFactory.Connect(context);
-        await _ping.WaitUntilConnected();
+        _ping = await _pingFactory.ConnectAsync(context);
+        await _ping.WaitUntilConnectedAsync();
     }
 
     public async Task TeardownAsync()

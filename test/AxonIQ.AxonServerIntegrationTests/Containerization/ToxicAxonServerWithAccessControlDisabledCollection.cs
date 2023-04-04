@@ -1,0 +1,8 @@
+using Xunit;
+
+namespace AxonIQ.AxonServerIntegrationTests.Containerization;
+
+[CollectionDefinition(nameof(ToxicAxonServerWithAccessControlDisabledCollection))]
+public class ToxicAxonServerWithAccessControlDisabledCollection : ICollectionFixture<ToxicAxonServerWithAccessControlDisabled>
+{
+}

@@ -15,7 +15,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
     private readonly ILogger<QueryChannel> _logger;
 
     private State _state;
-    private readonly Channel<Protocol> _channel;
+    private readonly Channel<Message> _channel;
     private readonly CancellationTokenSource _channelCancellation;
     private readonly Task _protocol;
 
@@ -46,7 +46,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
             new FlowController(permits, permitsBatch),
             new Dictionary<string, QueryTask>(),
             new Dictionary<SubscriptionIdentifier, ISubscriptionQueryRegistration?>());
-        _channel = Channel.CreateUnbounded<Protocol>(new UnboundedChannelOptions
+        _channel = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
         {
             SingleReader = true,
             SingleWriter = false
@@ -61,7 +61,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         {
             await foreach (var response in reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                await _channel.Writer.WriteAsync(new Protocol.ReceiveQueryProviderInbound(response), ct).ConfigureAwait(false);
+                await _channel.Writer.WriteAsync(new Message.ReceiveQueryProviderInbound(response), ct).ConfigureAwait(false);
             }
         }
         catch (ObjectDisposedException exception)
@@ -153,11 +153,11 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                     _logger.LogDebug("Began {Message} when {State}", message.ToString(), _state.ToString());
                     switch (message)
                     {
-                        case Protocol.Connect:
+                        case Message.Connect:
                             await EnsureConnected(ct).ConfigureAwait(false);
 
                             break;
-                        case Protocol.SubscribeQueryHandler subscribe:
+                        case Message.SubscribeQueryHandler subscribe:
                             await EnsureConnected(ct).ConfigureAwait(false);
                             switch (_state)
                             {
@@ -209,7 +209,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.UnsubscribeQueryHandler unsubscribe:
+                        case Message.UnsubscribeQueryHandler unsubscribe:
                             switch (_state)
                             {
                                 case State.Connected connected:
@@ -285,7 +285,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.Reconnect:
+                        case Message.Reconnect:
                             switch (_state)
                             {
                                 case State.Disconnected:
@@ -293,7 +293,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.Disconnect:
+                        case Message.Disconnect:
                             switch (_state)
                             {
                                 case State.Disconnected:
@@ -301,7 +301,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.ReceiveQueryProviderInbound receive:
+                        case Message.ReceiveQueryProviderInbound receive:
                             switch (_state)
                             {
                                 case State.Connected connected:
@@ -338,7 +338,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                                         receive.Message.Query,
                                                                         instruction =>
                                                                             _channel.Writer.WriteAsync(
-                                                                                new Protocol.SendQueryProviderOutbound(
+                                                                                new Message.SendQueryProviderOutbound(
                                                                                     instruction),
                                                                                 ct)))));
                                                     }
@@ -383,7 +383,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                                         subscriptionIdentifier,
                                                                         instruction =>
                                                                             _channel.Writer.WriteAsync(
-                                                                                new Protocol.SendQueryProviderOutbound(
+                                                                                new Message.SendQueryProviderOutbound(
                                                                                     instruction),
                                                                                 ct))));
                                                         }
@@ -415,7 +415,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                             getInitialResult.QueryRequest,
                                                             instruction =>
                                                                 _channel.Writer.WriteAsync(
-                                                                    new Protocol.SendQueryProviderOutbound(
+                                                                    new Message.SendQueryProviderOutbound(
                                                                         instruction),
                                                                     ct));
                                                     
@@ -462,7 +462,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                             }
 
                             break;
-                        case Protocol.SendQueryProviderOutbound send:
+                        case Message.SendQueryProviderOutbound send:
                             switch (_state)
                             {
                                 case State.Connected connected:
@@ -508,28 +508,28 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
     public PermitCount PermitsBatch { get; }
     public QueryService.QueryServiceClient Service { get; }
     
-    private record Protocol
+    private record Message
     {
-        public record Connect : Protocol;
+        public record Connect : Message;
 
-        public record ReceiveQueryProviderInbound(QueryProviderInbound Message) : Protocol;
+        public record ReceiveQueryProviderInbound(QueryProviderInbound Message) : Message;
 
-        public record Reconnect : Protocol;
+        public record Reconnect : Message;
 
-        public record Disconnect : Protocol;
+        public record Disconnect : Message;
         
         public record SubscribeQueryHandler(
             RegistrationId QueryHandlerId,
             IQueryHandler Handler,
             RegisteredQuery[] SubscribedQueries,
-            CountdownCompletionSource CompletionSource) : Protocol;
+            CountdownCompletionSource CompletionSource) : Message;
         
         public record UnsubscribeQueryHandler(
             RegistrationId QueryHandlerId,
             RegisteredQuery[] SubscribedQueries,
-            CountdownCompletionSource CompletionSource) : Protocol;
+            CountdownCompletionSource CompletionSource) : Message;
 
-        public record SendQueryProviderOutbound(QueryProviderOutbound Instruction) : Protocol;
+        public record SendQueryProviderOutbound(QueryProviderOutbound Instruction) : Message;
     }
     
     private record RegisteredQuery(RegistrationId SubscriptionId, QueryDefinition Query);
@@ -555,7 +555,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
     
     public async ValueTask Reconnect()
     {
-        await _channel.Writer.WriteAsync(new Protocol.Reconnect()).ConfigureAwait(false);
+        await _channel.Writer.WriteAsync(new Message.Reconnect()).ConfigureAwait(false);
     }
     
     public async Task<IQueryHandlerRegistration> RegisterQueryHandler(IQueryHandler handler, params QueryDefinition[] queries)
@@ -569,7 +569,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         var registrationId = RegistrationId.New();
         var registeredQueries = queries.Select(query => new RegisteredQuery(RegistrationId.New(), query)).ToArray();
         var subscribeCompletionSource = new CountdownCompletionSource(queries.Length);
-        await _channel.Writer.WriteAsync(new Protocol.SubscribeQueryHandler(
+        await _channel.Writer.WriteAsync(new Message.SubscribeQueryHandler(
             registrationId, 
             handler,
             registeredQueries, 
@@ -578,7 +578,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         {
             var unsubscribeCompletionSource = new CountdownCompletionSource(queries.Length);
             await _channel.Writer.WriteAsync(
-                new Protocol.UnsubscribeQueryHandler(
+                new Message.UnsubscribeQueryHandler(
                     registrationId,
                     registeredQueries,
                     unsubscribeCompletionSource)).ConfigureAwait(false);

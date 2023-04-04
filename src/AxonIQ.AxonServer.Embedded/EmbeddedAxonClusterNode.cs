@@ -241,8 +241,9 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
             {
                 _logger.LogDebug(
                     exception,
-                    "[{ClusterId}]Embedded Axon Cluster actuator health does not contain have a 'status' or a 'components.raft.status' property with the value 'UP'",
-                    cluster);
+                    "[{ClusterId}]Embedded Axon Cluster actuator health does not contain have a 'status' of UP, or a 'components.raft.status' of 'UP', or a 'components.raft.details.({Contexts}).leader' with a value",
+                    cluster,
+                    string.Join("|", contexts.Select(context => context.ToString())));
                 await Task.Delay(delayBetweenAttempts ?? DefaultDelayBetweenAttempts);
             }
             catch (HttpRequestException exception)

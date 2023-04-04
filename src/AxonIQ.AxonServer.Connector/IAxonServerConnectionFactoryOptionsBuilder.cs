@@ -23,6 +23,7 @@ public interface IAxonServerConnectionFactoryOptionsBuilder
     IAxonServerConnectionFactoryOptionsBuilder WithInterceptors(params Interceptor[] interceptors);
     IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(PermitCount count);
     IAxonServerConnectionFactoryOptionsBuilder WithQueryPermits(PermitCount count);
+    IAxonServerConnectionFactoryOptionsBuilder WithReconnectOptions(ReconnectOptions options);
 
     AxonServerConnectionFactoryOptions Build();
 }
