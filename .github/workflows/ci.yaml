@@ -24,6 +24,7 @@ jobs:
         env:
           AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_BASE_REF: ${{ vars.GITHUB_BASE_REF }}
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:
