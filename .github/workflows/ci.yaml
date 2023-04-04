@@ -25,7 +25,7 @@ jobs:
           AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
       # run the CD build (on master only)
       - name: make cd
-        if: ${{ vars.GITHUB_REF_NAME == 'master' }}
+        if: ${{ env.GITHUB_REF_NAME == 'master' }}
         run: make cd
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
