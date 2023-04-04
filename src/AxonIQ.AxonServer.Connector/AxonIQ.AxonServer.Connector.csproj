@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <RootNamespace>AxonIQ.AxonServer.Connector</RootNamespace>
         <Authors>Yves Reynhout</Authors>
-        <Copyright>AxonIQ 2022</Copyright>
+        <Copyright>AxonIQ 2023</Copyright>
         <RepositoryUrl>https://github.com/AxonIQ/axonserver-connector-dotnet</RepositoryUrl>
         <Company>AxonIQ</Company>
         <Product>AxonServer</Product>
