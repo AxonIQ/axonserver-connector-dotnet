@@ -11,6 +11,7 @@
         <Company>AxonIQ</Company>
         <Product>AxonServer</Product>
         <IsPackable>true</IsPackable>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
 
     <PropertyGroup>
