@@ -1,15 +1,16 @@
 using AutoFixture;
-using AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
+using AxonIQ.AxonServer.Connector;
 using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
+using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc.Admin;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.IntegrationTests;
+namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 public class AxonServerAdminChannelIntegrationTests

@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
+namespace AxonIQ.AxonServerIntegrationTests.Containerization;
 
-public class AxonServerWithAccessControlEnabled : Embedded.AxonServer, IAsyncLifetime
+public class AxonServerWithAccessControlEnabled : AxonServer.Embedded.AxonServer, IAsyncLifetime
 {
     public AxonServerWithAccessControlEnabled(IMessageSink sink)
     {

@@ -1,10 +1,11 @@
 using AutoFixture;
-using AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
+using AxonIQ.AxonServer.Connector;
 using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Embedded;
+using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Xunit;
 
-namespace AxonIQ.AxonServer.Connector.IntegrationTests;
+namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 public class AxonServerConnectionFactoryIntegrationTests

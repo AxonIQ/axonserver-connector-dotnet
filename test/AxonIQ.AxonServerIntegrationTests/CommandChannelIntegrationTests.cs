@@ -1,9 +1,10 @@
 using System.Net;
 using AutoFixture;
-using AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
+using AxonIQ.AxonServer.Connector;
 using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
+using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Google.Protobuf;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Command;
@@ -11,7 +12,7 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.IntegrationTests;
+namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(ToxicAxonServerWithAccessControlDisabledCollection))]
 public class CommandChannelIntegrationTests

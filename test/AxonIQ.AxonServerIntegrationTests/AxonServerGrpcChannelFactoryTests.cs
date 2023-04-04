@@ -1,16 +1,17 @@
 using System.Net;
 using AutoFixture;
-using AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
+using AxonIQ.AxonServer.Connector;
 using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
+using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.IntegrationTests;
+namespace AxonIQ.AxonServerIntegrationTests;
 
 public class AxonServerGrpcChannelFactoryTests
 {

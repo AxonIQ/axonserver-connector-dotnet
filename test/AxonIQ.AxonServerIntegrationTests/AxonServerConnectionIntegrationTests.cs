@@ -1,14 +1,16 @@
+using System.Net;
 using AutoFixture;
-using AxonIQ.AxonServer.Connector.IntegrationTests.Containerization;
+using AxonIQ.AxonServer.Connector;
 using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
+using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace AxonIQ.AxonServer.Connector.IntegrationTests;
+namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 public class AxonServerConnectionIntegrationTests
@@ -54,7 +56,9 @@ public class AxonServerConnectionIntegrationTests
     [Fact]
     public async Task WhenDisposingWaitUntilConnectedAsyncReturnsExpectedResult()
     {
-        var sut = await CreateSystemUnderTest();
+        var sut = await CreateSystemUnderTest(
+            options => options.WithRoutingServers(
+                new DnsEndPoint("127.0.0.0", AxonServerConnectionFactoryDefaults.Port)));
         var wait = sut.WaitUntilConnectedAsync().ConfigureAwait(false);
         await sut.DisposeAsync().ConfigureAwait(false);
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
@@ -63,7 +67,9 @@ public class AxonServerConnectionIntegrationTests
     [Fact]
     public async Task WhenDisposingWaitUntilReadyAsyncReturnsExpectedResult()
     {
-        var sut = await CreateSystemUnderTest();
+        var sut = await CreateSystemUnderTest(
+            options => options.WithRoutingServers(
+                new DnsEndPoint("127.0.0.0", AxonServerConnectionFactoryDefaults.Port)));
         var wait = sut.WaitUntilReadyAsync().ConfigureAwait(false);
         await sut.DisposeAsync().ConfigureAwait(false);
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
