@@ -90,6 +90,7 @@ public class SchedulerTests
             source2.TrySetResult();
             return ValueTask.CompletedTask;
         }, TimeSpan.Zero);
+        
         Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
     }
 }
