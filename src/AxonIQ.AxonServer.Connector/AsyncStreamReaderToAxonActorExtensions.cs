@@ -75,6 +75,11 @@ internal static class AsyncStreamReaderToAxonActorExtensions
                     "The channel stream is no longer being read because an operation was cancelled");
             }
         }
+        catch (RpcException exception) when (exception is { StatusCode: StatusCode.Cancelled, InnerException: OperationCanceledException inner } && inner.CancellationToken == ct)
+        {
+            logger.LogDebug(exception,
+                "The channel stream is no longer being read because an operation was cancelled");
+        }
         catch (RpcException exception)
         {
             logger.LogWarning(
