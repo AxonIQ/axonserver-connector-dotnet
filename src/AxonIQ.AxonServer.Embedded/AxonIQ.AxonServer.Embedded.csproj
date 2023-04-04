@@ -4,13 +4,24 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <RootNamespace>AxonIQ.AxonServer.Embedded</RootNamespace>
+        <Authors>Yves Reynhout</Authors>
+        <Copyright>AxonIQ 2023</Copyright>
+        <RepositoryUrl>https://github.com/AxonIQ/axonserver-connector-dotnet</RepositoryUrl>
+        <Company>AxonIQ</Company>
+        <Product>AxonServer</Product>
+        <IsPackable>true</IsPackable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+        <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Ductus.FluentDocker" Version="2.10.59" />
-        <PackageReference Include="RestSharp" Version="110.0.0" />
+        <PackageReference Include="MinVer" Version="4.3.0" PrivateAssets="all" />
         <PackageReference Include="shortid" Version="4.0.0" />
-        <PackageReference Include="System.Linq.Async" Version="6.0.1" />
         <PackageReference Include="ToxiproxyNetCore" Version="1.0.23" />
         <PackageReference Include="YamlDotNet" Version="13.0.2" />
     </ItemGroup>
