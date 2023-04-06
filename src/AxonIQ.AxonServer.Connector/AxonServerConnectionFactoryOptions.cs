@@ -41,7 +41,7 @@ public class AxonServerConnectionFactoryOptions
         IReadOnlyList<DnsEndPoint> routingServers,
         IReadOnlyDictionary<string, string> clientTags,
         IAxonServerAuthentication authentication,
-        ILoggerFactory loggerFactory,
+        ILoggerFactory? loggerFactory,
         Func<DateTimeOffset>? clock,
         GrpcChannelOptions? grpcChannelOptions,
         IReadOnlyList<Interceptor> interceptors,
@@ -55,7 +55,7 @@ public class AxonServerConnectionFactoryOptions
         RoutingServers = routingServers;
         ClientTags = clientTags;
         Authentication = authentication;
-        LoggerFactory = loggerFactory;
+        LoggerFactory = loggerFactory ?? new NullLoggerFactory();
         Clock = clock ?? (() => DateTimeOffset.UtcNow);
         GrpcChannelOptions = grpcChannelOptions;
         Interceptors = interceptors;
@@ -65,18 +65,57 @@ public class AxonServerConnectionFactoryOptions
         ReconnectOptions = reconnectOptions;
     }
 
+    /// <summary>
+    /// The component name the factory identifies as to the server.
+    /// </summary>
     public ComponentName ComponentName { get; }
+    /// <summary>
+    /// The clients instance identifier the factory identifies as to the server.
+    /// </summary>
     public ClientInstanceId ClientInstanceId { get; }
+    /// <summary>
+    /// The addresses the factory uses to connect to the server. 
+    /// </summary>
     public IReadOnlyList<DnsEndPoint> RoutingServers { get; }
+    /// <summary>
+    /// The tags the factory announces to the server.
+    /// </summary>
     public IReadOnlyDictionary<string, string> ClientTags { get; }
+    /// <summary>
+    /// The authentication mechanism in use by the factory to authenticate to the server.
+    /// </summary>
     public IAxonServerAuthentication Authentication { get; }
+    /// <summary>
+    /// The logger factory used to create loggers from by the factory.
+    /// </summary>
     public ILoggerFactory LoggerFactory { get; }
+    /// <summary>
+    /// The clock used by the factory (mainly used for testing purposes).
+    /// </summary>
     public Func<DateTimeOffset> Clock { get; }
+    /// <summary>
+    /// The gRPC channel options used by the factory when calling the server.
+    /// </summary>
     public GrpcChannelOptions? GrpcChannelOptions { get; }
+    /// <summary>
+    /// The gRPC interceptors used by the factory when calling the server.
+    /// </summary>
     public IReadOnlyList<Interceptor> Interceptors { get; }
+    /// <summary>
+    /// The number of commands each connection is able to handle from the server (minimum is 16).
+    /// </summary>
     public PermitCount CommandPermits { get; }
+    /// <summary>
+    /// The number of queries each connection is able to handle from the server (minimum is 16).
+    /// </summary>
     public PermitCount QueryPermits { get; }
+    /// <summary>
+    /// The frequency at which updates about event processors is sent to the server.
+    /// </summary>
     public TimeSpan EventProcessorUpdateFrequency { get; }
+    /// <summary>
+    /// The options that control the connection timeout, reconnection interval and whether or not to force a platform reconnect.
+    /// </summary>
     public ReconnectOptions ReconnectOptions { get; }
 
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
@@ -88,7 +127,7 @@ public class AxonServerConnectionFactoryOptions
         private readonly List<DnsEndPoint> _routingServers;
         private readonly Dictionary<string, string> _clientTags;
         private IAxonServerAuthentication _authentication;
-        private ILoggerFactory _loggerFactory;
+        private ILoggerFactory? _loggerFactory;
         private Func<DateTimeOffset>? _clock;
         private GrpcChannelOptions? _grpcChannelOptions;
         private readonly List<Interceptor> _interceptors;
@@ -109,7 +148,7 @@ public class AxonServerConnectionFactoryOptions
             }
 
             _authentication = AxonServerAuthentication.None;
-            _loggerFactory = new NullLoggerFactory();
+            _loggerFactory = null;
             _clock = null;
             _grpcChannelOptions = null;
             _interceptors = new List<Interceptor>();
@@ -210,6 +249,13 @@ public class AxonServerConnectionFactoryOptions
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
             _loggerFactory = loggerFactory;
+            
+            return this;
+        }
+        
+        public IAxonServerConnectionFactoryOptionsBuilder WithoutLoggerFactory()
+        {
+            _loggerFactory = null;
             
             return this;
         }

@@ -9,10 +9,8 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddAxonServerConnectionFactory(this IServiceCollection services)
     {
-        var options = AxonServerConnectionFactoryOptions
-            .For(ComponentName.GenerateRandomName())
-            .Build();
-        services.AddSingleton(sp => new AxonServerConnectionFactory(options));
+        var builder = AxonServerConnectionFactoryOptions.For(ComponentName.GenerateRandomName());
+        AddAxonServerConnectionFactoryCore(services, builder);
         return services;
     }
 
@@ -21,10 +19,8 @@ public static class ServiceCollectionExtensions
     {
         if (configuration == null)
             throw new ArgumentNullException(nameof(configuration));
-        var options = AxonServerConnectionFactoryOptions
-            .FromConfiguration(configuration)
-            .Build();
-        services.AddSingleton(sp => new AxonServerConnectionFactory(options));
+        var builder = AxonServerConnectionFactoryOptions.FromConfiguration(configuration);
+        AddAxonServerConnectionFactoryCore(services, builder);
         return services;
     }
 
@@ -44,8 +40,18 @@ public static class ServiceCollectionExtensions
 
         var builder = AxonServerConnectionFactoryOptions.For(ComponentName.GenerateRandomName());
         configure(builder);
-        var options = builder.Build();
-        services.AddSingleton(sp => new AxonServerConnectionFactory(options));
+        AddAxonServerConnectionFactoryCore(services, builder);
         return services;
+    }
+
+    private static void AddAxonServerConnectionFactoryCore(
+        IServiceCollection services,
+        IAxonServerConnectionFactoryOptionsBuilder builder)
+    {
+        services.AddSingleton(sp =>
+            new AxonServerConnectionFactory(
+                builder
+                    .WithLoggerFactory(sp.GetService<ILoggerFactory>() ?? new NullLoggerFactory())
+                    .Build()));
     }
 }
