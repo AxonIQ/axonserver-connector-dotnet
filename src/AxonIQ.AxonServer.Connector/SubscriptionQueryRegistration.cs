@@ -13,7 +13,7 @@ public class SubscriptionQueryRegistration : ISubscriptionQueryRegistration
         _unsubscribe = unsubscribe ?? throw new ArgumentNullException(nameof(unsubscribe));
     }
 
-    public Task WaitUntilCompleted() => _subscribeCompletion;
+    public Task WaitUntilCompletedAsync() => _subscribeCompletion;
 
     public async ValueTask DisposeAsync()
     {

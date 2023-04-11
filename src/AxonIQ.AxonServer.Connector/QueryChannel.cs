@@ -333,7 +333,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                     {
                                                         connected.QueryTasks.Add(receive.Message.Query.MessageIdentifier,
                                                             new QueryTask(
-                                                                handler.Handle(receive.Message.Query,
+                                                                handler.HandleAsync(receive.Message.Query,
                                                                     new QueryResponseChannel(
                                                                         receive.Message.Query,
                                                                         instruction =>
@@ -426,7 +426,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
                                                         {
                                                             connected.QueryTasks.Add(
                                                                 getInitialResult.QueryRequest.MessageIdentifier,
-                                                                new QueryTask(handler.Handle(getInitialResult.QueryRequest, responseChannel))
+                                                                new QueryTask(handler.HandleAsync(getInitialResult.QueryRequest, responseChannel))
                                                             );
                                                         }
                                                     }
@@ -558,7 +558,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         await _channel.Writer.WriteAsync(new Message.Reconnect()).ConfigureAwait(false);
     }
     
-    public async Task<IQueryHandlerRegistration> RegisterQueryHandler(IQueryHandler handler, params QueryDefinition[] queries)
+    public async Task<IQueryHandlerRegistration> RegisterQueryHandlerAsync(IQueryHandler handler, params QueryDefinition[] queries)
     {
         if (handler == null) throw new ArgumentNullException(nameof(handler));
         if (queries == null) throw new ArgumentNullException(nameof(queries));
@@ -610,7 +610,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         }
     }
 
-    public async Task<IQuerySubscriptionResult> SubscriptionQuery(QueryRequest query, SerializedObject updateType, PermitCount bufferSize, PermitCount fetchSize, CancellationToken ct)
+    public async Task<IQuerySubscriptionResult> SubscriptionQueryAsync(QueryRequest query, SerializedObject updateType, PermitCount bufferSize, PermitCount fetchSize, CancellationToken ct)
     {
         if (query == null) throw new ArgumentNullException(nameof(query));
         if (updateType == null) throw new ArgumentNullException(nameof(updateType));

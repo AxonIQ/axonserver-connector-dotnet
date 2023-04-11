@@ -65,18 +65,11 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
             case (_, Message.PauseHeartbeats):
                 await HeartbeatChannel.Pause().ConfigureAwait(false);
                 break;
-            case (State.Reconnecting.StreamClosed, Message.OpenStream open):
-                if (_connection.ConnectivityState != ConnectivityState.Ready)
-                {
-                    await _actor.ScheduleAsync(open, TimeSpan.FromMilliseconds(500), ct);
-                }
-                else
-                {
-                    await _actor.TellAsync(
-                        () => Service.OpenStream(cancellationToken: ct),
-                        result => new Message.StreamOpened(result),
-                        ct);    
-                }
+            case (State.Reconnecting.StreamClosed, Message.OpenStream):
+                await _actor.TellAsync(
+                    () => Service.OpenStream(cancellationToken: ct),
+                    result => new Message.StreamOpened(result),
+                    ct);    
                 
                 break;
             case (State.Reconnecting.StreamClosed closed, Message.StreamOpened opened):
@@ -158,18 +151,11 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                         break;
                 }
                 break;
-            case (State.Connecting.StreamClosed, Message.OpenStream open):
-                if (_connection.ConnectivityState != ConnectivityState.Ready)
-                {
-                    await _actor.ScheduleAsync(open, TimeSpan.FromMilliseconds(500), ct);
-                }
-                else
-                {
-                    await _actor.TellAsync(
-                        () => Service.OpenStream(cancellationToken: ct),
-                        result => new Message.StreamOpened(result),
-                        ct);
-                }
+            case (State.Connecting.StreamClosed, Message.OpenStream):
+                await _actor.TellAsync(
+                    () => Service.OpenStream(cancellationToken: ct),
+                    result => new Message.StreamOpened(result),
+                    ct);
 
                 break;
             case (State.Connecting.StreamClosed closed, Message.StreamOpened opened):
@@ -380,13 +366,13 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
             }
                 break;
             case (State.Connected connected, Message.SendAwaitablePlatformInboundInstruction send):
-                if (!string.IsNullOrEmpty(send.Instruction.InstructionId))
-                {
-                    connected.AwaitedInstructions.Add(new InstructionId(send.Instruction.InstructionId), send.Completion);
-                }
                 try
                 {
                     await connected.Call.RequestStream.WriteAsync(send.Instruction).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(send.Instruction.InstructionId))
+                    {
+                        connected.AwaitedInstructions.Add(new InstructionId(send.Instruction.InstructionId), send.Completion);
+                    }
                     if (string.IsNullOrEmpty(send.Instruction.InstructionId))
                     {
                         send.Completion.SetResult();
@@ -432,7 +418,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                     new EventProcessorName(ok.Value.PauseEventProcessor.ProcessorName),
                                     async handler =>
                                     {
-                                        await handler.Pause();
+                                        await handler.PauseAsync();
                                         return true;
                                     },
                                     new InstructionId(ok.Value.InstructionId),
@@ -445,7 +431,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                     new EventProcessorName(ok.Value.StartEventProcessor.ProcessorName),
                                     async handler =>
                                     {
-                                        await handler.Start();
+                                        await handler.StartAsync();
                                         return true;
                                     },
                                     new InstructionId(ok.Value.InstructionId),
@@ -456,7 +442,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                             case PlatformOutboundInstruction.RequestOneofCase.ReleaseSegment:
                                 await ExecuteEventProcessorInstruction(
                                     new EventProcessorName(ok.Value.ReleaseSegment.ProcessorName),
-                                    handler => handler.ReleaseSegment(new SegmentId(ok.Value.ReleaseSegment.SegmentIdentifier)),
+                                    handler => handler.ReleaseSegmentAsync(new SegmentId(ok.Value.ReleaseSegment.SegmentIdentifier)),
                                     new InstructionId(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
@@ -481,7 +467,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                             case PlatformOutboundInstruction.RequestOneofCase.SplitEventProcessorSegment:
                                 await ExecuteEventProcessorInstruction(
                                     new EventProcessorName(ok.Value.SplitEventProcessorSegment.ProcessorName),
-                                    handler => handler.SplitSegment(new SegmentId(ok.Value.SplitEventProcessorSegment.SegmentIdentifier)),
+                                    handler => handler.SplitSegmentAsync(new SegmentId(ok.Value.SplitEventProcessorSegment.SegmentIdentifier)),
                                     new InstructionId(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
@@ -490,7 +476,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                             case PlatformOutboundInstruction.RequestOneofCase.MergeEventProcessorSegment:
                                 await ExecuteEventProcessorInstruction(
                                     new EventProcessorName(ok.Value.MergeEventProcessorSegment.ProcessorName),
-                                    handler => handler.MergeSegment(new SegmentId(ok.Value.MergeEventProcessorSegment.SegmentIdentifier)),
+                                    handler => handler.MergeSegmentAsync(new SegmentId(ok.Value.MergeEventProcessorSegment.SegmentIdentifier)),
                                     new InstructionId(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
@@ -535,14 +521,13 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                         }
                         break;
                     case TaskResult<PlatformOutboundInstruction>.Error error:
-                        if (error.Exception is RpcException rpcException)
+                        if (error.Exception is RpcException { StatusCode: StatusCode.Unavailable } or IOException)
                         {
-                            if (rpcException.StatusCode == StatusCode.Unavailable &&
-                                _connection.ConnectivityState == ConnectivityState.Ready)
-                            {
-                                _logger.LogInformation("Upstream unavailable. Forcing new connection");
-                                await _connection.ReconnectAsync().ConfigureAwait(false);
-                            }
+                            await _connection.ReconnectAsync().ConfigureAwait(false);    
+                        }
+                        else
+                        {
+                            _logger.LogCritical("{Exception} remains unhandled and did not cause a reconnect", error.Exception);
                         }
                         
                         foreach (var completion in connected.AwaitedInstructions.Values)
@@ -550,12 +535,26 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                             completion.SetException(error.Exception);
                         }
                         connected.AwaitedInstructions.Clear();
-                        
-                        var due = ScheduleDue.FromException(error.Exception);
-                        
-                        _logger.LogError(error.Exception, "Failed to receive platform outbound instructions. Reconnecting in {Due}ms", due.TotalMilliseconds);
 
-                        await _actor.ScheduleAsync(new Message.Reconnect(), due, ct);
+                        try
+                        {
+                            connected.ConsumePlatformOutboundInstructionsCancellationTokenSource.Cancel();
+                            await connected.ConsumePlatformOutboundInstructions.ConfigureAwait(false);
+                            connected.Call.Dispose();
+                            connected.ConsumePlatformOutboundInstructionsCancellationTokenSource.Dispose();
+                        }
+                        catch (Exception exception)
+                        {
+                            _logger.LogError(exception, "Failed to clean up call resources");
+                        }
+
+                        state = new State.Faulted(connected.EventProcessors);
+                        
+                        // var due = ScheduleDue.FromException(error.Exception);
+                        //
+                        // _logger.LogError(error.Exception, "Failed to receive platform outbound instructions. Reconnecting in {Due}ms", due.TotalMilliseconds);
+                        //
+                        // await _actor.ScheduleAsync(new Message.Reconnect(), due, ct);
                         
                         break;
                 }
@@ -583,11 +582,13 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                 state.EventProcessors.RegisterEventProcessor(register.Name, register.Supplier, register.Handler);
 
                 register.Completion.SetResult();
+                
                 break;
             case (_, Message.UnregisterEventProcessor unregister):
                 state.EventProcessors.UnregisterEventProcessor(unregister.Name, unregister.Supplier, unregister.Handler);
 
                 unregister.Completion.SetResult();
+                
                 break;
             case (State.Connected connected, Message.Reconnect):
                 try
@@ -613,6 +614,17 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                 break;
             case (State.Connected, Message.OnConnected):
                 await _connection.CheckReadinessAsync();
+                
+                break;
+            case (State.Faulted faulted, Message.Reconnect):
+                await _actor.TellAsync(new Message.OpenStream(), ct);
+                
+                state = new State.Reconnecting.StreamClosed(faulted.EventProcessors);
+                
+                break;
+            default:
+                _logger.LogWarning("Skipped {Message} in {State}", message, state);
+                
                 break;
         }
 
@@ -741,6 +753,8 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
     {
         public record Disconnected(EventProcessorCollection EventProcessors) : State(EventProcessors);
 
+        public record Faulted(EventProcessorCollection EventProcessors) : State(EventProcessors);
+
         public abstract record Connecting(EventProcessorCollection EventProcessors) : State(EventProcessors)
         {
             public record StreamOpened(AsyncDuplexStreamingCall<PlatformInboundInstruction, PlatformOutboundInstruction> Call, EventProcessorCollection EventProcessors) : Connecting(EventProcessors);
@@ -783,7 +797,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
         ).ConfigureAwait(false);
     }
 
-    public async Task<IEventProcessorRegistration> RegisterEventProcessor(
+    public async Task<IEventProcessorRegistration> RegisterEventProcessorAsync(
         EventProcessorName name,
         Func<Task<EventProcessorInfo?>> supplier,
         IEventProcessorInstructionHandler handler)
@@ -806,7 +820,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
         });
     }
 
-    public async Task SendInstruction(PlatformInboundInstruction instruction)
+    public async Task SendInstructionAsync(PlatformInboundInstruction instruction)
     {
         if (instruction == null) throw new ArgumentNullException(nameof(instruction));
         if (!string.IsNullOrEmpty(instruction.InstructionId))
@@ -817,12 +831,12 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
         }
     }
 
-    public Task EnableHeartbeat(TimeSpan interval, TimeSpan timeout)
+    public Task EnableHeartbeatAsync(TimeSpan interval, TimeSpan timeout)
     {
         return HeartbeatChannel.Enable(interval, timeout);
     }
 
-    public Task DisableHeartbeat()
+    public Task DisableHeartbeatAsync()
     {
         return HeartbeatChannel.Disable();
     }

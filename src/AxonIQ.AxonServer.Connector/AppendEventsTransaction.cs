@@ -34,7 +34,7 @@ public class AppendEventsTransaction : IAppendEventsTransaction
         return await _call.ResponseAsync.ConfigureAwait(false);
     }
 
-    public Task Rollback()
+    public Task RollbackAsync()
     {
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
         {

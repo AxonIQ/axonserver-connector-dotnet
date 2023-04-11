@@ -54,11 +54,11 @@ public class CommandChannelIntegrationTests
         var sut = connection.CommandChannel;
 
         var commandName = _fixture.Create<CommandName>();
-        var registration = await sut.RegisterCommandHandler(
+        var registration = await sut.RegisterCommandHandlerAsync(
             (_, _) => Task.FromResult(new CommandResponse()),
             new LoadFactor(10), commandName);
 
-        await Assert.ThrowsAsync<AxonServerException>(() => registration.WaitUntilCompleted());
+        await Assert.ThrowsAsync<AxonServerException>(() => registration.WaitUntilCompletedAsync());
     }
  
     [Fact]
@@ -72,7 +72,7 @@ public class CommandChannelIntegrationTests
         var requestId = InstructionId.New();
         var responseId = InstructionId.New();
         var commandName = _fixture.Create<CommandName>();
-        var registration = await sut.RegisterCommandHandler((command, ct) => Task.FromResult(new CommandResponse
+        var registration = await sut.RegisterCommandHandlerAsync((command, ct) => Task.FromResult(new CommandResponse
         {
             MessageIdentifier = responseId.ToString(),
             Payload = new SerializedObject
@@ -84,9 +84,9 @@ public class CommandChannelIntegrationTests
             
         }), new LoadFactor(1), commandName);
 
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
 
-        var result = await sut.SendCommand(new Command
+        var result = await sut.SendCommandAsync(new Command
         {
             Name = commandName.ToString(),
             MessageIdentifier = requestId.ToString()
@@ -107,7 +107,7 @@ public class CommandChannelIntegrationTests
         var requestId = InstructionId.New();
         var responseId = InstructionId.New();
         var commandName = _fixture.Create<CommandName>();
-        var registration = await sut.RegisterCommandHandler((command, ct) => Task.FromResult(new CommandResponse
+        var registration = await sut.RegisterCommandHandlerAsync((command, ct) => Task.FromResult(new CommandResponse
         {
             MessageIdentifier = responseId.ToString(),
             Payload = new SerializedObject
@@ -119,9 +119,9 @@ public class CommandChannelIntegrationTests
             
         }), new LoadFactor(1), commandName);
 
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
 
-        var result = await sut.SendCommand(new Command
+        var result = await sut.SendCommandAsync(new Command
         {
             Name = commandName.ToString(),
             MessageIdentifier = requestId.ToString()
@@ -132,7 +132,7 @@ public class CommandChannelIntegrationTests
 
         await registration.DisposeAsync();
         
-        var response = await sut.SendCommand(new Command
+        var response = await sut.SendCommandAsync(new Command
         {
             Name = commandName.ToString(),
             MessageIdentifier = requestId.ToString()
@@ -155,7 +155,7 @@ public class CommandChannelIntegrationTests
         var requestId = InstructionId.New();
         var responseId = InstructionId.New();
         var commandName = _fixture.Create<CommandName>();
-        var registration = await server.CommandChannel.RegisterCommandHandler((command, ct) => Task.FromResult(new CommandResponse
+        var registration = await server.CommandChannel.RegisterCommandHandlerAsync((command, ct) => Task.FromResult(new CommandResponse
         {
             MessageIdentifier = responseId.ToString(),
             Payload = new SerializedObject
@@ -167,7 +167,7 @@ public class CommandChannelIntegrationTests
             
         }), new LoadFactor(1), commandName);
 
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
 
         await _container.DisableGrpcProxyEndpointAsync();
 
@@ -177,7 +177,7 @@ public class CommandChannelIntegrationTests
         
         await Task.Delay(TimeSpan.FromSeconds(2));
 
-        var result = await client.CommandChannel.SendCommand(new Command
+        var result = await client.CommandChannel.SendCommandAsync(new Command
         {
             Name = commandName.ToString(),
             MessageIdentifier = requestId.ToString()

@@ -1,29 +1,41 @@
-@startuml ControlChannel Statemachine
+@startuml ControlChannel state machine
 [*] --> Disconnected
-Disconnected --> Connecting: Connect / OpenStream
-Connecting --> Connected: ClientAnnounced(Ok) / ResumeHeartbeats, ResumeEventProcessors
-Connected --> Connected: ResumeHeartbeats \n ResumeEventProcessors / [processor count <> 0] Schedule(SendAllEventProcessorInfo) \n ReceivePlatformOutboundInstruction(Error exception) / Reconnect \n ReceivePlatformOutboundInstruction(Ok instruction) \n RegisterEventProcessor / GotEventProcessorInfo, [processor count = 0] Schedule(SendAllEventProcessorInfo) \n UnregisterEventProcessor \n SendEventProcessorInfo / GotEventProcessorInfo \n GotEventProcessorInfo(Error exception) \n GotEventProcessorInfo(Ok info) / SendPlatformInboundInstruction \n SendPlatformInboundInstruction / PlatformInboundInstructionSent \n SendPlatformInboundInstructionFaulted(Error exception) / Reconnect \n PlatformInboundInstructionSent(Ok) \n SendAllEventProcessorInfo / [processor count <> 0] GotEventProcessorInfo, [processor count <> 0]  Schedule(SendAllEventProcessorInfo)
-Connected --> Reconnecting: Reconnect / PauseHeartbeats, OpenStream
-Disconnected --> Reconnecting: Reconnect / PauseHeartbeats, OpenStream
-Reconnecting --> Connected: ClientAnnounced(Ok) / ResumeHeartbeats, ResumeEventProcessors
-Connected --> Disconnected: Disconnect
-Connecting --> Disconnected: Disconnect
-Reconnecting --> Disconnected: Disconnect
 
 state Connecting {
-    [*] --> Connecting.StreamClosed
-    Connecting.StreamClosed --> Connecting.StreamClosed: OpenStream / StreamOpened \n StreamOpened(Error exception) / Schedule(OpenStream) \n StreamOpened(Ok stream) [stream null] / Schedule(OpenStream)
-    Connecting.StreamClosed --> Connecting.StreamOpened: StreamOpened(Ok stream) [stream not null] / AnnounceClient
-    Connecting.StreamOpened --> Connecting.StreamOpened: AnnounceClient / ClientAnnounced
-    Connecting.StreamOpened --> Connecting.StreamClosed: ClientAnnounced(Error exception) / Schedule(OpenStream) 
+    state Connecting.StreamClosed {
+    }
+    state Connecting.StreamOpened {
+    }     
 }
 
 state Reconnecting {
-    [*] --> Reconnecting.StreamClosed
-    Reconnecting.StreamClosed --> Reconnecting.StreamClosed: PauseHeartbeats \n OpenStream / StreamOpened \n StreamOpened(Error exception) / Schedule(OpenStream) \n StreamOpened(Ok stream) [stream null] / Schedule(OpenStream)
-    Reconnecting.StreamClosed --> Reconnecting.StreamOpened: StreamOpened(Ok stream) [stream not null] / AnnounceClient
-    Reconnecting.StreamOpened --> Reconnecting.StreamOpened: AnnounceClient / ClientAnnounced
-    Reconnecting.StreamOpened --> Reconnecting.StreamClosed: ClientAnnounced(Error exception) / Schedule(OpenStream) 
+    state Reconnecting.StreamClosed {
+    }
+    state Reconnecting.StreamOpened {
+    }     
 }
 
+Disconnected --> Connecting.StreamClosed: Connect / OpenStream
+
+Connected --> Connected: ResumeHeartbeats \n ResumeEventProcessors / [processor count <> 0] Schedule(SendAllEventProcessorInfo) \n ReceivePlatformOutboundInstruction(Ok instruction) \n RegisterEventProcessor / GotEventProcessorInfo, [processor count = 0] Schedule(SendAllEventProcessorInfo) \n UnregisterEventProcessor \n SendEventProcessorInfo / GotEventProcessorInfo \n GotEventProcessorInfo(Error exception) \n GotEventProcessorInfo(Ok info) / SendPlatformInboundInstruction \n SendPlatformInboundInstruction / PlatformInboundInstructionSent \n SendPlatformInboundInstructionFaulted(Error exception) / Reconnect \n PlatformInboundInstructionSent(Ok) \n SendAllEventProcessorInfo / [processor count <> 0] GotEventProcessorInfo, [processor count <> 0] Schedule(SendAllEventProcessorInfo)
+Connected --> Faulted: ReceivePlatformOutboundInstruction(Error exception) / PauseHeartbeats
+Faulted --> Reconnecting.StreamClosed: Reconnect / OpenStream
+Faulted --> Faulted: PauseHeartbeats
+
+Connecting.StreamClosed --> Connecting.StreamClosed: OpenStream / StreamOpened \n StreamOpened(Error exception) / Schedule(OpenStream) \n StreamOpened(Ok stream) [stream null] / Schedule(OpenStream)
+Connecting.StreamClosed --> Connecting.StreamOpened: StreamOpened(Ok stream) [stream not null] / AnnounceClient
+Connecting.StreamOpened --> Connecting.StreamOpened: AnnounceClient / ClientAnnounced
+Connecting.StreamOpened --> Connecting.StreamClosed: ClientAnnounced(Error exception) / Schedule(OpenStream)
+Connecting.StreamOpened --> Connected: ClientAnnounced(Ok) / ResumeHeartbeats, ResumeEventProcessors
+
+Reconnecting.StreamClosed --> Reconnecting.StreamClosed: PauseHeartbeats \n OpenStream / StreamOpened \n StreamOpened(Error exception) / Schedule(OpenStream) \n StreamOpened(Ok stream) [stream null] / Schedule(OpenStream)
+Reconnecting.StreamClosed --> Reconnecting.StreamOpened: StreamOpened(Ok stream) [stream not null] / AnnounceClient
+Reconnecting.StreamOpened --> Reconnecting.StreamOpened: AnnounceClient / ClientAnnounced
+Reconnecting.StreamOpened --> Reconnecting.StreamClosed: ClientAnnounced(Error exception) / Schedule(OpenStream)
+Reconnecting.StreamOpened --> Connected: ClientAnnounced(Ok) / ResumeHeartbeats, ResumeEventProcessors
+
+Connecting --> [*]: Close
+Reconnecting --> [*]: Close
+Connected --> [*]: Close
+Faulted --> [*]: Close
 @enduml

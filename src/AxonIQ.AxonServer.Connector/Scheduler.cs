@@ -165,12 +165,12 @@ public class Scheduler : IScheduler
         public record ScheduleTask(Func<ValueTask> Task, DateTimeOffset Due) : Message;
     }
 
-    public ValueTask ScheduleTask(Func<ValueTask> task, DateTimeOffset due)
+    public ValueTask ScheduleTaskAsync(Func<ValueTask> task, DateTimeOffset due)
     {
         return _inbox.Writer.WriteAsync(new Message.ScheduleTask(task, due));
     }
     
-    public ValueTask ScheduleTask(Func<ValueTask> task, TimeSpan due)
+    public ValueTask ScheduleTaskAsync(Func<ValueTask> task, TimeSpan due)
     {
         return _inbox.Writer.WriteAsync(new Message.ScheduleTask(task, _clock().Add(due)));
     }

@@ -158,6 +158,23 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
 
         return CompletedAsyncDisposable.Instance;
     }
+    
+    public async Task<IAsyncDisposable> TimeoutEndpointAsync(int? timeout = default)
+    {
+        if (_proxyConnection != null)
+        {
+            var proxy = await _proxyConnection.Client().FindProxyAsync("AxonServer");
+            var inputToxic = new TimeoutToxic();
+            if (timeout.HasValue)
+            {
+                inputToxic.Attributes.Timeout = timeout.Value;
+            }
+            var toxic = await proxy.AddAsync(inputToxic);
+            return new RemoveToxicOnDispose(proxy, toxic);
+        }
+        
+        return CompletedAsyncDisposable.Instance;
+    }
 
     public DnsEndPoint GetGrpcProxyEndpoint()
     {

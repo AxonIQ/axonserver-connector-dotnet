@@ -73,8 +73,8 @@ internal class AxonServerConnection : IAxonServerConnection
 
     internal Context Context => _context;
 
-    private GrpcChannel? Channel => _actor.State is State.Connected connected ? connected.Channel : null;
-    internal ConnectivityState ConnectivityState => Channel?.State ?? ConnectivityState.Shutdown;
+    //private GrpcChannel? Channel => _actor.State is State.Connected connected ? connected.Channel : null;
+    //internal ConnectivityState ConnectivityState => Channel?.State ?? ConnectivityState.Shutdown;
     internal CallInvoker CallInvoker => _callInvoker;
 
 #pragma warning disable CS4014
@@ -95,20 +95,19 @@ internal class AxonServerConnection : IAxonServerConnection
                 }
 
                 break;
+            case (State.Connecting, Message.Connect):
+                _factory.ChannelFactory
+                    .Create(_context)
+                    .TellToAsync(_actor,
+                        result => new Message.GrpcChannelEstablished(result),
+                        ct);
+                break;
             case (State.Connecting connecting, Message.GrpcChannelEstablished established):
                 switch (established.Result)
                 {
                     case TaskResult<GrpcChannel?>.Ok ok:
                         if (ok.Value != null)
                         {
-                            ok
-                                .Value
-                                .WaitForStateChangedAsync(ConnectivityState.Ready, ct)
-                                .TellToAsync(
-                                    _actor,
-                                    result => new Message.GrpcChannelStateChanged(result),
-                                    ct);
-                            
                             var callInvoker = ok.Value
                                 .CreateCallInvoker()
                                 .Intercept(_factory.Interceptors.ToArray())
@@ -118,10 +117,9 @@ internal class AxonServerConnection : IAxonServerConnection
                                     _context.WriteTo(metadata);
                                     return metadata;
                                 });
-                            
-                            
 
                             state = new State.Connected(ok.Value, callInvoker, connecting.WaitUntil);
+                            
                             await _actor.TellAsync(new Message[]
                             {
                                 new Message.ConnectControlChannel(),
@@ -150,55 +148,6 @@ internal class AxonServerConnection : IAxonServerConnection
                 }
 
                 break;
-            case (State.Connected connected, Message.GrpcChannelStateChanged changed):
-                switch (changed.Result)
-                {
-                    case TaskResult.Ok:
-                        if (connected.Channel.State != ConnectivityState.Ready)
-                        {
-                            try
-                            {
-                                await connected.Channel.ShutdownAsync();
-                                connected.Channel.Dispose();
-                            }
-                            catch (Exception exception)
-                            {
-                                _logger.LogCritical(exception, "Failed to shut down channel");
-                            }
-                            
-                            _factory
-                                .ChannelFactory
-                                .Create(_context)
-                                .TellToAsync(_actor,
-                                    result => new Message.GrpcChannelEstablished(result),
-                                    ct);
-                    
-                            state = new State.Connecting(0, connected.WaitUntil);
-                        }
-                        else
-                        {
-                            connected
-                                .Channel
-                                .WaitForStateChangedAsync(ConnectivityState.Ready, ct)
-                                .TellToAsync(
-                                    _actor,
-                                    result => new Message.GrpcChannelStateChanged(result),
-                                    ct);
-                        }
-                        break;
-                    case TaskResult.Error error:
-                        _logger.LogCritical(
-                            error.Exception,
-                            "Could not watch channel for context '{Context}' for state changes",
-                            _context);
-                        break;
-                }
-                
-                break;
-            case (State.Connected, Message.ConnectControlChannel):
-                await _controlChannel.Connect().ConfigureAwait(false);
-
-                break;
             case (State.Connected connected, Message.Reconnect reconnect):
                 try
                 {
@@ -220,20 +169,21 @@ internal class AxonServerConnection : IAxonServerConnection
                 state = new State.Reconnecting(reconnect.Attempt, connected.WaitUntil); 
                 
                 break;
+            case (State.Reconnecting, Message.Reconnect):
+                _factory
+                    .ChannelFactory
+                    .Create(_context)
+                    .TellToAsync(_actor,
+                        result => new Message.GrpcChannelEstablished(result),
+                        ct);
+
+                break;
             case (State.Reconnecting reconnecting, Message.GrpcChannelEstablished established):
                 switch (established.Result)
                 {
                     case TaskResult<GrpcChannel?>.Ok ok:
                         if (ok.Value != null)
                         {
-                            ok
-                                .Value
-                                .WaitForStateChangedAsync(ConnectivityState.Ready, ct)
-                                .TellToAsync(
-                                    _actor,
-                                    result => new Message.GrpcChannelStateChanged(result),
-                                    ct);
-                            
                             var callInvoker = ok.Value
                                 .CreateCallInvoker()
                                 .Intercept(_factory.Interceptors.ToArray())
@@ -271,6 +221,10 @@ internal class AxonServerConnection : IAxonServerConnection
                         
                         break;
                 }
+
+                break;
+            case (State.Connected, Message.ConnectControlChannel):
+                await _controlChannel.Connect().ConfigureAwait(false);
 
                 break;
             case (State.Connected, Message.ReconnectChannels):
@@ -315,6 +269,9 @@ internal class AxonServerConnection : IAxonServerConnection
             
             case (_, Message.OnConnected):
                 state.WaitUntil.OnConnected();
+                break;
+            default:
+                _logger.LogWarning("Skipped {Message} in {State}", message, state);
                 break;
         }
 
@@ -386,8 +343,6 @@ internal class AxonServerConnection : IAxonServerConnection
         public record ReconnectChannels : Message;
 
         public record GrpcChannelEstablished(TaskResult<GrpcChannel?> Result) : Message;
-
-        public record GrpcChannelStateChanged(TaskResult Result) : Message;
 
         public record WaitUntilConnected(TaskCompletionSource Completion) : Message;
         public record WaitUntilReady(TaskCompletionSource Completion) : Message;

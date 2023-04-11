@@ -19,7 +19,7 @@ public class SchedulerTests
         var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5), _logger);
 
         var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await sut.ScheduleTask(() =>
+        await sut.ScheduleTaskAsync(() =>
         {
             source.TrySetResult();
             return ValueTask.CompletedTask;
@@ -34,7 +34,7 @@ public class SchedulerTests
         var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
 
         var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await sut.ScheduleTask(() =>
+        await sut.ScheduleTaskAsync(() =>
         {
             source.TrySetResult();
             return ValueTask.CompletedTask;
@@ -51,7 +51,7 @@ public class SchedulerTests
         var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var source1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await sut.ScheduleTask(() =>
+        await sut.ScheduleTaskAsync(() =>
         {
             source1.TrySetResult();
             return ValueTask.FromCanceled(cancellation.Token);
@@ -60,7 +60,7 @@ public class SchedulerTests
         Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
         
         var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await sut.ScheduleTask(() =>
+        await sut.ScheduleTaskAsync(() =>
         {
             source2.TrySetResult();
             return ValueTask.CompletedTask;
@@ -76,7 +76,7 @@ public class SchedulerTests
         var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var source1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await sut.ScheduleTask(() =>
+        await sut.ScheduleTaskAsync(() =>
         {
             source1.TrySetResult();
             throw new Exception();
@@ -85,7 +85,7 @@ public class SchedulerTests
         Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
         
         var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await sut.ScheduleTask(() =>
+        await sut.ScheduleTaskAsync(() =>
         {
             source2.TrySetResult();
             return ValueTask.CompletedTask;

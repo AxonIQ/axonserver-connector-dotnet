@@ -55,7 +55,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.StartEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.StartEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
     
@@ -65,7 +65,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.PauseEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.PauseEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
     
@@ -75,7 +75,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.SplitEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.SplitEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
     
@@ -85,7 +85,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MergeEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MergeEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.Cancelled, exception.StatusCode); // REMARK: Why is the status code here cancelled?
     }
     
@@ -97,7 +97,7 @@ public class AxonServerAdminChannelIntegrationTests
         var name = _fixture.Create<EventProcessorName>();
         var segmentId = _fixture.Create<SegmentId>();
         var targetClient = _fixture.Create<ClientInstanceId>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MoveEventProcessorSegment(name, TokenStoreIdentifier.Empty, segmentId, targetClient));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MoveEventProcessorSegmentAsync(name, TokenStoreIdentifier.Empty, segmentId, targetClient));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode); // REMARK: Why is the status code here cancelled?
     }
     
@@ -122,12 +122,12 @@ public class AxonServerAdminChannelIntegrationTests
     
     // Users
 
-    [Fact(Skip = "Because the axon cluster is reused between invocations, the order tests run in is unpredictable, it's impossible to test this scenario")]
+    [Fact(Skip = "Because the axon server is reused between invocations, the order tests run in is unpredictable, it's impossible to test this scenario")]
     public async Task GetAllUsersWhenNoneReturnsExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Empty(actual);
     }
     
@@ -136,12 +136,12 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user1",
             Password = "p@ssw0rd"
         });
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Contains(actual, overview => overview.UserName == "user1");
     }
     
@@ -150,17 +150,17 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user2",
             Password = "p@ssw0rd1"
         });
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user2",
             Password = "p@ssw0rd2"
         });
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Contains(actual, overview => overview.UserName == "user2");
     }
     
@@ -169,17 +169,17 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user3",
             Password = "p@ssw0rd"
         });
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user4",
             Password = "p@ssw0rd"
         });
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Contains(actual, overview => overview.UserName == "user3");
         Assert.Contains(actual, overview => overview.UserName == "user4");
     }
@@ -189,7 +189,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.DeleteUser("non-existing-user");
+        await sut.DeleteUserAsync("non-existing-user");
     }
     
     [Fact]
@@ -197,13 +197,13 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user5",
             Password = "p@ssw0rd"
         });       
-        await sut.DeleteUser("user5");
-        var actual = await sut.GetAllUsers();
+        await sut.DeleteUserAsync("user5");
+        var actual = await sut.GetAllUsersAsync();
         Assert.DoesNotContain(actual, overview => overview.UserName == "user5");
     }
     
@@ -214,7 +214,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllApplications());
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllApplicationsAsync());
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -224,7 +224,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.CreateOrUpdateApplication(new ApplicationRequest
+            await sut.CreateOrUpdateApplicationAsync(new ApplicationRequest
             {
                 ApplicationName = "app1",
                 Description = ""
@@ -238,7 +238,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.GetApplication("app1"));
+            await sut.GetApplicationAsync("app1"));
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -248,7 +248,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.DeleteApplication("app1"));
+            await sut.DeleteApplicationAsync("app1"));
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -258,7 +258,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.RefreshToken("app1"));
+            await sut.RefreshTokenAsync("app1"));
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -269,7 +269,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllContexts());
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllContextsAsync());
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -279,7 +279,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<Context>().ToString();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.CreateContext(new CreateContextRequest
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.CreateContextAsync(new CreateContextRequest
         {
             Name = name
         }));
@@ -292,7 +292,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<Context>().ToString();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.UpdateContextProperties(new UpdateContextPropertiesRequest
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.UpdateContextPropertiesAsync(new UpdateContextPropertiesRequest
         {
             Name = name
         }));
@@ -305,7 +305,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<Context>().ToString();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.DeleteContext(new DeleteContextRequest
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.DeleteContextAsync(new DeleteContextRequest
         {
             Name = name
         }));
@@ -317,7 +317,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetContextOverview(Context.Default.ToString()));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetContextOverviewAsync(Context.Default.ToString()));
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -326,7 +326,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllContexts());
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllContextsAsync());
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -347,7 +347,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.CreateReplicationGroup(new CreateReplicationGroupRequest
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.CreateReplicationGroupAsync(new CreateReplicationGroupRequest
         {
             Name = "group1"
         }));
@@ -359,7 +359,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.DeleteReplicationGroup(new DeleteReplicationGroupRequest
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.DeleteReplicationGroupAsync(new DeleteReplicationGroupRequest
         {
             Name = "group1"
         }));
@@ -371,7 +371,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetReplicationGroup("group1"));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetReplicationGroupAsync("group1"));
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -380,7 +380,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllReplicationGroups());
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllReplicationGroupsAsync());
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -389,7 +389,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllNodes());
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllNodesAsync());
         Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     }
     
@@ -398,7 +398,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.AddNodeToReplicationGroup(new JoinReplicationGroup
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.AddNodeToReplicationGroupAsync(new JoinReplicationGroup
         {
             ReplicationGroupName = "group1",
             NodeName = "node1"
@@ -411,7 +411,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.RemoveNodeFromReplicationGroup(new LeaveReplicationGroup
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.RemoveNodeFromReplicationGroupAsync(new LeaveReplicationGroup
         {
             ReplicationGroupName = "group1",
             NodeName = "node1"

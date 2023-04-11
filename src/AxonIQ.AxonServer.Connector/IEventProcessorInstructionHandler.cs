@@ -2,9 +2,9 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface IEventProcessorInstructionHandler
 {
-    Task<bool> ReleaseSegment(SegmentId segment);
-    Task<bool> SplitSegment(SegmentId segment);
-    Task<bool> MergeSegment(SegmentId segment);
-    Task Pause();
-    Task Start();
+    Task<bool> ReleaseSegmentAsync(SegmentId segment);
+    Task<bool> SplitSegmentAsync(SegmentId segment);
+    Task<bool> MergeSegmentAsync(SegmentId segment);
+    Task PauseAsync();
+    Task StartAsync();
 }

@@ -38,7 +38,7 @@ public class AxonServerConnectionFactory : IAsyncDisposable
                 options.RoutingServers, 
                 options.LoggerFactory, 
                 options.Interceptors,
-                (options.GrpcChannelOptions?.Clone() ?? new GrpcChannelOptions()).ConfigureAxonOptions(),
+                options.GrpcChannelOptions ?? new GrpcChannelOptions(),
                 options.Clock,
                 options.ReconnectOptions.ConnectionTimeout);
 

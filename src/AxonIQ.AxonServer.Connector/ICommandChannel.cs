@@ -4,10 +4,10 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface ICommandChannel
 {
-    Task<ICommandHandlerRegistration> RegisterCommandHandler(
+    Task<ICommandHandlerRegistration> RegisterCommandHandlerAsync(
         Func<Command, CancellationToken, Task<CommandResponse>> handler,
         LoadFactor loadFactor,
         params CommandName[] commandNames);
 
-    Task<CommandResponse> SendCommand(Command command, CancellationToken ct);
+    Task<CommandResponse> SendCommandAsync(Command command, CancellationToken ct);
 }

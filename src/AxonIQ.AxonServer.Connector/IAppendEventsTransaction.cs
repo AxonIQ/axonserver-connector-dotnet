@@ -8,5 +8,5 @@ public interface IAppendEventsTransaction : IDisposable
 
     Task<Confirmation> CommitAsync();
 
-    Task Rollback();
+    Task RollbackAsync();
 }

@@ -4,5 +4,5 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface IEventStream : IAsyncEnumerable<EventWithToken>, IDisposable
 {
-    Task ExcludePayloadType(string payloadType, string? revision);
+    Task ExcludePayloadTypeAsync(string payloadType, string? revision);
 }

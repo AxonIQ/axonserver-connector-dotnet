@@ -47,7 +47,7 @@ public class ControlChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.ControlChannel;
-        var result = sut.SendInstruction(new PlatformInboundInstruction());
+        var result = sut.SendInstructionAsync(new PlatformInboundInstruction());
         Assert.True(result.IsCompleted);
     }
     

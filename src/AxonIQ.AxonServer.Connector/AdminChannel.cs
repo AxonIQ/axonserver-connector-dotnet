@@ -43,7 +43,7 @@ public class AdminChannel : IAdminChannel
         return result.ResponseStream.ReadAllAsync();
     }
 
-    public async Task<Result> PauseEventProcessor(EventProcessorName name, TokenStoreIdentifier identifier)
+    public async Task<Result> PauseEventProcessorAsync(EventProcessorName name, TokenStoreIdentifier identifier)
     {
         var result = await EventProcessorAdminService.PauseEventProcessorAsync(new EventProcessorIdentifier
         {
@@ -53,7 +53,7 @@ public class AdminChannel : IAdminChannel
         return result.Result;
     }
 
-    public async Task<Result> StartEventProcessor(EventProcessorName name, TokenStoreIdentifier identifier)
+    public async Task<Result> StartEventProcessorAsync(EventProcessorName name, TokenStoreIdentifier identifier)
     {
         var result = await EventProcessorAdminService.StartEventProcessorAsync(new EventProcessorIdentifier
         {
@@ -63,7 +63,7 @@ public class AdminChannel : IAdminChannel
         return result.Result;
     }
 
-    public async Task<Result> SplitEventProcessor(EventProcessorName name, TokenStoreIdentifier identifier)
+    public async Task<Result> SplitEventProcessorAsync(EventProcessorName name, TokenStoreIdentifier identifier)
     {
         var result = await EventProcessorAdminService.SplitEventProcessorAsync(new EventProcessorIdentifier
         {
@@ -73,7 +73,7 @@ public class AdminChannel : IAdminChannel
         return result.Result;
     }
 
-    public async Task<Result> MergeEventProcessor(EventProcessorName name, TokenStoreIdentifier identifier)
+    public async Task<Result> MergeEventProcessorAsync(EventProcessorName name, TokenStoreIdentifier identifier)
     {
         var result = await EventProcessorAdminService.MergeEventProcessorAsync(new EventProcessorIdentifier
         {
@@ -83,7 +83,7 @@ public class AdminChannel : IAdminChannel
         return result.Result;
     }
 
-    public async Task LoadBalanceEventProcessor(EventProcessorName name, TokenStoreIdentifier identifier, string strategy)
+    public async Task LoadBalanceEventProcessorAsync(EventProcessorName name, TokenStoreIdentifier identifier, string strategy)
     {
         using var result = EventProcessorAdminService.LoadBalanceProcessor(new LoadBalanceRequest
         {
@@ -97,7 +97,7 @@ public class AdminChannel : IAdminChannel
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task SetAutoLoadBalanceStrategy(EventProcessorName name, TokenStoreIdentifier identifier, string strategy)
+    public async Task SetAutoLoadBalanceStrategyAsync(EventProcessorName name, TokenStoreIdentifier identifier, string strategy)
     {
         using var result = EventProcessorAdminService.SetAutoLoadBalanceStrategy(new LoadBalanceRequest
         {
@@ -111,13 +111,13 @@ public class AdminChannel : IAdminChannel
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<LoadBalancingStrategy>> GetBalancingStrategies()
+    public async Task<IReadOnlyCollection<LoadBalancingStrategy>> GetBalancingStrategiesAsync()
     {
         using var result = EventProcessorAdminService.GetBalancingStrategies(new Empty());
         return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task<Result> MoveEventProcessorSegment(EventProcessorName name, TokenStoreIdentifier identifier, SegmentId segmentId,
+    public async Task<Result> MoveEventProcessorSegmentAsync(EventProcessorName name, TokenStoreIdentifier identifier, SegmentId segmentId,
         ClientInstanceId targetClient)
     {
         var result = await EventProcessorAdminService.MoveEventProcessorSegmentAsync(new MoveSegment
@@ -133,20 +133,20 @@ public class AdminChannel : IAdminChannel
         return result.Result;
     }
 
-    public async Task CreateOrUpdateUser(CreateOrUpdateUserRequest request)
+    public async Task CreateOrUpdateUserAsync(CreateOrUpdateUserRequest request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = UserAdminService.CreateOrUpdateUser(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<UserOverview>> GetAllUsers()
+    public async Task<IReadOnlyCollection<UserOverview>> GetAllUsersAsync()
     {
         using var result = UserAdminService.GetUsers(new Empty());
         return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task DeleteUser(string username)
+    public async Task DeleteUserAsync(string username)
     {
         using var result = UserAdminService.DeleteUser(new DeleteUserRequest
         {
@@ -155,13 +155,13 @@ public class AdminChannel : IAdminChannel
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task CreateOrUpdateApplication(ApplicationRequest request)
+    public async Task CreateOrUpdateApplicationAsync(ApplicationRequest request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         await ApplicationAdminService.CreateOrUpdateApplicationAsync(request).ConfigureAwait(false);
     }
 
-    public async Task<ApplicationOverview> GetApplication(string applicationName)
+    public async Task<ApplicationOverview> GetApplicationAsync(string applicationName)
     {
         if (applicationName == null) throw new ArgumentNullException(nameof(applicationName));
         return await ApplicationAdminService.GetApplicationAsync(new ApplicationId
@@ -170,19 +170,19 @@ public class AdminChannel : IAdminChannel
         }).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<ApplicationOverview>> GetAllApplications()
+    public async Task<IReadOnlyCollection<ApplicationOverview>> GetAllApplicationsAsync()
     {
         using var result = ApplicationAdminService.GetApplications(new Empty());
         return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task<Token> RefreshToken(string applicationName)
+    public async Task<Token> RefreshTokenAsync(string applicationName)
     {
         return await ApplicationAdminService.RefreshTokenAsync(new ApplicationId { ApplicationName = applicationName })
             .ConfigureAwait(false);
     }
 
-    public async Task DeleteApplication(string applicationName)
+    public async Task DeleteApplicationAsync(string applicationName)
     {
         if (applicationName == null) throw new ArgumentNullException(nameof(applicationName));
         using var result =
@@ -190,28 +190,28 @@ public class AdminChannel : IAdminChannel
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task CreateContext(CreateContextRequest request)
+    public async Task CreateContextAsync(CreateContextRequest request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ContextAdminService.CreateContext(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task UpdateContextProperties(UpdateContextPropertiesRequest request)
+    public async Task UpdateContextPropertiesAsync(UpdateContextPropertiesRequest request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ContextAdminService.UpdateContextProperties(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task DeleteContext(DeleteContextRequest request)
+    public async Task DeleteContextAsync(DeleteContextRequest request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ContextAdminService.DeleteContext(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task<ContextOverview> GetContextOverview(string context)
+    public async Task<ContextOverview> GetContextOverviewAsync(string context)
     {
         if (context == null) throw new ArgumentNullException(nameof(context));
         return await ContextAdminService.GetContextAsync(new GetContextRequest
@@ -220,7 +220,7 @@ public class AdminChannel : IAdminChannel
         }).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<ContextOverview>> GetAllContexts()
+    public async Task<IReadOnlyCollection<ContextOverview>> GetAllContextsAsync()
     {
         using var result = ContextAdminService.GetContexts(new Empty());
         return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
@@ -232,21 +232,21 @@ public class AdminChannel : IAdminChannel
         return result.ResponseStream.ReadAllAsync();
     }
 
-    public async Task CreateReplicationGroup(CreateReplicationGroupRequest request)
+    public async Task CreateReplicationGroupAsync(CreateReplicationGroupRequest request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ReplicationGroupAdminService.CreateReplicationGroup(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task DeleteReplicationGroup(DeleteReplicationGroupRequest request)
+    public async Task DeleteReplicationGroupAsync(DeleteReplicationGroupRequest request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ReplicationGroupAdminService.DeleteReplicationGroup(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task<ReplicationGroupOverview> GetReplicationGroup(string replicationGroup)
+    public async Task<ReplicationGroupOverview> GetReplicationGroupAsync(string replicationGroup)
     {
         if (replicationGroup == null) throw new ArgumentNullException(nameof(replicationGroup));
         return await ReplicationGroupAdminService.GetReplicationGroupAsync(new GetReplicationGroupRequest
@@ -255,26 +255,26 @@ public class AdminChannel : IAdminChannel
         }).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<ReplicationGroupOverview>> GetAllReplicationGroups()
+    public async Task<IReadOnlyCollection<ReplicationGroupOverview>> GetAllReplicationGroupsAsync()
     {
         var result = ReplicationGroupAdminService.GetReplicationGroups(new Empty());
         return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<NodeOverview>> GetAllNodes()
+    public async Task<IReadOnlyCollection<NodeOverview>> GetAllNodesAsync()
     {
         var result = ReplicationGroupAdminService.GetNodes(new Empty());
         return await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task AddNodeToReplicationGroup(JoinReplicationGroup request)
+    public async Task AddNodeToReplicationGroupAsync(JoinReplicationGroup request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ReplicationGroupAdminService.AddNodeToReplicationGroup(request);
         await result.ResponseStream.ReadAllAsync().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task RemoveNodeFromReplicationGroup(LeaveReplicationGroup request)
+    public async Task RemoveNodeFromReplicationGroupAsync(LeaveReplicationGroup request)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
         using var result = ReplicationGroupAdminService.RemoveNodeFromReplicationGroup(request);
