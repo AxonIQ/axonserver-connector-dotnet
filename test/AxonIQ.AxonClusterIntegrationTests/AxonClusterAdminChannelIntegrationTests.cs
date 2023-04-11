@@ -56,7 +56,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.StartEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.StartEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
     
@@ -66,7 +66,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.PauseEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.PauseEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
     
@@ -76,7 +76,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.SplitEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.SplitEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
     
@@ -86,7 +86,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<EventProcessorName>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MergeEventProcessor(name, TokenStoreIdentifier.Empty));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MergeEventProcessorAsync(name, TokenStoreIdentifier.Empty));
         Assert.Equal(StatusCode.Cancelled, exception.StatusCode); // REMARK: Why is the status code here cancelled?
     }
     
@@ -98,7 +98,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var name = _fixture.Create<EventProcessorName>();
         var segmentId = _fixture.Create<SegmentId>();
         var targetClient = _fixture.Create<ClientInstanceId>();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MoveEventProcessorSegment(name, TokenStoreIdentifier.Empty, segmentId, targetClient));
+        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.MoveEventProcessorSegmentAsync(name, TokenStoreIdentifier.Empty, segmentId, targetClient));
         Assert.Equal(StatusCode.NotFound, exception.StatusCode); // REMARK: Why is the status code here cancelled?
     }
     
@@ -128,7 +128,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Empty(actual);
     }
     
@@ -137,12 +137,12 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user1",
             Password = "p@ssw0rd"
         });
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Contains(actual, overview => overview.UserName == "user1");
     }
     
@@ -151,17 +151,17 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user2",
             Password = "p@ssw0rd1"
         });
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user2",
             Password = "p@ssw0rd2"
         });
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Contains(actual, overview => overview.UserName == "user2");
     }
     
@@ -170,17 +170,17 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user3",
             Password = "p@ssw0rd"
         });
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user4",
             Password = "p@ssw0rd"
         });
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.Contains(actual, overview => overview.UserName == "user3");
         Assert.Contains(actual, overview => overview.UserName == "user4");
     }
@@ -190,7 +190,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.DeleteUser("non-existing-user");
+        await sut.DeleteUserAsync("non-existing-user");
     }
     
     [Fact]
@@ -198,14 +198,14 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateUser(new CreateOrUpdateUserRequest
+        await sut.CreateOrUpdateUserAsync(new CreateOrUpdateUserRequest
         {
             UserName = "user5",
             Password = "p@ssw0rd"
         });       
-        await sut.DeleteUser("user5");
+        await sut.DeleteUserAsync("user5");
         await Task.Delay(500);
-        var actual = await sut.GetAllUsers();
+        var actual = await sut.GetAllUsersAsync();
         Assert.DoesNotContain(actual, overview => overview.UserName == "user5");
     }
     
@@ -216,7 +216,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetAllApplications();
+        var actual = await sut.GetAllApplicationsAsync();
         Assert.NotEmpty(actual);
     }
     
@@ -225,13 +225,13 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateApplication(new ApplicationRequest
+        await sut.CreateOrUpdateApplicationAsync(new ApplicationRequest
         {
             ApplicationName = "app1",
             Description = ""
         });
         await Task.Delay(500);
-        var actual = await sut.GetAllApplications();
+        var actual = await sut.GetAllApplicationsAsync();
         Assert.Contains(actual, overview => overview.ApplicationName == "app1");
     }
     
@@ -240,14 +240,14 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateOrUpdateApplication(new ApplicationRequest
+        await sut.CreateOrUpdateApplicationAsync(new ApplicationRequest
         {
             ApplicationName = "app2",
             Description = ""
         });
-        await sut.DeleteApplication("app2");
+        await sut.DeleteApplicationAsync("app2");
         await Task.Delay(500);
-        var actual = await sut.GetAllApplications();
+        var actual = await sut.GetAllApplicationsAsync();
         Assert.DoesNotContain(actual, overview => overview.ApplicationName == "app2");
     }
     
@@ -258,7 +258,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetAllContexts();
+        var actual = await sut.GetAllContextsAsync();
         Assert.NotEmpty(actual);
     }
     
@@ -268,13 +268,13 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<Context>().ToString();
-        await sut.CreateContext(new CreateContextRequest
+        await sut.CreateContextAsync(new CreateContextRequest
         {
             Name = name,
             ReplicationGroupName = Context.Default.ToString()
         });
         await Task.Delay(500);
-        var actual = await sut.GetAllContexts();
+        var actual = await sut.GetAllContextsAsync();
         Assert.Contains(actual, overview => overview.Name == name);
     }
     
@@ -284,19 +284,19 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<Context>().ToString();
-        await sut.CreateContext(new CreateContextRequest
+        await sut.CreateContextAsync(new CreateContextRequest
         {
             Name = name,
             ReplicationGroupName = Context.Default.ToString()
         });
         await Task.Delay(500);
-        await sut.UpdateContextProperties(new UpdateContextPropertiesRequest
+        await sut.UpdateContextPropertiesAsync(new UpdateContextPropertiesRequest
         {
             Name = name,
             MetaData = { { "Key", "Value" } }
         });
         await Task.Delay(500);
-        var actual = await sut.GetContextOverview(name);
+        var actual = await sut.GetContextOverviewAsync(name);
         Assert.Contains(actual.MetaData, pair => pair is { Key: "Key", Value: "Value" });
     }
     
@@ -306,15 +306,15 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var name = _fixture.Create<Context>().ToString();
-        await sut.CreateContext(new CreateContextRequest
+        await sut.CreateContextAsync(new CreateContextRequest
         {
             Name = name,
             ReplicationGroupName = Context.Default.ToString()
         });
         await Task.Delay(500);
-        await sut.DeleteContext(new DeleteContextRequest { Name = name });
+        await sut.DeleteContextAsync(new DeleteContextRequest { Name = name });
         await Task.Delay(500);
-        var actual = await sut.GetAllContexts();
+        var actual = await sut.GetAllContextsAsync();
         Assert.DoesNotContain(actual, overview => overview.Name == name);
     }
     
@@ -323,7 +323,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetContextOverview(Context.Default.ToString());
+        var actual = await sut.GetContextOverviewAsync(Context.Default.ToString());
         Assert.Equal(Context.Default.ToString(), actual.Name);
     }
     
@@ -332,7 +332,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetAllContexts();
+        var actual = await sut.GetAllContextsAsync();
         Assert.Contains(actual, overview => overview.Name == Context.Default.ToString());
         Assert.Contains(actual, overview => overview.Name == Context.Admin.ToString());
     }
@@ -358,7 +358,7 @@ public class AxonClusterAdminChannelIntegrationTests
                 }
             }
         });
-        await sut.CreateContext(new CreateContextRequest
+        await sut.CreateContextAsync(new CreateContextRequest
         {
             Name = name,
             ReplicationGroupName = Context.Default.ToString()
@@ -374,7 +374,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateReplicationGroup(new CreateReplicationGroupRequest
+        await sut.CreateReplicationGroupAsync(new CreateReplicationGroupRequest
         {
             Name = "group1",
             Members = { new ReplicationGroupMember
@@ -385,7 +385,7 @@ public class AxonClusterAdminChannelIntegrationTests
             } }
         });
         await Task.Delay(500);
-        var actual = await sut.GetAllReplicationGroups();
+        var actual = await sut.GetAllReplicationGroupsAsync();
         Assert.Contains(actual, overview => overview.Name == "group1");
     }
     
@@ -395,7 +395,7 @@ public class AxonClusterAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        await sut.CreateReplicationGroup(new CreateReplicationGroupRequest
+        await sut.CreateReplicationGroupAsync(new CreateReplicationGroupRequest
         {
             Name = "group2",
             Members = { new ReplicationGroupMember
@@ -406,12 +406,12 @@ public class AxonClusterAdminChannelIntegrationTests
             } }
         });
         await Task.Delay(500);
-        await sut.DeleteReplicationGroup(new DeleteReplicationGroupRequest
+        await sut.DeleteReplicationGroupAsync(new DeleteReplicationGroupRequest
         {
             Name = "group2"
         });
         await Task.Delay(500);
-        var actual = await sut.GetAllReplicationGroups();
+        var actual = await sut.GetAllReplicationGroupsAsync();
         Assert.DoesNotContain(actual, overview => overview.Name == "group2");
     }
     
@@ -421,7 +421,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
-        await sut.CreateReplicationGroup(new CreateReplicationGroupRequest
+        await sut.CreateReplicationGroupAsync(new CreateReplicationGroupRequest
         {
             Name = "group3",
             Members = { new ReplicationGroupMember
@@ -432,7 +432,7 @@ public class AxonClusterAdminChannelIntegrationTests
             } }
         });
         await Task.Delay(500);
-        var actual = await sut.GetReplicationGroup("group3");
+        var actual = await sut.GetReplicationGroupAsync("group3");
         Assert.NotNull(actual);
     }
     
@@ -442,7 +442,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetAllReplicationGroups();
+        var actual = await sut.GetAllReplicationGroupsAsync();
         Assert.Contains(actual, overview => overview.Name == Context.Default.ToString());
         Assert.Contains(actual, overview => overview.Name == Context.Admin.ToString());
     }
@@ -454,7 +454,7 @@ public class AxonClusterAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetAllNodes();
+        var actual = await sut.GetAllNodesAsync();
         foreach (var name in names)
         {
             Assert.Contains(actual, overview => overview.NodeName == name);    

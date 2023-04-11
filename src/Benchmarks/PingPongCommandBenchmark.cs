@@ -32,7 +32,7 @@ public class PingPongCommandBenchmark : IBenchmark
     {
         for(var command = 0; command < _commandCount; command++)
         {
-            var result = await _ping.CommandChannel.SendCommand(new Command
+            var result = await _ping.CommandChannel.SendCommandAsync(new Command
             {
                 Name = "ping",
                 Payload = new SerializedObject
@@ -79,7 +79,7 @@ public class PingPongCommandBenchmark : IBenchmark
         await _pong.WaitUntilConnectedAsync();
         
         _handler =
-            await _pong.CommandChannel.RegisterCommandHandler(
+            await _pong.CommandChannel.RegisterCommandHandlerAsync(
                 (command, ct) =>
                 {
                     var ping = JsonSerializer.Deserialize<Ping>(command.Payload.Data.Span);
@@ -96,7 +96,7 @@ public class PingPongCommandBenchmark : IBenchmark
                 new LoadFactor(100),
                 new CommandName("ping"));
 
-        await _handler.WaitUntilCompleted();
+        await _handler.WaitUntilCompletedAsync();
     }
 
     public async Task TeardownAsync()

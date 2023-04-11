@@ -91,13 +91,13 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
     public ValueTask ScheduleAsync(TMessage message, TimeSpan due)
     {
         ThrowIfDisposed();
-        return _scheduler.ScheduleTask(() => TellAsync(message, _inboxCancellation.Token), due);
+        return _scheduler.ScheduleTaskAsync(() => TellAsync(message, _inboxCancellation.Token), due);
     }
 
     public ValueTask ScheduleAsync(TMessage message, TimeSpan due, CancellationToken ct)
     {
         ThrowIfDisposed();
-        return _scheduler.ScheduleTask(() => TellAsync(message, ct), due);
+        return _scheduler.ScheduleTaskAsync(() => TellAsync(message, ct), due);
     }
 
     public ValueTask TellAsync(TMessage message)

@@ -9,16 +9,16 @@ public interface IEventChannel
     IAppendEventsTransaction StartAppendEventsTransaction();
     
     // Scheduling
-    Task<ScheduledEventCancellationToken> ScheduleEvent(Duration duration, Event @event);
+    Task<ScheduledEventCancellationToken> ScheduleEventAsync(Duration duration, Event @event);
 
-    Task<ScheduledEventCancellationToken> ScheduleEvent(DateTimeOffset instant, Event @event);
+    Task<ScheduledEventCancellationToken> ScheduleEventAsync(DateTimeOffset instant, Event @event);
 
-    Task<InstructionAck> CancelSchedule(ScheduledEventCancellationToken token);
+    Task<InstructionAck> CancelScheduleAsync(ScheduledEventCancellationToken token);
 
-    Task<ScheduledEventCancellationToken> Reschedule(ScheduledEventCancellationToken token, Duration duration,
+    Task<ScheduledEventCancellationToken> RescheduleAsync(ScheduledEventCancellationToken token, Duration duration,
         Event @event);
     
-    Task<ScheduledEventCancellationToken> Reschedule(ScheduledEventCancellationToken token, DateTimeOffset instant,
+    Task<ScheduledEventCancellationToken> RescheduleAsync(ScheduledEventCancellationToken token, DateTimeOffset instant,
         Event @event);
 
     Task<EventSequenceNumber> FindHighestSequenceAsync(AggregateId id);
@@ -33,9 +33,9 @@ public interface IEventChannel
     IAggregateEventStream LoadSnapshots(AggregateId id, EventSequenceNumber? from = default, EventSequenceNumber? to = default,
         int maxResults = 1);
 
-    Task<EventStreamToken> GetLastToken();
-    Task<EventStreamToken> GetFirstToken();
-    Task<EventStreamToken> GetTokenAt(long instant);
+    Task<EventStreamToken> GetLastTokenAsync();
+    Task<EventStreamToken> GetFirstTokenAsync();
+    Task<EventStreamToken> GetTokenAtAsync(long instant);
     
     IAsyncEnumerable<IEventQueryResultEntry> QueryEvents(string expression, bool liveStream);
     IAsyncEnumerable<IEventQueryResultEntry> QuerySnapshotEvents(string expression, bool liveStream);

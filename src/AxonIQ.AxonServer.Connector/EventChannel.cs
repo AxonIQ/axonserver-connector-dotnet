@@ -44,12 +44,12 @@ public class EventChannel : IEventChannel
             _loggerFactory.CreateLogger<AppendEventsTransaction>());
     }
 
-    public Task<ScheduledEventCancellationToken> ScheduleEvent(Duration duration, Event @event)
+    public Task<ScheduledEventCancellationToken> ScheduleEventAsync(Duration duration, Event @event)
     {
-        return ScheduleEvent(Clock().Add(duration.ToTimeSpan()), @event);
+        return ScheduleEventAsync(Clock().Add(duration.ToTimeSpan()), @event);
     }
 
-    public async Task<ScheduledEventCancellationToken> ScheduleEvent(DateTimeOffset instant, Event @event)
+    public async Task<ScheduledEventCancellationToken> ScheduleEventAsync(DateTimeOffset instant, Event @event)
     {
         var request = new ScheduleEventRequest
         {
@@ -61,7 +61,7 @@ public class EventChannel : IEventChannel
         return new ScheduledEventCancellationToken(response.Token);
     }
 
-    public async Task<InstructionAck> CancelSchedule(ScheduledEventCancellationToken token)
+    public async Task<InstructionAck> CancelScheduleAsync(ScheduledEventCancellationToken token)
     {
         var request = new CancelScheduledEventRequest
         {
@@ -71,12 +71,12 @@ public class EventChannel : IEventChannel
         return await call.ResponseAsync.ConfigureAwait(false);
     }
 
-    public Task<ScheduledEventCancellationToken> Reschedule(ScheduledEventCancellationToken token, Duration duration, Event @event)
+    public Task<ScheduledEventCancellationToken> RescheduleAsync(ScheduledEventCancellationToken token, Duration duration, Event @event)
     {
-        return Reschedule(token, Clock().Add(duration.ToTimeSpan()), @event);
+        return RescheduleAsync(token, Clock().Add(duration.ToTimeSpan()), @event);
     }
 
-    public async Task<ScheduledEventCancellationToken> Reschedule(ScheduledEventCancellationToken token, DateTimeOffset instant, Event @event)
+    public async Task<ScheduledEventCancellationToken> RescheduleAsync(ScheduledEventCancellationToken token, DateTimeOffset instant, Event @event)
     {
         var request = new RescheduleEventRequest
         {
@@ -155,7 +155,7 @@ public class EventChannel : IEventChannel
         return new AggregateEventStream(call, _loggerFactory.CreateLogger<AggregateEventStream>());
     }
 
-    public async Task<EventStreamToken> GetLastToken()
+    public async Task<EventStreamToken> GetLastTokenAsync()
     {
         var request = new GetLastTokenRequest();
         using var call = EventStore.GetLastTokenAsync(request);
@@ -163,7 +163,7 @@ public class EventChannel : IEventChannel
         return new EventStreamToken(Math.Max(token.Token, 0L) - 1L);
     }
 
-    public async Task<EventStreamToken> GetFirstToken()
+    public async Task<EventStreamToken> GetFirstTokenAsync()
     {
         var request = new GetFirstTokenRequest();
         using var call = EventStore.GetFirstTokenAsync(request);
@@ -171,7 +171,7 @@ public class EventChannel : IEventChannel
         return new EventStreamToken(Math.Max(token.Token, 0L) - 1L);
     }
 
-    public async Task<EventStreamToken> GetTokenAt(long instant)
+    public async Task<EventStreamToken> GetTokenAtAsync(long instant)
     {
         var request = new GetTokenAtRequest
         {

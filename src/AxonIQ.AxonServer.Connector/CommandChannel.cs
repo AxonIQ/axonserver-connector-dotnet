@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-[SuppressMessage("ReSharper", "MethodSupportsCancellation")]
 public class CommandChannel : ICommandChannel, IAsyncDisposable
 {
     private readonly AxonActor<Message, State> _actor;
@@ -554,7 +553,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         await _actor.TellAsync(new Message.Reconnect()).ConfigureAwait(false);
     }
     
-    public async Task<ICommandHandlerRegistration> RegisterCommandHandler(
+    public async Task<ICommandHandlerRegistration> RegisterCommandHandlerAsync(
         Func<Command, CancellationToken, Task<CommandResponse>> handler,
         LoadFactor loadFactor,
         params CommandName[] commandNames)
@@ -586,7 +585,7 @@ public class CommandChannel : ICommandChannel, IAsyncDisposable
         });
     }
 
-    public async Task<CommandResponse> SendCommand(Command command, CancellationToken ct)
+    public async Task<CommandResponse> SendCommandAsync(Command command, CancellationToken ct)
     {
         if (command == null) throw new ArgumentNullException(nameof(command));
         

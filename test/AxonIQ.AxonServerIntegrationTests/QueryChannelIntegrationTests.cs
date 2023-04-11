@@ -58,11 +58,11 @@ public class QueryChannelIntegrationTests
         };
         // NOTE: We're not using `await using var ...` here because disposing would trigger an exception that
         // we're not able to reach the server.
-        var registration = await sut.RegisterQueryHandler(
+        var registration = await sut.RegisterQueryHandlerAsync(
             new QueryHandler(),
             queries);
 
-        await Assert.ThrowsAsync<AxonServerException>(() => registration.WaitUntilCompleted());
+        await Assert.ThrowsAsync<AxonServerException>(() => registration.WaitUntilCompletedAsync());
     }
  
     [Fact]
@@ -79,11 +79,11 @@ public class QueryChannelIntegrationTests
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
-        await using var registration = await sut.RegisterQueryHandler(
+        await using var registration = await sut.RegisterQueryHandlerAsync(
             new PingPongQueryHandler(responseId), 
             queries);
     
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
     
         var result = sut.Query(new QueryRequest
         {
@@ -114,11 +114,11 @@ public class QueryChannelIntegrationTests
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
-        await using var registration = await sut.RegisterQueryHandler(
+        await using var registration = await sut.RegisterQueryHandlerAsync(
             new PingPongQueryHandler(responseId), 
             queries);
     
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
         
         await registration.DisposeAsync();
     
@@ -149,11 +149,11 @@ public class QueryChannelIntegrationTests
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
-        await using var registration = await sut.RegisterQueryHandler(
+        await using var registration = await sut.RegisterQueryHandlerAsync(
             new OnePingManyPongQueryHandler(responseIds), 
             queries);
     
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
     
         var result = sut.Query(new QueryRequest
         {
@@ -182,13 +182,13 @@ public class QueryChannelIntegrationTests
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
-        await using var registration = await sut.RegisterQueryHandler(
+        await using var registration = await sut.RegisterQueryHandlerAsync(
             new PingPongQueryHandler(responseId), 
             queries);
     
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
     
-        var result = await sut.SubscriptionQuery(new QueryRequest
+        var result = await sut.SubscriptionQueryAsync(new QueryRequest
         {
             Query = "Ping",
             MessageIdentifier = requestId.ToString()
@@ -216,13 +216,13 @@ public class QueryChannelIntegrationTests
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
-        await using var registration = await sut.RegisterQueryHandler(
+        await using var registration = await sut.RegisterQueryHandlerAsync(
             new OnePingManyPongQueryHandler(responseIds), 
             queries);
     
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
     
-        var result = await sut.SubscriptionQuery(new QueryRequest
+        var result = await sut.SubscriptionQueryAsync(new QueryRequest
         {
             Query = "Ping",
             MessageIdentifier = requestId.ToString()
@@ -237,7 +237,7 @@ public class QueryChannelIntegrationTests
 
     private class QueryHandler : IQueryHandler
     {
-        public Task Handle(QueryRequest request, IQueryResponseChannel responseChannel)
+        public Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
         {
             return Task.CompletedTask;
         }
@@ -258,7 +258,7 @@ public class QueryChannelIntegrationTests
             _responseId = responseId;
         }
         
-        public async Task Handle(QueryRequest request, IQueryResponseChannel responseChannel)
+        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
         {
             if (request.Query == "Ping")
             {
@@ -293,7 +293,7 @@ public class QueryChannelIntegrationTests
             _responseIds = responseIds;
         }
         
-        public async Task Handle(QueryRequest request, IQueryResponseChannel responseChannel)
+        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
         {
             if (request.Query == "Ping")
             {

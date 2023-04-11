@@ -4,12 +4,12 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface IControlChannel
 {
-    Task EnableHeartbeat(TimeSpan interval, TimeSpan timeout);
-    Task DisableHeartbeat();
+    Task EnableHeartbeatAsync(TimeSpan interval, TimeSpan timeout);
+    Task DisableHeartbeatAsync();
     
-    Task SendInstruction(PlatformInboundInstruction instruction);
+    Task SendInstructionAsync(PlatformInboundInstruction instruction);
 
-    Task<IEventProcessorRegistration> RegisterEventProcessor(
+    Task<IEventProcessorRegistration> RegisterEventProcessorAsync(
         EventProcessorName name,
         Func<Task<EventProcessorInfo?>> supplier,
         IEventProcessorInstructionHandler handler);

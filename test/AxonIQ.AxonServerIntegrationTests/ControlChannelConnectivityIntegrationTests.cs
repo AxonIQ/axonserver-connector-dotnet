@@ -4,6 +4,7 @@ using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
 using AxonIQ.AxonServerIntegrationTests.Containerization;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
@@ -40,6 +41,52 @@ public class ControlChannelConnectivityIntegrationTests
         var factory = new AxonServerConnectionFactory(options);
         return factory.ConnectAsync(Context.Default);
     }
+    
+    [Fact]
+    public async Task RecoverFromConnectionLoss()
+    {
+        await using var connection = await CreateSystemUnderTest(options => 
+            options
+                .WithReconnectOptions(
+                    new ReconnectOptions(
+                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        TimeSpan.FromMilliseconds(100),
+                        false)));
+        await connection.WaitUntilReadyAsync();
+        Assert.True(connection.IsConnected);
+        Assert.True(connection.IsReady);
+
+        await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
+        {
+            InstructionId = InstructionId.New().ToString(), 
+            Heartbeat = new Heartbeat()
+        });
+
+        await _container.DisableGrpcProxyEndpointAsync();
+
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        // Assert.False(connection.IsConnected);
+        // Assert.False(connection.IsReady);
+
+        await Assert.ThrowsAsync<AxonServerException>(async () => await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
+        {
+            InstructionId = InstructionId.New().ToString(), 
+            Heartbeat = new Heartbeat()
+        }));
+
+        await _container.EnableGrpcProxyEndpointAsync();
+        
+        await Task.Delay(TimeSpan.FromMilliseconds(1000));
+        // Assert.True(connection.IsConnected);
+        // Assert.True(connection.IsReady);
+        
+        await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
+        {
+            InstructionId = InstructionId.New().ToString(), 
+            Heartbeat = new Heartbeat()
+        });
+    }
+
     
     // [Fact(Skip = "This needs work")]
     // public async Task RecoveryAfterConnectionReset()

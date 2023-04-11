@@ -34,7 +34,7 @@ public class PingDotNetPongJavaCommandInteropBenchmark : IBenchmark
         var errorCode = ErrorCategory.NoHandlerForCommand;
         while(errorCode.Equals(ErrorCategory.NoHandlerForCommand))
         {
-            var result = await _ping.CommandChannel.SendCommand(new Command
+            var result = await _ping.CommandChannel.SendCommandAsync(new Command
             {
                 Name = "ping",
                 Payload = new SerializedObject
@@ -49,7 +49,7 @@ public class PingDotNetPongJavaCommandInteropBenchmark : IBenchmark
         
         for(var command = 0; command < _commandCount; command++)
         {
-            var result = await _ping.CommandChannel.SendCommand(new Command
+            var result = await _ping.CommandChannel.SendCommandAsync(new Command
             {
                 Name = "ping",
                 Payload = new SerializedObject

@@ -273,7 +273,7 @@ public class AxonServerConnectionIntegrationTests
     {
         await using var sut = await CreateSystemUnderTest();
 
-        await sut.ControlChannel.EnableHeartbeat(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
+        await sut.ControlChannel.EnableHeartbeatAsync(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
 
         await Task.Delay(TimeSpan.FromSeconds(20));
     }

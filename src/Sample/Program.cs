@@ -53,7 +53,7 @@ try
         await connection2.WaitUntilConnectedAsync();
 
         var registration =
-            await connection1.CommandChannel.RegisterCommandHandler(
+            await connection1.CommandChannel.RegisterCommandHandlerAsync(
                 (command, ct) => Task.FromResult(new CommandResponse
                 {
                     Payload = new SerializedObject
@@ -66,7 +66,7 @@ try
                 new LoadFactor(100),
                 new CommandName("ping"));
 
-        await registration.WaitUntilCompleted();
+        await registration.WaitUntilCompletedAsync();
 
         Log.Information("Command handler registration completed");
         Console.ReadLine();
@@ -75,14 +75,14 @@ try
         {
             Name = "ping"
         };
-        var result1 = await connection2.CommandChannel.SendCommand(request1, CancellationToken.None);
+        var result1 = await connection2.CommandChannel.SendCommandAsync(request1, CancellationToken.None);
         Log.Information(result1.ToString());
         
         var request2 = new Command
         {
             Name = "ping"
         };
-        var result2 = await connection2.CommandChannel.SendCommand(request2, CancellationToken.None);
+        var result2 = await connection2.CommandChannel.SendCommandAsync(request2, CancellationToken.None);
         Log.Information(result2.ToString());
 
         Log.Information("Got response from sending command");

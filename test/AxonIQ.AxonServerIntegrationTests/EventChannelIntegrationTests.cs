@@ -243,9 +243,9 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var sut = connection.EventChannel;
 
-        var token = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), CreateEvent("payload1"));
+        var token = await sut.ScheduleEventAsync(Duration.FromTimeSpan(TimeSpan.FromDays(1)), CreateEvent("payload1"));
         
-        var ack = await sut.CancelSchedule(token);
+        var ack = await sut.CancelScheduleAsync(token);
         
         Assert.True(ack.Success);
     }
@@ -261,11 +261,11 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         var @event = CreateEvent("payload2");
         
-        var scheduleToken = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), @event);
+        var scheduleToken = await sut.ScheduleEventAsync(Duration.FromTimeSpan(TimeSpan.FromDays(1)), @event);
         
-        var rescheduleToken = await sut.Reschedule(scheduleToken, DateTimeOffset.UtcNow, @event);
+        var rescheduleToken = await sut.RescheduleAsync(scheduleToken, DateTimeOffset.UtcNow, @event);
         
-        var ack = await sut.CancelSchedule(rescheduleToken);
+        var ack = await sut.CancelScheduleAsync(rescheduleToken);
         
         Assert.True(ack.Success);
     }
@@ -281,11 +281,11 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         var @event = CreateEvent("payload2");
         
-        var scheduleToken = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), @event);
+        var scheduleToken = await sut.ScheduleEventAsync(Duration.FromTimeSpan(TimeSpan.FromDays(1)), @event);
         
-        var rescheduleToken = await sut.Reschedule(scheduleToken, Duration.FromTimeSpan(TimeSpan.FromDays(2)), @event);
+        var rescheduleToken = await sut.RescheduleAsync(scheduleToken, Duration.FromTimeSpan(TimeSpan.FromDays(2)), @event);
         
-        var ack = await sut.CancelSchedule(rescheduleToken);
+        var ack = await sut.CancelScheduleAsync(rescheduleToken);
         
         Assert.True(ack.Success);
     }
@@ -299,13 +299,13 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var sut = connection.EventChannel;
 
-        var token = await sut.ScheduleEvent(Duration.FromTimeSpan(TimeSpan.FromDays(1)), CreateEvent("payload"));
+        var token = await sut.ScheduleEventAsync(Duration.FromTimeSpan(TimeSpan.FromDays(1)), CreateEvent("payload"));
         
-        var ack1 = await sut.CancelSchedule(token);
+        var ack1 = await sut.CancelScheduleAsync(token);
         
         Assert.True(ack1.Success);
         
-        var ack2 = await sut.CancelSchedule(token);
+        var ack2 = await sut.CancelScheduleAsync(token);
         
         Assert.True(ack2.Success);
     }
@@ -333,7 +333,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         Assert.True((await transaction.CommitAsync()).Success);
 
-        var token = await sut.GetFirstToken();
+        var token = await sut.GetFirstTokenAsync();
         using var stream = await sut.OpenStreamAsync(token, new PermitCount(10));
         var actual = await stream.Take(2).Select(@event => @event.Event).ToArrayAsync();
         Assert.Equal(expected, actual);
@@ -364,7 +364,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         Assert.True((await transaction.CommitAsync()).Success);
 
-        var token = await sut.GetFirstToken();
+        var token = await sut.GetFirstTokenAsync();
         using var stream1 = await sut.OpenStreamAsync(token, new PermitCount(10));
         var actual1 = await stream1.Take(1).SingleAsync();
         Assert.Equal(event1, actual1.Event);
@@ -477,7 +477,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var sut = connection.EventChannel;
 
-        var result = await sut.GetFirstToken();
+        var result = await sut.GetFirstTokenAsync();
         
         Assert.Equal(EventStreamToken.None, result);
     }
@@ -505,7 +505,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         Assert.True((await transaction.CommitAsync()).Success);
 
-        var result = await sut.GetFirstToken();
+        var result = await sut.GetFirstTokenAsync();
         
         Assert.Equal(EventStreamToken.None, result);
     }
@@ -519,7 +519,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var sut = connection.EventChannel;
 
-        var result = await sut.GetLastToken();
+        var result = await sut.GetLastTokenAsync();
         
         Assert.Equal(EventStreamToken.None, result);
     }
@@ -547,7 +547,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         Assert.True((await transaction.CommitAsync()).Success);
 
-        var result = await sut.GetLastToken();
+        var result = await sut.GetLastTokenAsync();
         
         Assert.Equal(new EventStreamToken(count - 2), result);
     }
@@ -561,7 +561,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         var sut = connection.EventChannel;
 
-        var result = await sut.GetTokenAt(Random.Shared.NextInt64(0, long.MaxValue));
+        var result = await sut.GetTokenAtAsync(Random.Shared.NextInt64(0, long.MaxValue));
         
         Assert.Equal(EventStreamToken.None, result);
     }
@@ -589,7 +589,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         Assert.True((await transaction.CommitAsync()).Success);
 
-        var result = await sut.GetTokenAt(DateTimeOffset.UnixEpoch.ToUnixTimeMilliseconds());
+        var result = await sut.GetTokenAtAsync(DateTimeOffset.UnixEpoch.ToUnixTimeMilliseconds());
         
         Assert.Equal(EventStreamToken.None, result);
     }
@@ -617,7 +617,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
 
         Assert.True((await transaction.CommitAsync()).Success);
 
-        var result = await sut.GetTokenAt(DateTimeOffset.UtcNow.AddYears(1).ToUnixTimeMilliseconds());
+        var result = await sut.GetTokenAtAsync(DateTimeOffset.UtcNow.AddYears(1).ToUnixTimeMilliseconds());
         
         Assert.Equal(new EventStreamToken(count - 1), result);
     }

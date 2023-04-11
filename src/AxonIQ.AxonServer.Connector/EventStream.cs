@@ -34,7 +34,7 @@ public class EventStream : IEventStream
             .GetAsyncEnumerator(cancellationToken);
     }
 
-    public Task ExcludePayloadType(string payloadType, string? revision)
+    public Task ExcludePayloadTypeAsync(string payloadType, string? revision)
     {
         if (payloadType == null) throw new ArgumentNullException(nameof(payloadType));
         

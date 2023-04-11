@@ -68,8 +68,8 @@ public class EventProcessorIntegrationTests
             });
         };
         
-        await using var registration = await control.RegisterEventProcessor(name, supplier, new EmptyEventProcessor());
-        await registration.WaitUntilCompleted();
+        await using var registration = await control.RegisterEventProcessorAsync(name, supplier, new EmptyEventProcessor());
+        await registration.WaitUntilCompletedAsync();
 
         //Allow the poll to happen
         await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
@@ -97,13 +97,13 @@ public class EventProcessorIntegrationTests
         });
 
         var processor = new AwaitableEventProcessor();
-        await using var registration = await control.RegisterEventProcessor(name, supplier, processor);
-        await registration.WaitUntilCompleted();
+        await using var registration = await control.RegisterEventProcessorAsync(name, supplier, processor);
+        await registration.WaitUntilCompletedAsync();
 
         // Allow Axon Server to learn about this event processor
         await Task.Delay(TimeSpan.FromSeconds(1));
 
-        var result = await admin.StartEventProcessor(name, TokenStoreIdentifier.Empty);
+        var result = await admin.StartEventProcessorAsync(name, TokenStoreIdentifier.Empty);
         Assert.Equal( Io.Axoniq.Axonserver.Grpc.Admin.Result.Success, result);
         
         await processor.StartCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
@@ -131,13 +131,13 @@ public class EventProcessorIntegrationTests
         });
 
         var processor = new AwaitableEventProcessor();
-        await using var registration = await control.RegisterEventProcessor(name, supplier, processor);
-        await registration.WaitUntilCompleted();
+        await using var registration = await control.RegisterEventProcessorAsync(name, supplier, processor);
+        await registration.WaitUntilCompletedAsync();
 
         // Allow Axon Server to learn about this event processor
         await Task.Delay(TimeSpan.FromSeconds(1));
 
-        var result = await admin.PauseEventProcessor(name, TokenStoreIdentifier.Empty);
+        var result = await admin.PauseEventProcessorAsync(name, TokenStoreIdentifier.Empty);
         Assert.Equal( Io.Axoniq.Axonserver.Grpc.Admin.Result.Success, result);
         
         await processor.PauseCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
@@ -145,27 +145,27 @@ public class EventProcessorIntegrationTests
     
     private class EmptyEventProcessor : IEventProcessorInstructionHandler
     {
-        public Task<bool> ReleaseSegment(SegmentId segment)
+        public Task<bool> ReleaseSegmentAsync(SegmentId segment)
         {
             return Task.FromResult(true);
         }
 
-        public Task<bool> SplitSegment(SegmentId segment)
+        public Task<bool> SplitSegmentAsync(SegmentId segment)
         {
             return Task.FromResult(true);
         }
 
-        public Task<bool> MergeSegment(SegmentId segment)
+        public Task<bool> MergeSegmentAsync(SegmentId segment)
         {
             return Task.FromResult(true);
         }
 
-        public Task Pause()
+        public Task PauseAsync()
         {
             return Task.CompletedTask;
         }
 
-        public Task Start()
+        public Task StartAsync()
         {
             return Task.CompletedTask;
         }
@@ -179,31 +179,31 @@ public class EventProcessorIntegrationTests
         public TaskCompletionSource PauseCompletion { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource StartCompletion { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         
-        public Task<bool> ReleaseSegment(SegmentId segment)
+        public Task<bool> ReleaseSegmentAsync(SegmentId segment)
         {
             ReleaseSegmentCompletion.TrySetResult();
             return Task.FromResult(true);
         }
 
-        public Task<bool> SplitSegment(SegmentId segment)
+        public Task<bool> SplitSegmentAsync(SegmentId segment)
         {
             SplitSegmentCompletion.TrySetResult();
             return Task.FromResult(true);
         }
 
-        public Task<bool> MergeSegment(SegmentId segment)
+        public Task<bool> MergeSegmentAsync(SegmentId segment)
         {
             MergeSegmentCompletion.TrySetResult();
             return Task.FromResult(true);
         }
 
-        public Task Pause()
+        public Task PauseAsync()
         {
             PauseCompletion.TrySetResult();
             return Task.CompletedTask;
         }
 
-        public Task Start()
+        public Task StartAsync()
         {
             StartCompletion.TrySetResult();
             return Task.CompletedTask;

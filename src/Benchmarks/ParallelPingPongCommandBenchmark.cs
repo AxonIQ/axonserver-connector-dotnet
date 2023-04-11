@@ -51,7 +51,7 @@ public class ParallelPingPongCommandBenchmark : IBenchmark
                 commands.Clear();
                 currentCount = _maximumDegreeOfParallelism;
             }
-            commands.Add((command, _ping.CommandChannel.SendCommand(new Command
+            commands.Add((command, _ping.CommandChannel.SendCommandAsync(new Command
             {
                 Name = "ping",
                 Payload = new SerializedObject
@@ -93,7 +93,7 @@ public class ParallelPingPongCommandBenchmark : IBenchmark
         await _pong.WaitUntilConnectedAsync();
         
         _handler =
-            await _pong.CommandChannel.RegisterCommandHandler(
+            await _pong.CommandChannel.RegisterCommandHandlerAsync(
                 (command, ct) =>
                 {
                     var ping = JsonSerializer.Deserialize<Ping>(command.Payload.Data.Span);
@@ -110,7 +110,7 @@ public class ParallelPingPongCommandBenchmark : IBenchmark
                 new LoadFactor(100),
                 new CommandName("ping"));
 
-        await _handler.WaitUntilCompleted();
+        await _handler.WaitUntilCompletedAsync();
     }
 
     public async Task TeardownAsync()
