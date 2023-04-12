@@ -4,8 +4,8 @@ ci:
 	dotnet tool restore
 	dotnet restore
 	dotnet build --configuration Release --no-restore
-	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServer.Connector.Tests
-	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServer.Connector.Tests --logger "trx;logfilename=connector_tests.trx"
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --logger "trx;logfilename=server_integration_tests.trx"
 
 cd:
 	dotnet tool restore
