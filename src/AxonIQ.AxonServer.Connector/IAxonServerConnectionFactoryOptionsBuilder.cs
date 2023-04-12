@@ -114,6 +114,12 @@ public interface IAxonServerConnectionFactoryOptionsBuilder
     /// <returns>An instance of the builder to continue configuring options with.</returns>
     IAxonServerConnectionFactoryOptionsBuilder WithReconnectOptions(ReconnectOptions options);
     /// <summary>
+    /// Specifies the frequency with which event processors are polled to provide information and transmit it to the server.  
+    /// </summary>
+    /// <param name="frequency">The frequency with which to poll</param>
+    /// <returns>An instance of the builder to continue configuring options with.</returns>
+    IAxonServerConnectionFactoryOptionsBuilder WithEventProcessorUpdateFrequency(TimeSpan frequency);
+    /// <summary>
     /// Builds the configured options and falls back to defaults for those options that have not been specified.
     /// </summary>
     /// <returns>An instance of the configured options.</returns>

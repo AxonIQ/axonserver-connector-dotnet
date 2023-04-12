@@ -3,6 +3,16 @@ namespace AxonIQ.AxonServer.Connector;
 public interface IAxonServerConnection : IAsyncDisposable
 {
     /// <summary>
+    /// Gets the client identity associated with the connection.
+    /// </summary>
+    ClientIdentity ClientIdentity { get; }
+    
+    /// <summary>
+    /// Gets the context associated with the connection.
+    /// </summary>
+    Context Context { get; }
+    
+    /// <summary>
     /// Provides access to the admin channel set up with Axon Server.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if this instance is closed or disposed.</exception>

@@ -568,7 +568,7 @@ public class AxonServerConnectionFactoryOptionsTests
     }
     
     [Fact]
-    public void WithoutConnectBackoffPolicyReturnsExpectedResult()
+    public void WithoutReconnectOptionsReturnsExpectedResult()
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
@@ -576,6 +576,29 @@ public class AxonServerConnectionFactoryOptionsTests
         var result = sut.Build();
         
         Assert.Equal(AxonServerConnectionFactoryDefaults.DefaultReconnectOptions, result.ReconnectOptions);
+    }
+    
+    [Fact]
+    public void WithEventProcessorUpdateFrequencyReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var frequency = TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000));
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var result = sut.WithEventProcessorUpdateFrequency(frequency).Build();
+        
+        Assert.Equal(frequency, result.EventProcessorUpdateFrequency);
+    }
+    
+    [Fact]
+    public void WithoutEventProcessorUpdateFrequencyReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.Equal(AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency, result.EventProcessorUpdateFrequency);
     }
     //TODO: Extend with tests that cover obtaining all other options from configuration
     

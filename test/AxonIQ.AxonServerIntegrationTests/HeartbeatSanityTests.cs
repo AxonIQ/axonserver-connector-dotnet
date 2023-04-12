@@ -55,5 +55,3 @@ public class HeartbeatSanityCheckTests
         }
     }
 }
-
-//Why? Because writes to the request stream need to be serialized

@@ -4,6 +4,7 @@ using AxonIQ.AxonServer.Connector.Tests;
 using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
 using AxonIQ.AxonServerIntegrationTests.Containerization;
+using Io.Axoniq.Axonserver.Grpc.Admin;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -25,6 +26,7 @@ public class EventProcessorIntegrationTests
         _fixture.CustomizeClientInstanceId();
         _fixture.CustomizeComponentName();
         _fixture.CustomizeEventProcessorName();
+        _fixture.CustomizeTokenStoreIdentifier();
         _loggerFactory = new TestOutputHelperLoggerFactory(output);
     }
     
@@ -44,7 +46,45 @@ public class EventProcessorIntegrationTests
     }
 
     [Fact]
-    public async Task RegisterEventProcessorCausesPeriodicInfoPollToHappen()
+    public async Task RegisterEventProcessorCausesServerToObserveEventProcessorInfo()
+    {
+        var sut = await CreateSystemUnderTest();
+        await sut.WaitUntilReadyAsync();
+        
+        var control = sut.ControlChannel;
+        var admin = sut.AdminChannel;
+        var name = _fixture.Create<EventProcessorName>();
+        var id = _fixture.Create<TokenStoreIdentifier>();
+        Func<Task<EventProcessorInfo?>> supplier = () =>
+        {
+            return Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
+            {
+                Running = true,
+                AvailableThreads = 1,
+                ActiveThreads = 1,
+                Error = false,
+                IsStreamingProcessor = false,
+                Mode = "Tracking",
+                ProcessorName = name.ToString(),
+                TokenStoreIdentifier = id.ToString()
+            });
+        };
+        
+        await using var registration = await control.RegisterEventProcessorAsync(name, supplier, new EmptyEventProcessor());
+        await registration.WaitUntilCompletedAsync();
+
+        // Allow Axon Server to learn about this event processor
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        var actual = await admin
+            .GetEventProcessorsByComponent(sut.ClientIdentity.ComponentName)
+            .SingleAsync();
+            
+        Assert.Equal(name.ToString(), actual.Identifier.ProcessorName);
+    }
+    
+    [Fact]
+    public async Task RegisterEventProcessorCausesInitialInfoPollToHappen()
     {
         var sut = await CreateSystemUnderTest();
         await sut.WaitUntilReadyAsync();
@@ -76,6 +116,129 @@ public class EventProcessorIntegrationTests
     }
 
     [Fact]
+    public async Task RegisterEventProcessorCausesPeriodicInfoPollToHappen()
+    {
+        var sut = await CreateSystemUnderTest(
+            options => options.WithEventProcessorUpdateFrequency(TimeSpan.FromMilliseconds(100)));
+        await sut.WaitUntilReadyAsync();
+        
+        var control = sut.ControlChannel;
+        //var admin = sut.AdminChannel;
+        var name = _fixture.Create<EventProcessorName>();
+        var callCount = 0;
+        var completion = new TaskCompletionSource();
+        Func<Task<EventProcessorInfo?>> supplier = () =>
+        {
+            callCount++;
+            if (callCount == 2)
+            {
+                completion.SetResult();    
+            }
+            return Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
+            {
+                Running = true,
+                AvailableThreads = 1,
+                ActiveThreads = 1,
+                Error = false,
+                IsStreamingProcessor = false,
+                Mode = "Tracking",
+                ProcessorName = name.ToString()
+            });
+        };
+        
+        await using var registration = await control.RegisterEventProcessorAsync(name, supplier, new EmptyEventProcessor());
+        await registration.WaitUntilCompletedAsync();
+
+        //Allow the poll to happen
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+    }
+
+    [Fact]
+    public async Task RegisterEventProcessorWithBadSupplierThatThrowsHasExpectedResult()
+    {
+        var sut = await CreateSystemUnderTest(
+            options => options.WithEventProcessorUpdateFrequency(TimeSpan.FromMilliseconds(100)));
+        await sut.WaitUntilReadyAsync();
+        
+        var control = sut.ControlChannel;
+        var name = _fixture.Create<EventProcessorName>();
+        var callCount = 0;
+        var completion = new TaskCompletionSource();
+        Func<Task<EventProcessorInfo?>> supplier = () =>
+        {
+            callCount++;
+            switch (callCount)
+            {
+                case < 2:
+                    throw new Exception();
+                case 2:
+                    completion.SetResult();
+                    break;
+            }
+
+            return Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
+            {
+                Running = true,
+                AvailableThreads = 1,
+                ActiveThreads = 1,
+                Error = false,
+                IsStreamingProcessor = false,
+                Mode = "Tracking",
+                ProcessorName = name.ToString()
+            });
+        };
+        
+        await using var registration = await control.RegisterEventProcessorAsync(name, supplier, new EmptyEventProcessor());
+        await registration.WaitUntilCompletedAsync();
+
+        //Allow the poll to happen
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task RegisterEventProcessorWithBadSupplierThatNeverReturnsHasExpectedResult()
+    {
+        var sut = await CreateSystemUnderTest(
+            options => options.WithEventProcessorUpdateFrequency(TimeSpan.FromMilliseconds(100)));
+        await sut.WaitUntilReadyAsync();
+        
+        var control = sut.ControlChannel;
+        var name = _fixture.Create<EventProcessorName>();
+        var callCount = 0;
+        var completion = new TaskCompletionSource();
+        Func<Task<EventProcessorInfo?>> supplier = async () =>
+        {
+            callCount++;
+            switch (callCount)
+            {
+                case 1:
+                    await Task.Delay(Timeout.InfiniteTimeSpan);
+                    break;
+                case 2:
+                    completion.SetResult();
+                    break;
+            }
+
+            return new EventProcessorInfo
+            {
+                Running = true,
+                AvailableThreads = 1,
+                ActiveThreads = 1,
+                Error = false,
+                IsStreamingProcessor = false,
+                Mode = "Tracking",
+                ProcessorName = name.ToString()
+            };
+        };
+        
+        await using var registration = await control.RegisterEventProcessorAsync(name, supplier, new EmptyEventProcessor());
+        await registration.WaitUntilCompletedAsync();
+
+        //Allow the poll to happen
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+    }
+    
+    [Fact]
     public async Task EventProcessorHandlesStartRequestFromAdminChannel()
     {
         var sut = await CreateSystemUnderTest();
@@ -104,7 +267,7 @@ public class EventProcessorIntegrationTests
         await Task.Delay(TimeSpan.FromSeconds(1));
 
         var result = await admin.StartEventProcessorAsync(name, TokenStoreIdentifier.Empty);
-        Assert.Equal( Io.Axoniq.Axonserver.Grpc.Admin.Result.Success, result);
+        Assert.Equal( Result.Success, result);
         
         await processor.StartCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
     }
@@ -119,6 +282,7 @@ public class EventProcessorIntegrationTests
         var admin = sut.AdminChannel;
         
         var name = _fixture.Create<EventProcessorName>();
+        
         Func<Task<EventProcessorInfo?>> supplier = () => Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
         {
             Running = true,
@@ -138,9 +302,195 @@ public class EventProcessorIntegrationTests
         await Task.Delay(TimeSpan.FromSeconds(1));
 
         var result = await admin.PauseEventProcessorAsync(name, TokenStoreIdentifier.Empty);
-        Assert.Equal( Io.Axoniq.Axonserver.Grpc.Admin.Result.Success, result);
+        Assert.Equal( Result.Success, result);
         
         await processor.PauseCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+    }
+
+    [Fact]
+    public async Task EventProcessorHandlesMoveSegmentRequestFromAdminChannel()
+    {
+        var fromClient = await CreateSystemUnderTest(
+            options => options.WithEventProcessorUpdateFrequency(TimeSpan.FromMilliseconds(500)));
+        var toClient = await CreateSystemUnderTest();
+        await Task.WhenAll(fromClient.WaitUntilReadyAsync(), toClient.WaitUntilReadyAsync());
+        
+        var fromControl = fromClient.ControlChannel;
+
+        var name = _fixture.Create<EventProcessorName>();
+        var id = _fixture.Create<TokenStoreIdentifier>();
+        Func<Task<EventProcessorInfo?>> supplier1 = () => Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
+        {
+            SegmentStatus =
+            {
+                new EventProcessorInfo.Types.SegmentStatus
+                {
+                    SegmentId = 0,
+                    OnePartOf = 2,
+                    CaughtUp = false,
+                    TokenPosition = Random.Shared.Next(1, 10000),
+                    Replaying = true
+                },
+                new EventProcessorInfo.Types.SegmentStatus
+                {
+                    SegmentId = 1,
+                    OnePartOf = 2,
+                    CaughtUp = false,
+                    TokenPosition = Random.Shared.Next(1, 10000),
+                    Replaying = true
+                }
+            },
+            Running = true,
+            AvailableThreads = 1,
+            ActiveThreads = 1,
+            Error = false,
+            IsStreamingProcessor = true,
+            Mode = "Tracking",
+            ProcessorName = name.ToString(),
+            TokenStoreIdentifier = id.ToString()
+        });
+
+        var processor1 = new AwaitableEventProcessor();
+        await using var registration1 = await fromControl.RegisterEventProcessorAsync(name, supplier1, processor1);
+        await registration1.WaitUntilCompletedAsync();
+        
+        Func<Task<EventProcessorInfo?>> supplier2 = () => Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
+        {
+            Running = true,
+            AvailableThreads = 1,
+            ActiveThreads = 1,
+            Error = false,
+            IsStreamingProcessor = true,
+            Mode = "Tracking",
+            ProcessorName = name.ToString(),
+            TokenStoreIdentifier = id.ToString()
+        });
+
+        var toControl = toClient.ControlChannel;
+        
+        var processor2 = new AwaitableEventProcessor();
+        await using var registration2 = await toControl.RegisterEventProcessorAsync(name, supplier2, processor2);
+        await registration2.WaitUntilCompletedAsync();
+
+        // Allow Axon Server to learn about these event processor
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        var admin = fromClient.AdminChannel;
+        
+        var result = await admin.MoveEventProcessorSegmentAsync(name, id, new SegmentId(0), toClient.ClientIdentity.ClientInstanceId);
+        Assert.Equal( Result.Success, result);
+        
+        await processor1.ReleaseSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task EventProcessorHandlesSplitSegmentRequestFromAdminChannel()
+    {
+        var sut = await CreateSystemUnderTest(
+            options => options.WithEventProcessorUpdateFrequency(TimeSpan.FromMilliseconds(500)));
+        await sut.WaitUntilReadyAsync();
+        
+        var name = _fixture.Create<EventProcessorName>();
+        var id = _fixture.Create<TokenStoreIdentifier>();
+        Func<Task<EventProcessorInfo?>> supplier = () => Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
+        {
+            SegmentStatus =
+            {
+                new EventProcessorInfo.Types.SegmentStatus
+                {
+                    SegmentId = 0,
+                    OnePartOf = 2,
+                    CaughtUp = false,
+                    TokenPosition = Random.Shared.Next(1, 10000),
+                    Replaying = true
+                },
+                new EventProcessorInfo.Types.SegmentStatus
+                {
+                    SegmentId = 1,
+                    OnePartOf = 2,
+                    CaughtUp = false,
+                    TokenPosition = Random.Shared.Next(1, 10000),
+                    Replaying = true
+                }
+            },
+            Running = true,
+            AvailableThreads = 1,
+            ActiveThreads = 4,
+            Error = false,
+            IsStreamingProcessor = true,
+            Mode = "Tracking",
+            ProcessorName = name.ToString(),
+            TokenStoreIdentifier = id.ToString()
+        });
+
+        var processor = new AwaitableEventProcessor();
+        await using var registration = await sut.ControlChannel.RegisterEventProcessorAsync(name, supplier, processor);
+        await registration.WaitUntilCompletedAsync();
+        
+        // Allow Axon Server to learn about these event processor
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        var admin = sut.AdminChannel;
+        
+        var result = await admin.SplitEventProcessorAsync(name, id);
+        Assert.Equal( Result.Success, result);
+        
+        await processor.SplitSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+    }
+    
+    [Fact]
+    public async Task EventProcessorHandlesMergeSegmentRequestFromAdminChannel()
+    {
+        var sut = await CreateSystemUnderTest(
+            options => options.WithEventProcessorUpdateFrequency(TimeSpan.FromMilliseconds(500)));
+        await sut.WaitUntilReadyAsync();
+        
+        var name = _fixture.Create<EventProcessorName>();
+        var id = _fixture.Create<TokenStoreIdentifier>();
+        Func<Task<EventProcessorInfo?>> supplier = () => Task.FromResult<EventProcessorInfo?>(new EventProcessorInfo
+        {
+            SegmentStatus =
+            {
+                new EventProcessorInfo.Types.SegmentStatus
+                {
+                    SegmentId = 0,
+                    OnePartOf = 2,
+                    CaughtUp = false,
+                    TokenPosition = Random.Shared.Next(1, 10000),
+                    Replaying = true
+                },
+                new EventProcessorInfo.Types.SegmentStatus
+                {
+                    SegmentId = 1,
+                    OnePartOf = 2,
+                    CaughtUp = false,
+                    TokenPosition = Random.Shared.Next(1, 10000),
+                    Replaying = true
+                }
+            },
+            Running = true,
+            AvailableThreads = 1,
+            ActiveThreads = 4,
+            Error = false,
+            IsStreamingProcessor = true,
+            Mode = "Tracking",
+            ProcessorName = name.ToString(),
+            TokenStoreIdentifier = id.ToString()
+        });
+
+        var processor = new AwaitableEventProcessor();
+        await using var registration = await sut.ControlChannel.RegisterEventProcessorAsync(name, supplier, processor);
+        await registration.WaitUntilCompletedAsync();
+        
+        // Allow Axon Server to learn about these event processor
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        var admin = sut.AdminChannel;
+        
+        var result = await admin.MergeEventProcessorAsync(name, id);
+        Assert.Equal( Result.Success, result);
+        
+        await processor.MergeSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
     }
     
     private class EmptyEventProcessor : IEventProcessorInstructionHandler

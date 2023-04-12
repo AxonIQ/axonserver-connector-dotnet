@@ -74,4 +74,9 @@ public abstract class ToxicAxonServer : IToxicAxonServer
     {
         return Server.ResetPeerOnGrpcProxyEndpointAsync(timeout);
     }
+
+    public Task<IAsyncDisposable> TimeoutEndpointAsync(int? timeout = default)
+    {
+        return Server.TimeoutEndpointAsync(timeout);
+    }
 }

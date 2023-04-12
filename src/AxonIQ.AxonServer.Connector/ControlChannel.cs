@@ -293,7 +293,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                 {
                     foreach (var (name, supplier) in suppliers)
                     {
-                        supplier()
+                        supplier
                             .TellToAsync(
                                 _actor,
                                 result => new Message.GotEventProcessorInfo(name, InstructionId.New(), result),
@@ -453,7 +453,6 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                 if (connected.EventProcessors.TryGetEventProcessorInfoSupplier(name, out var supplier))
                                 {
                                     supplier?
-                                        .Invoke()
                                         .TellToAsync(
                                             _actor,
                                             result => new Message.GotEventProcessorInfo(
@@ -571,7 +570,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                 register.Completion.SetResult();
                 
                 register
-                    .Supplier()
+                    .Supplier
                     .TellToAsync(
                         _actor,
                         result => new Message.GotEventProcessorInfo(register.Name, InstructionId.New(),  result),
