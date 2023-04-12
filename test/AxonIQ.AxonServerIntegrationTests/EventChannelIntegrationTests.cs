@@ -809,7 +809,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
     
     public Task InitializeAsync()
     {
-        return _container.PurgeEvents();
+        return _container.PurgeEventsAsync();
     }
 
     public Task DisposeAsync()

@@ -7,6 +7,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+    
+    <ItemGroup>
       <ProjectReference Include="..\..\src\AxonIQ.AxonServer.Connector\AxonIQ.AxonServer.Connector.csproj" />
       <ProjectReference Include="..\..\src\AxonIQ.AxonServer.Embedded\AxonIQ.AxonServer.Embedded.csproj" />
       <ProjectReference Include="..\AxonIQ.AxonServer.Connector.Tests\AxonIQ.AxonServer.Connector.Tests.csproj" />
@@ -23,5 +27,5 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
-    </ItemGroup>
+    </ItemGroup>    
 </Project>

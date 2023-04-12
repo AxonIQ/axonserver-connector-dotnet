@@ -32,7 +32,7 @@ internal static class TaskToAxonActorExtensions
             exception => translate(new TaskResult<T>.Error(exception)), 
             ct);
     }
-
+    
     private static async Task TellToCore<T, TMessage>(
         Task<T> task, 
         IAxonActor<TMessage> actor, 
@@ -43,6 +43,40 @@ internal static class TaskToAxonActorExtensions
         try
         {
             var result = await task.ConfigureAwait(false);
+            await actor.TellAsync(success(result), ct).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            await actor.TellAsync(failure(exception), ct).ConfigureAwait(false);
+        }
+    }
+    
+    public static Task TellToAsync<T, TMessage>(
+        this Func<Task<T>> task,
+        IAxonActor<TMessage> actor,
+        Func<TaskResult<T>, TMessage> translate,
+        CancellationToken ct = default
+    )
+    {
+        if (actor == null) throw new ArgumentNullException(nameof(actor));
+        if (translate == null) throw new ArgumentNullException(nameof(translate));
+
+        return TellToCore(task, actor, 
+            value => translate(new TaskResult<T>.Ok(value)), 
+            exception => translate(new TaskResult<T>.Error(exception)), 
+            ct);
+    }
+
+    private static async Task TellToCore<T, TMessage>(
+        Func<Task<T>> task, 
+        IAxonActor<TMessage> actor, 
+        Func<T, TMessage> success, 
+        Func<Exception, TMessage> failure,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await task().ConfigureAwait(false);
             await actor.TellAsync(success(result), ct).ConfigureAwait(false);
         }
         catch (Exception exception)

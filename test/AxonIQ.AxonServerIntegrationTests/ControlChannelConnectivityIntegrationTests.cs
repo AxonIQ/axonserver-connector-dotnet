@@ -64,9 +64,9 @@ public class ControlChannelConnectivityIntegrationTests
 
         await _container.DisableGrpcProxyEndpointAsync();
 
-        await Task.Delay(TimeSpan.FromMilliseconds(200));
-        // Assert.False(connection.IsConnected);
-        // Assert.False(connection.IsReady);
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.False(connection.IsConnected);
+        Assert.False(connection.IsReady);
 
         await Assert.ThrowsAsync<AxonServerException>(async () => await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
         {
@@ -76,9 +76,9 @@ public class ControlChannelConnectivityIntegrationTests
 
         await _container.EnableGrpcProxyEndpointAsync();
         
-        await Task.Delay(TimeSpan.FromMilliseconds(1000));
-        // Assert.True(connection.IsConnected);
-        // Assert.True(connection.IsReady);
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.True(connection.IsConnected);
+        Assert.True(connection.IsReady);
         
         await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
         {
@@ -87,96 +87,50 @@ public class ControlChannelConnectivityIntegrationTests
         });
     }
 
-    
-    // [Fact(Skip = "This needs work")]
-    // public async Task RecoveryAfterConnectionReset()
-    // {
-    //     var connection = await CreateSystemUnderTest();
-    //     var sut = connection.ControlChannel;
-    //     await connection.WaitUntilReady();
-    //     Assert.True(connection.IsConnected);
-    //     Assert.True(connection.IsReady);
-    //
-    //     await sut.EnableHeartbeat(TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100));
-    //     
-    //     // Observe connection loss
-    //     var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    //     connection.Disconnected += (_, _) =>
-    //     {
-    //         disconnected.TrySetResult();
-    //     };
-    //     
-    //     //await _container.DisableGrpcProxyEndpointAsync();
-    //     var reset = await _container.ResetPeerOnGrpcProxyEndpointAsync();
-    //
-    //     await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-    //     Assert.False(connection.IsConnected);
-    //     Assert.False(connection.IsReady);
-    //     
-    //     // Observe recovery
-    //     var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    //     connection.Connected += (_, _) =>
-    //     {
-    //         connected.TrySetResult();
-    //     };
-    //     
-    //     var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    //     connection.Ready += (_, _) =>
-    //     {
-    //         ready.TrySetResult();
-    //     };
-    //
-    //     await reset.DisposeAsync();
-    //     //await _container.EnableGrpcProxyEndpointAsync();
-    //     
-    //     await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-    //     Assert.True(connection.IsConnected);
-    //     await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
-    //     Assert.True(connection.IsReady);
-    // }
-    //
-    // [Fact(Skip = "This needs work")]
-    // public async Task RecoveryAfterConnectionLoss()
-    // {
-    //     var connection = await CreateSystemUnderTest();
-    //     var sut = connection.ControlChannel;
-    //     await connection.WaitUntilReady();
-    //     Assert.True(connection.IsConnected);
-    //     Assert.True(connection.IsReady);
-    //
-    //     //await sut.EnableHeartbeat(TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100));
-    //     
-    //     // Observe connection loss
-    //     var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    //     connection.Disconnected += (_, _) =>
-    //     {
-    //         disconnected.TrySetResult();
-    //     };
-    //     
-    //     await _container.DisableGrpcProxyEndpointAsync();
-    //
-    //     await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-    //     Assert.False(connection.IsConnected);
-    //     Assert.False(connection.IsReady);
-    //     
-    //     // Observe recovery
-    //     var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    //     connection.Connected += (_, _) =>
-    //     {
-    //         connected.TrySetResult();
-    //     };
-    //     
-    //     var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    //     connection.Ready += (_, _) =>
-    //     {
-    //         ready.TrySetResult();
-    //     };
-    //
-    //     await _container.EnableGrpcProxyEndpointAsync();
-    //     
-    //     await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-    //     Assert.True(connection.IsConnected);
-    //     await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
-    //     Assert.True(connection.IsReady);
-    // }
+    [Fact]
+    public async Task RecoverFromHeartbeatMissed()
+    {
+        await using var connection = await CreateSystemUnderTest(options => 
+            options
+                .WithReconnectOptions(
+                    new ReconnectOptions(
+                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        TimeSpan.FromMilliseconds(100),
+                        false)));
+        await connection.WaitUntilReadyAsync();
+        Assert.True(connection.IsConnected);
+        Assert.True(connection.IsReady);
+        await connection.ControlChannel.EnableHeartbeatAsync(
+            TimeSpan.FromMilliseconds(200),
+            TimeSpan.FromMilliseconds(500));
+
+        await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
+        {
+            InstructionId = InstructionId.New().ToString(), 
+            Heartbeat = new Heartbeat()
+        });
+
+        await using (await _container.TimeoutEndpointAsync())
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            Assert.False(connection.IsConnected);
+            Assert.False(connection.IsReady);
+            
+            await Assert.ThrowsAsync<AxonServerException>(async () => await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
+            {
+                InstructionId = InstructionId.New().ToString(), 
+                Heartbeat = new Heartbeat()
+            }));
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        Assert.True(connection.IsConnected);
+        Assert.True(connection.IsReady);
+        
+        await connection.ControlChannel.SendInstructionAsync(new PlatformInboundInstruction
+        {
+            InstructionId = InstructionId.New().ToString(), 
+            Heartbeat = new Heartbeat()
+        });
+    }
 }

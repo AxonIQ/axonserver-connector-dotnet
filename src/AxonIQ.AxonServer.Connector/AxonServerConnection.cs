@@ -69,9 +69,9 @@ internal class AxonServerConnection : IAxonServerConnection
             factory.LoggerFactory));
     }
 
-    internal ClientIdentity ClientIdentity => _factory.ChannelFactory.ClientIdentity;
+    public ClientIdentity ClientIdentity => _factory.ChannelFactory.ClientIdentity;
 
-    internal Context Context => _context;
+    public Context Context => _context;
 
     //private GrpcChannel? Channel => _actor.State is State.Connected connected ? connected.Channel : null;
     //internal ConnectivityState ConnectivityState => Channel?.State ?? ConnectivityState.Shutdown;

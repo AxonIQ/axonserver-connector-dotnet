@@ -129,6 +129,7 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
             var proxy = await _proxyConnection.Client().FindProxyAsync("AxonServer");
             proxy.Enabled = false;
             await proxy.UpdateAsync();
+            _logger.LogDebug("Disabled gRPC proxy endpoint");
         }
     }
     
@@ -139,6 +140,7 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
             var proxy = await _proxyConnection.Client().FindProxyAsync("AxonServer");
             proxy.Enabled = true;
             await proxy.UpdateAsync();
+            _logger.LogDebug("Enabled gRPC proxy endpoint");
         }
     }
 
@@ -152,8 +154,9 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
             {
                 inputToxic.Attributes.Timeout = timeout.Value;
             }
+            _logger.LogDebug("Begin {Toxic} toxic", inputToxic.Type);
             var toxic = await proxy.AddAsync(inputToxic);
-            return new RemoveToxicOnDispose(proxy, toxic);
+            return new RemoveToxicOnDispose(proxy, toxic, _logger);
         }
 
         return CompletedAsyncDisposable.Instance;
@@ -163,14 +166,16 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
     {
         if (_proxyConnection != null)
         {
+            
             var proxy = await _proxyConnection.Client().FindProxyAsync("AxonServer");
             var inputToxic = new TimeoutToxic();
             if (timeout.HasValue)
             {
                 inputToxic.Attributes.Timeout = timeout.Value;
             }
+            _logger.LogDebug("Begin {Toxic} toxic", inputToxic.Type);
             var toxic = await proxy.AddAsync(inputToxic);
-            return new RemoveToxicOnDispose(proxy, toxic);
+            return new RemoveToxicOnDispose(proxy, toxic, _logger);
         }
         
         return CompletedAsyncDisposable.Instance;
@@ -221,14 +226,20 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
     {
         private readonly Proxy _proxy;
         private readonly ToxicBase _toxic;
+        private readonly ILogger _logger;
 
-        public RemoveToxicOnDispose(Proxy proxy, ToxicBase toxic)
+        public RemoveToxicOnDispose(Proxy proxy, ToxicBase toxic, ILogger logger)
         {
             _proxy = proxy ?? throw new ArgumentNullException(nameof(proxy));
             _toxic = toxic ?? throw new ArgumentNullException(nameof(toxic));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
-    
-        public async ValueTask DisposeAsync() => await _proxy.RemoveToxicAsync(_toxic.Name);
+
+        public async ValueTask DisposeAsync()
+        {
+            await _proxy.RemoveToxicAsync(_toxic.Name);
+            _logger.LogDebug("Completed {Toxic} toxic", _toxic.Type);
+        }
     }
     
     private class CompletedAsyncDisposable : IAsyncDisposable

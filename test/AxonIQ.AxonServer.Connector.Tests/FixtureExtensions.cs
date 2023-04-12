@@ -88,6 +88,14 @@ public static class FixtureExtensions
                 .OmitAutoProperties());
     }
     
+    public static void CustomizeTokenStoreIdentifier(this IFixture fixture)
+    {
+        fixture.Customize<TokenStoreIdentifier>(composer =>
+            composer
+                .FromFactory<int>(value => new TokenStoreIdentifier($"TS{value}"))
+                .OmitAutoProperties());
+    }
+    
     public static void CustomizeSegmentId(this IFixture fixture)
     {
         fixture.Customize<SegmentId>(composer =>
