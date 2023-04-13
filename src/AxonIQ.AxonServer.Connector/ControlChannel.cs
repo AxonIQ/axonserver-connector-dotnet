@@ -822,12 +822,9 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
     public async Task SendInstructionAsync(PlatformInboundInstruction instruction)
     {
         if (instruction == null) throw new ArgumentNullException(nameof(instruction));
-        if (!string.IsNullOrEmpty(instruction.InstructionId))
-        {
-            var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            await _actor.TellAsync(new Message.SendAwaitablePlatformInboundInstruction(instruction, completionSource));
-            await completionSource.Task;
-        }
+        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _actor.TellAsync(new Message.SendAwaitablePlatformInboundInstruction(instruction, completionSource));
+        await completionSource.Task;
     }
 
     public Task EnableHeartbeatAsync(TimeSpan interval, TimeSpan timeout)

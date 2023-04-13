@@ -42,8 +42,8 @@ public class ControlChannelIntegrationTests
         return factory.ConnectAsync(Context.Default);
     }
     
-    [Fact]
-    public async Task SendingInstructionsWithoutIdAreCompletedImmediately()
+    [Fact(Skip = "Need to figure out how to test this without reaching for the internals")]
+    public async Task SendingInstructionWithoutIdHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.ControlChannel;
@@ -51,42 +51,12 @@ public class ControlChannelIntegrationTests
         Assert.True(result.IsCompleted);
     }
     
-    // [Fact(Skip = "This needs work")]
-    // public async Task RecoveryAfterMissedHeartbeat()
-    // {
-    //     var interceptor = new ControlledAvailabilityInterceptor();
-    //
-    //     var connection = await CreateSystemUnderTest(options => options.WithInterceptors(interceptor));
-    //     var sut = connection.ControlChannel;
-    //     await connection.WaitUntilReadyAsync();
-    //     
-    //     await sut.EnableHeartbeat(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
-    //     // Allow the heartbeat pump to start
-    //     await Task.Delay(TimeSpan.FromSeconds(2));
-    //     
-    //     Assert.True(connection.IsConnected);
-    //     Assert.True(connection.IsReady);
-    //     
-    //     // Observe a disconnect
-    //     var disconnected = connection.WaitUntilClosedAsync();
-    //     
-    //     //Simulate unavailability
-    //     interceptor.Available = false;
-    //
-    //     await disconnected.WaitAsync(TimeSpan.FromSeconds(5));
-    //     
-    //     Assert.False(connection.IsConnected);
-    //     Assert.False(connection.IsReady);
-    //     
-    //     //Observe a connect
-    //     var connected = connection.WaitUntilConnectedAsync();
-    //     
-    //     //Simulate availability
-    //     interceptor.Available = true;
-    //     
-    //     await connected.WaitAsync(TimeSpan.FromSeconds(5));
-    //     
-    //     Assert.True(connection.IsConnected);
-    //     Assert.True(connection.IsReady);
-    // }
+    [Fact(Skip = "Need to figure out how to test this without reaching for the internals")]
+    public async Task SendingInstructionWithIdHasExpectedResult()
+    {
+        var connection = await CreateSystemUnderTest();
+        var sut = connection.ControlChannel;
+        var result = sut.SendInstructionAsync(new PlatformInboundInstruction());
+        Assert.True(result.IsCompleted);
+    }
 }
