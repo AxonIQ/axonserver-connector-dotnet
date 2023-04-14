@@ -19,7 +19,10 @@ internal class AxonServerConnection : IAxonServerConnection
     private readonly Lazy<QueryChannel> _queryChannel;
     private readonly Lazy<EventChannel> _eventChannel;
 
-    private bool _disposed;
+    private const long NotDisposed = 0L;
+    private const long Disposed = 1L;
+    
+    private long _disposed;
 
     public AxonServerConnection(AxonServerConnectionFactory factory, Context context)
     {
@@ -321,12 +324,12 @@ internal class AxonServerConnection : IAxonServerConnection
         }
     }
 
-    public bool IsConnected => !_disposed && _actor.State is State.Connected;
+    public bool IsConnected => Interlocked.Read(ref _disposed) == NotDisposed && _actor.State is State.Connected;
 
-    public bool IsClosed => _disposed;
+    public bool IsClosed => Interlocked.Read(ref _disposed) == Disposed;
 
     public bool IsReady =>
-        !_disposed 
+        Interlocked.Read(ref _disposed) == NotDisposed 
         && IsConnected
         && _controlChannel.IsConnected
         // _adminChannel does not have this notion
@@ -416,42 +419,42 @@ internal class AxonServerConnection : IAxonServerConnection
 
     private void ThrowIfDisposed()
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(AxonServerConnection));
+        if (Interlocked.Read(ref _disposed) == Disposed) 
+            throw new ObjectDisposedException(nameof(AxonServerConnection));
     }
     
     public Task CloseAsync() => DisposeAsync().AsTask();
     
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        
-        await _controlChannel.DisposeAsync().ConfigureAwait(false);
-        if (_commandChannel.IsValueCreated)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed, NotDisposed) == NotDisposed)
         {
-            await _commandChannel.Value.DisposeAsync().ConfigureAwait(false);
-        }
-
-        if (_queryChannel.IsValueCreated)
-        {
-            await _queryChannel.Value.DisposeAsync().ConfigureAwait(false);
-        }
-
-        await _actor.DisposeAsync().ConfigureAwait(false);
-        if (_actor.State is State.Connected connected)
-        {
-            try
+            await _controlChannel.DisposeAsync().ConfigureAwait(false);
+            if (_commandChannel.IsValueCreated)
             {
-                await connected.Channel.ShutdownAsync().ConfigureAwait(false);
-                connected.Channel.Dispose();
+                await _commandChannel.Value.DisposeAsync().ConfigureAwait(false);
             }
-            catch (Exception exception)
+
+            if (_queryChannel.IsValueCreated)
             {
-                _logger.LogCritical(exception, "Failed to shut down and dispose gRPC channel");
+                await _queryChannel.Value.DisposeAsync().ConfigureAwait(false);
             }
+
+            await _actor.DisposeAsync().ConfigureAwait(false);
+            if (_actor.State is State.Connected connected)
+            {
+                try
+                {
+                    await connected.Channel.ShutdownAsync().ConfigureAwait(false);
+                    connected.Channel.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogCritical(exception, "Failed to shut down and dispose gRPC channel");
+                }
+            }
+
+            await _factory.TryRemoveConnectionAsync(_context, this);
         }
-
-        _factory.TryRemoveConnection(_context, this);
-
-        _disposed = true;
     }
 }
