@@ -8,8 +8,12 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class AxonServerConnectionFactory : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<Context, Lazy<AxonServerConnection>> _connections;
-    private bool _disposed;
+    private const long NotDisposed = 0L;
+    private const long Disposed = 1L;
+        
+    private readonly AsyncLock _lock;
+    private readonly Dictionary<Context, AxonServerConnection> _connections;
+    private long _disposed;
 
     public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
     {
@@ -48,7 +52,8 @@ public class AxonServerConnectionFactory : IAsyncDisposable
         EventProcessorUpdateFrequency = options.EventProcessorUpdateFrequency;
         ReconnectOptions = options.ReconnectOptions;
 
-        _connections = new ConcurrentDictionary<Context, Lazy<AxonServerConnection>>();
+        _lock = new AsyncLock();
+        _connections = new Dictionary<Context, AxonServerConnection>();
     }
 
     internal ClientIdentity ClientIdentity { get; }
@@ -63,51 +68,57 @@ public class AxonServerConnectionFactory : IAsyncDisposable
     internal ReconnectOptions ReconnectOptions { get; }
     internal ILoggerFactory LoggerFactory { get; }
 
-    public async Task<IAxonServerConnection> ConnectAsync(Context context)
+    public async Task<IAxonServerConnection> ConnectAsync(Context context, CancellationToken ct = default)
     {
         ThrowIfDisposed();
-        
-        var connection = _connections.GetOrAdd(context,
-            _ => new Lazy<AxonServerConnection>(() => new AxonServerConnection(this, context)))
-            .Value;
-        await connection.ConnectAsync().ConfigureAwait(false);
-        return connection;
+        ct.ThrowIfCancellationRequested();
+
+        using (await _lock.AcquireAsync(ct))
+        {
+            if (_connections.TryGetValue(context, out var connection)) return connection;
+            
+            connection = new AxonServerConnection(this, context);
+            await connection.ConnectAsync().ConfigureAwait(false);
+            _connections.Add(context, connection);
+            return connection;
+        }
     }
 
-    internal void TryRemoveConnection(Context context, AxonServerConnection connection)
+    internal async ValueTask TryRemoveConnectionAsync(Context context, AxonServerConnection connection)
     {
-        //NOTE: Only if the value of the Lazy<T> instance matches the connection we're about to remove, do we attempt
-        //      to remove the corresponding lazy instance from the collection.
-        if (!_connections.TryGetValue(context, out var lazy)) return;
-
-        if (lazy.IsValueCreated && lazy.Value == connection)
+        if (Interlocked.Read(ref _disposed) == NotDisposed)
         {
-            _connections.TryRemove(new KeyValuePair<Context, Lazy<AxonServerConnection>>(context, lazy));
+            using (await _lock.AcquireAsync(CancellationToken.None))
+            {
+                if (_connections.TryGetValue(context, out var removable))
+                {
+                    if (ReferenceEquals(removable, connection))
+                    {
+                        _connections.Remove(context);
+                    }
+                }
+            }
         }
     }
     
     private void ThrowIfDisposed()
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(AxonServerConnection));
+        if (Interlocked.Read(ref _disposed) == Disposed) 
+            throw new ObjectDisposedException(nameof(AxonServerConnection));
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-
-        await Scheduler.DisposeAsync().ConfigureAwait(false);
-
-        var connections = Array.ConvertAll(_connections.ToArray(), connection => connection.Value);
-        _connections.Clear();
-        
-        foreach (var connection in connections)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed, NotDisposed) == NotDisposed)
         {
-            if (connection.IsValueCreated)
+            await _lock.DisposeAsync();
+            await Scheduler.DisposeAsync().ConfigureAwait(false);
+
+            foreach (var (_, connection) in _connections)
             {
-                await connection.Value.DisposeAsync().ConfigureAwait(false);
+                await connection.DisposeAsync();
             }
+            _connections.Clear();
         }
-        
-        _disposed = true;
     }
 }
