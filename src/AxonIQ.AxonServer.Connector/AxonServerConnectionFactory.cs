@@ -88,16 +88,19 @@ public class AxonServerConnectionFactory : IAsyncDisposable
     {
         if (Interlocked.Read(ref _disposed) == NotDisposed)
         {
-            using (await _lock.AcquireAsync(CancellationToken.None))
+            try
             {
-                if (_connections.TryGetValue(context, out var removable))
+                using (await _lock.AcquireAsync(CancellationToken.None))
                 {
-                    if (ReferenceEquals(removable, connection))
+                    if (_connections.TryGetValue(context, out var removable))
                     {
-                        _connections.Remove(context);
+                        if (ReferenceEquals(removable, connection))
+                        {
+                            _connections.Remove(context);
+                        }
                     }
                 }
-            }
+            } catch(ObjectDisposedException) {}
         }
     }
     
