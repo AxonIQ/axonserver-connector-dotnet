@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct TokenStoreIdentifier
+public readonly struct TokenStoreIdentifier : IEquatable<TokenStoreIdentifier>
 {
     public static readonly TokenStoreIdentifier Empty = new("");
     
@@ -15,4 +15,7 @@ public readonly struct TokenStoreIdentifier
     public override bool Equals(object? obj) => obj is TokenStoreIdentifier other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(_value);
     public override string ToString() => _value;
+
+    public static bool operator ==(TokenStoreIdentifier left, TokenStoreIdentifier right) => left.Equals(right);
+    public static bool operator !=(TokenStoreIdentifier left, TokenStoreIdentifier right) => !(left == right);
 }

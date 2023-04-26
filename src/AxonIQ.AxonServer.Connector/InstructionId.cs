@@ -4,20 +4,37 @@ public readonly struct InstructionId
 {
     private readonly string _value;
 
-    public static InstructionId New() => new InstructionId(Guid.NewGuid().ToString("D"));
-    
-    public InstructionId(string value)
+    public static InstructionId New() => new (Guid.NewGuid().ToString("D"));
+
+    public static bool CanParse(string value) => !string.IsNullOrEmpty(value);
+
+    public static bool TryParse(string value, out InstructionId parsed)
     {
-        if (value == null)
+        if (string.IsNullOrEmpty(value))
         {
-            throw new ArgumentNullException(nameof(value));
-        }
-        
-        if (value == "")
-        {
-            throw new ArgumentException("The instruction identifier can not be empty.", nameof(value));
+            parsed = default;
+            return false;
         }
 
+        parsed = new InstructionId(value);
+        return true;
+    }
+
+    public static InstructionId Parse(string value)
+    {
+        if (value == null) throw new ArgumentNullException(nameof(value));
+
+        
+        if (string.IsNullOrEmpty(value))
+        {
+            throw new FormatException("The instruction identifier can not be null or empty.");
+        }
+
+        return new InstructionId(value);
+    }
+    
+    private InstructionId(string value)
+    {
         _value = value;
     }
     

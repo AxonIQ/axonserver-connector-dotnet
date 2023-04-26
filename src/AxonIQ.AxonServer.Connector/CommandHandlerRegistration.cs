@@ -2,7 +2,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class CommandHandlerRegistration : ICommandHandlerRegistration
 {
-    private int _disposed;
+    private long _disposed;
     
     private readonly Func<Task> _unsubscribe;
     private readonly Task _subscribeCompletion;
@@ -17,7 +17,7 @@ public class CommandHandlerRegistration : ICommandHandlerRegistration
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
             await _unsubscribe().ConfigureAwait(false);
         }    

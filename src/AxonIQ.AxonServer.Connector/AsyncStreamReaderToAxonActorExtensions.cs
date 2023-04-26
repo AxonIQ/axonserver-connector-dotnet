@@ -7,21 +7,6 @@ internal static class AsyncStreamReaderToAxonActorExtensions
 {
     public static Task TellToAsync<T, TMessage>(this IAsyncStreamReader<T> reader,
         IAxonActor<TMessage> actor,
-        Func<T, TMessage> success,
-        Func<Exception, TMessage> failure,
-        ILogger logger,
-        CancellationToken ct = default)
-    {
-        if (actor == null) throw new ArgumentNullException(nameof(actor));
-        if (logger == null) throw new ArgumentNullException(nameof(logger));
-        if (success == null) throw new ArgumentNullException(nameof(success));
-        if (failure == null) throw new ArgumentNullException(nameof(failure));
-
-        return TellToCore(reader, actor, logger, success, failure, ct);
-    }
-    
-    public static Task TellToAsync<T, TMessage>(this IAsyncStreamReader<T> reader,
-        IAxonActor<TMessage> actor,
         Func<TaskResult<T>, TMessage> translate,
         ILogger logger,
         CancellationToken ct = default)

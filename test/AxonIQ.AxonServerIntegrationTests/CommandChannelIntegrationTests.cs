@@ -6,22 +6,24 @@ using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
 using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Google.Protobuf;
+using Grpc.Net.Client;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Command;
+using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace AxonIQ.AxonServerIntegrationTests;
 
-[Collection(nameof(ToxicAxonServerWithAccessControlDisabledCollection))]
+[Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 public class CommandChannelIntegrationTests
 {
-    private readonly IToxicAxonServer _container;
+    private readonly IAxonServer _container;
     private readonly Fixture _fixture;
     private readonly ILoggerFactory _loggerFactory;
 
-    public CommandChannelIntegrationTests(ToxicAxonServerWithAccessControlDisabled container, ITestOutputHelper output)
+    public CommandChannelIntegrationTests(AxonServerWithAccessControlDisabled container, ITestOutputHelper output)
     {
         _container = container ?? throw new ArgumentNullException(nameof(container));
         _fixture = new Fixture();
@@ -46,26 +48,10 @@ public class CommandChannelIntegrationTests
     }
 
     [Fact]
-    public async Task RegisterCommandHandlerWhileDisconnectedHasExpectedResult()
-    {
-        var connection = await CreateSystemUnderTest(builder =>
-            builder.WithRoutingServers(new DnsEndPoint("127.0.0.0", AxonServerConnectionFactoryDefaults.Port)));
-        
-        var sut = connection.CommandChannel;
-
-        var commandName = _fixture.Create<CommandName>();
-        var registration = await sut.RegisterCommandHandlerAsync(
-            (_, _) => Task.FromResult(new CommandResponse()),
-            new LoadFactor(10), commandName);
-
-        await Assert.ThrowsAsync<AxonServerException>(() => registration.WaitUntilCompletedAsync());
-    }
- 
-    [Fact]
-    public async Task RegisterCommandHandlerWhileConnectedHasExpectedResult()
+    public async Task RegisterCommandHandlerHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
-        await connection.WaitUntilConnectedAsync();
+        await connection.WaitUntilReadyAsync();
         
         var sut = connection.CommandChannel;
 
@@ -93,6 +79,54 @@ public class CommandChannelIntegrationTests
         }, CancellationToken.None);
                 
         Assert.Equal(responseId.ToString(), result.MessageIdentifier);
+        Assert.Equal(requestId.ToString(), result.RequestIdentifier);
+    }
+    
+    [Fact]
+    public async Task RegisterCommandHandlerForAlreadyRegisteredCommandNameHasExpectedResult()
+    {
+        var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilReadyAsync();
+        
+        var sut = connection.CommandChannel;
+
+        var requestId = InstructionId.New();
+        var responseId1 = InstructionId.New();
+        var responseId2 = InstructionId.New();
+        var commandName = _fixture.Create<CommandName>();
+        var registration1 = await sut.RegisterCommandHandlerAsync((command, ct) => Task.FromResult(new CommandResponse
+        {
+            MessageIdentifier = responseId1.ToString(),
+            Payload = new SerializedObject
+            {
+                Type = "pong",
+                Revision = "0",
+                Data = ByteString.CopyFromUtf8("{ \"pong\": 1 }")
+            }
+            
+        }), new LoadFactor(1), commandName);
+        await registration1.WaitUntilCompletedAsync();
+        
+        var registration2 = await sut.RegisterCommandHandlerAsync((command, ct) => Task.FromResult(new CommandResponse
+        {
+            MessageIdentifier = responseId2.ToString(),
+            Payload = new SerializedObject
+            {
+                Type = "pong",
+                Revision = "0",
+                Data = ByteString.CopyFromUtf8("{ \"pong\": 2 }")
+            }
+            
+        }), new LoadFactor(1), commandName);
+        await registration2.WaitUntilCompletedAsync();
+        
+        var result = await sut.SendCommandAsync(new Command
+        {
+            Name = commandName.ToString(),
+            MessageIdentifier = requestId.ToString()
+        }, CancellationToken.None);
+                
+        Assert.Equal(responseId2.ToString(), result.MessageIdentifier);
         Assert.Equal(requestId.ToString(), result.RequestIdentifier);
     }
     
@@ -141,50 +175,50 @@ public class CommandChannelIntegrationTests
         Assert.Equal(response.ErrorCode, ErrorCategory.NoHandlerForCommand.ToString());
     }
     
-    [Fact(Skip = "This needs work")]
-    public async Task ReconnectsAfterConnectionFailure()
-    {
-        var server = await CreateSystemUnderTest(
-            configure => 
-            configure.WithRoutingServers(_container.GetGrpcProxyEndpoint()));
-        await server.WaitUntilReadyAsync();
-
-        var client = await CreateSystemUnderTest();
-        await client.WaitUntilReadyAsync();
-        
-        var requestId = InstructionId.New();
-        var responseId = InstructionId.New();
-        var commandName = _fixture.Create<CommandName>();
-        var registration = await server.CommandChannel.RegisterCommandHandlerAsync((command, ct) => Task.FromResult(new CommandResponse
-        {
-            MessageIdentifier = responseId.ToString(),
-            Payload = new SerializedObject
-            {
-                Type = "pong",
-                Revision = "0",
-                Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
-            }
-            
-        }), new LoadFactor(1), commandName);
-
-        await registration.WaitUntilCompletedAsync();
-
-        await _container.DisableGrpcProxyEndpointAsync();
-
-        await Task.Delay(TimeSpan.FromSeconds(2));
-
-        await _container.EnableGrpcProxyEndpointAsync();
-        
-        await Task.Delay(TimeSpan.FromSeconds(2));
-
-        var result = await client.CommandChannel.SendCommandAsync(new Command
-        {
-            Name = commandName.ToString(),
-            MessageIdentifier = requestId.ToString()
-        }, CancellationToken.None);
-
-        Assert.Null(result.ErrorCode);
-        Assert.Equal(responseId.ToString(), result.MessageIdentifier);
-        Assert.Equal(requestId.ToString(), result.RequestIdentifier);
-    }
+    // [Fact(Skip = "This needs work")]
+    // public async Task ReconnectsAfterConnectionFailure()
+    // {
+    //     var server = await CreateSystemUnderTest(
+    //         configure => 
+    //         configure.WithRoutingServers(_container.GetGrpcProxyEndpoint()));
+    //     await server.WaitUntilReadyAsync();
+    //
+    //     var client = await CreateSystemUnderTest();
+    //     await client.WaitUntilReadyAsync();
+    //     
+    //     var requestId = InstructionId.New();
+    //     var responseId = InstructionId.New();
+    //     var commandName = _fixture.Create<CommandName>();
+    //     var registration = await server.CommandChannel.RegisterCommandHandlerAsync((command, ct) => Task.FromResult(new CommandResponse
+    //     {
+    //         MessageIdentifier = responseId.ToString(),
+    //         Payload = new SerializedObject
+    //         {
+    //             Type = "pong",
+    //             Revision = "0",
+    //             Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+    //         }
+    //         
+    //     }), new LoadFactor(1), commandName);
+    //
+    //     await registration.WaitUntilCompletedAsync();
+    //
+    //     await _container.DisableGrpcProxyEndpointAsync();
+    //
+    //     await Task.Delay(TimeSpan.FromSeconds(2));
+    //
+    //     await _container.EnableGrpcProxyEndpointAsync();
+    //     
+    //     await Task.Delay(TimeSpan.FromSeconds(2));
+    //
+    //     var result = await client.CommandChannel.SendCommandAsync(new Command
+    //     {
+    //         Name = commandName.ToString(),
+    //         MessageIdentifier = requestId.ToString()
+    //     }, CancellationToken.None);
+    //
+    //     Assert.Null(result.ErrorCode);
+    //     Assert.Equal(responseId.ToString(), result.MessageIdentifier);
+    //     Assert.Equal(requestId.ToString(), result.RequestIdentifier);
+    // }
 }

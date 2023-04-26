@@ -8,9 +8,6 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class AxonServerConnectionFactory : IAsyncDisposable
 {
-    private const long NotDisposed = 0L;
-    private const long Disposed = 1L;
-        
     private readonly AsyncLock _lock;
     private readonly Dictionary<Context, AxonServerConnection> _connections;
     private long _disposed;
@@ -86,7 +83,7 @@ public class AxonServerConnectionFactory : IAsyncDisposable
 
     internal async ValueTask TryRemoveConnectionAsync(Context context, AxonServerConnection connection)
     {
-        if (Interlocked.Read(ref _disposed) == NotDisposed)
+        if (Interlocked.Read(ref _disposed) == Disposed.No)
         {
             using (await _lock.AcquireAsync(CancellationToken.None))
             {
@@ -103,13 +100,13 @@ public class AxonServerConnectionFactory : IAsyncDisposable
     
     private void ThrowIfDisposed()
     {
-        if (Interlocked.Read(ref _disposed) == Disposed) 
-            throw new ObjectDisposedException(nameof(AxonServerConnection));
+        if (Interlocked.Read(ref _disposed) == Disposed.Yes) 
+            throw new ObjectDisposedException(nameof(AxonServerConnectionFactory));
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.CompareExchange(ref _disposed, Disposed, NotDisposed) == NotDisposed)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
             await _lock.DisposeAsync();
             await Scheduler.DisposeAsync().ConfigureAwait(false);

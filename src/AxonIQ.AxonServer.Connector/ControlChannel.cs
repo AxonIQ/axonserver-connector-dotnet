@@ -48,6 +48,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
 
 #pragma warning disable CA2016
 #pragma warning disable CS4014
+// ReSharper disable MethodSupportsCancellation
     private async Task<State> Receive(Message message, State state, CancellationToken ct)
     {
         switch (state, message)
@@ -371,7 +372,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                     await connected.Call.RequestStream.WriteAsync(send.Instruction).ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(send.Instruction.InstructionId))
                     {
-                        connected.AwaitedInstructions.Add(new InstructionId(send.Instruction.InstructionId), send.Completion);
+                        connected.AwaitedInstructions.Add(InstructionId.Parse(send.Instruction.InstructionId), send.Completion);
                     }
                     if (string.IsNullOrEmpty(send.Instruction.InstructionId))
                     {
@@ -405,8 +406,6 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                     case TaskResult<PlatformOutboundInstruction>.Ok ok:
                         switch (ok.Value.RequestCase)
                         {
-                            // case PlatformOutboundInstruction.RequestOneofCase.None:
-                            //     break;
                             // case PlatformOutboundInstruction.RequestOneofCase.NodeNotification:
                             //     break;
                             case PlatformOutboundInstruction.RequestOneofCase.RequestReconnect:
@@ -421,7 +420,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                         await handler.PauseAsync();
                                         return true;
                                     },
-                                    new InstructionId(ok.Value.InstructionId),
+                                    InstructionId.Parse(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
                                 );
@@ -434,7 +433,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                         await handler.StartAsync();
                                         return true;
                                     },
-                                    new InstructionId(ok.Value.InstructionId),
+                                    InstructionId.Parse(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
                                 );
@@ -443,7 +442,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                 await ExecuteEventProcessorInstruction(
                                     new EventProcessorName(ok.Value.ReleaseSegment.ProcessorName),
                                     handler => handler.ReleaseSegmentAsync(new SegmentId(ok.Value.ReleaseSegment.SegmentIdentifier)),
-                                    new InstructionId(ok.Value.InstructionId),
+                                    InstructionId.Parse(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
                                 );
@@ -457,7 +456,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                             _actor,
                                             result => new Message.GotEventProcessorInfo(
                                                 name,
-                                                new InstructionId(ok.Value.InstructionId),
+                                                InstructionId.Parse(ok.Value.InstructionId),
                                                 result),
                                             ct
                                         );
@@ -467,7 +466,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                 await ExecuteEventProcessorInstruction(
                                     new EventProcessorName(ok.Value.SplitEventProcessorSegment.ProcessorName),
                                     handler => handler.SplitSegmentAsync(new SegmentId(ok.Value.SplitEventProcessorSegment.SegmentIdentifier)),
-                                    new InstructionId(ok.Value.InstructionId),
+                                    InstructionId.Parse(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
                                 );
@@ -476,7 +475,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                 await ExecuteEventProcessorInstruction(
                                     new EventProcessorName(ok.Value.MergeEventProcessorSegment.ProcessorName),
                                     handler => handler.MergeSegmentAsync(new SegmentId(ok.Value.MergeEventProcessorSegment.SegmentIdentifier)),
-                                    new InstructionId(ok.Value.InstructionId),
+                                    InstructionId.Parse(ok.Value.InstructionId),
                                     connected.EventProcessors,
                                     ct
                                 );
@@ -490,12 +489,11 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                                     }), ct).ConfigureAwait(false);
                                 break;
                             case PlatformOutboundInstruction.RequestOneofCase.Ack:
-                                if (!string.IsNullOrEmpty(ok.Value.Ack.InstructionId))
+                                if(InstructionId.TryParse(ok.Value.Ack.InstructionId, out var instructionId)) 
                                 {
-                                    var instruction = new InstructionId(ok.Value.Ack.InstructionId);
-                                    if (connected.AwaitedInstructions.TryGetValue(instruction, out var completion))
+                                    if (connected.AwaitedInstructions.TryGetValue(instructionId, out var completion))
                                     {
-                                        connected.AwaitedInstructions.Remove(instruction);
+                                        connected.AwaitedInstructions.Remove(instructionId);
                                         if (ok.Value.Ack.Success)
                                         {
                                             completion.SetResult();
@@ -703,6 +701,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
     }
 #pragma warning restore CS4014
 #pragma warning restore CA2016
+// ReSharper enable MethodSupportsCancellation
 
     private abstract record Message
     {

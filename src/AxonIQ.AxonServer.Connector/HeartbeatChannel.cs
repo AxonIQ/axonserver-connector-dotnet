@@ -213,7 +213,7 @@ public class HeartbeatChannel : IAsyncDisposable
                     state
                         .SentHeartbeats
                         .SingleOrDefault(candidate =>
-                            candidate.InstructionId.Equals(new InstructionId(receive.Acknowledgement.InstructionId)));
+                            candidate.InstructionId.Equals(InstructionId.Parse(receive.Acknowledgement.InstructionId)));
                 if (match != null)
                 {
                     if (receive.Acknowledgement.Success)
