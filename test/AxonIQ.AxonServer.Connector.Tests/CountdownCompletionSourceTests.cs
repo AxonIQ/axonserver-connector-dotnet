@@ -30,7 +30,7 @@ public class CountdownCompletionSourceTests
         [Fact]
         public void SignalFaultReturnsExpectedResult()
         {
-            Assert.True(_sut.SignalFault(new Exception()));
+            Assert.True(_sut.TrySignalFailure(new Exception()));
             Assert.True(_sut.Completion.IsCompleted);
             Assert.True(_sut.Completion.IsFaulted);
             Assert.Equal(1, _sut.CurrentCount);
@@ -39,7 +39,7 @@ public class CountdownCompletionSourceTests
         [Fact]
         public void SignalSuccessReturnsExpectedResult()
         {
-            Assert.True(_sut.SignalSuccess());
+            Assert.True(_sut.TrySignalSuccess());
             Assert.True(_sut.Completion.IsCompleted);
             Assert.False(_sut.Completion.IsFaulted);
             Assert.True(_sut.Completion.IsCompletedSuccessfully);
@@ -65,7 +65,7 @@ public class CountdownCompletionSourceTests
         [Fact]
         public void SignalFaultReturnsExpectedResult()
         {
-            Assert.False(_sut.SignalFault(new Exception()));
+            Assert.False(_sut.TrySignalFailure(new Exception()));
             Assert.False(_sut.Completion.IsCompleted);
             Assert.Equal(1, _sut.CurrentCount);
         }
@@ -73,7 +73,7 @@ public class CountdownCompletionSourceTests
         [Fact]
         public void SignalSuccessReturnsExpectedResult()
         {
-            Assert.False(_sut.SignalSuccess());
+            Assert.False(_sut.TrySignalSuccess());
             Assert.False(_sut.Completion.IsCompleted);
             Assert.Equal(1, _sut.CurrentCount);
         }
@@ -89,22 +89,22 @@ public class CountdownCompletionSourceTests
                 {
                     if (index == _sut.InitialCount - 1)
                     {
-                        Assert.True(_sut.SignalFault(exception));    
+                        Assert.True(_sut.TrySignalFailure(exception));    
                     }
                     else
                     {
-                        Assert.False(_sut.SignalFault(exception));
+                        Assert.False(_sut.TrySignalFailure(exception));
                     }
                 }
                 else
                 {
                     if (index == _sut.InitialCount - 1)
                     {
-                        Assert.True(_sut.SignalSuccess());
+                        Assert.True(_sut.TrySignalSuccess());
                     }
                     else
                     {
-                        Assert.False(_sut.SignalSuccess());
+                        Assert.False(_sut.TrySignalSuccess());
                     }
                 }
             }
@@ -123,11 +123,11 @@ public class CountdownCompletionSourceTests
             {
                 if (index == _sut.InitialCount - 1)
                 {
-                    Assert.True(_sut.SignalFault(exception));
+                    Assert.True(_sut.TrySignalFailure(exception));
                 }
                 else
                 {
-                    Assert.False(_sut.SignalFault(exception));
+                    Assert.False(_sut.TrySignalFailure(exception));
                 }
             }
             
@@ -146,11 +146,11 @@ public class CountdownCompletionSourceTests
             {
                 if (index == _sut.InitialCount - 1)
                 {
-                    Assert.True(_sut.SignalSuccess());
+                    Assert.True(_sut.TrySignalSuccess());
                 }
                 else
                 {
-                    Assert.False(_sut.SignalSuccess());
+                    Assert.False(_sut.TrySignalSuccess());
                 }
             }
             

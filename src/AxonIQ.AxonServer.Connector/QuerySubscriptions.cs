@@ -68,7 +68,7 @@ public class QuerySubscriptions
     
     public void Acknowledge(InstructionAck acknowledgement)
     {
-        var instructionId = new InstructionId(acknowledgement.InstructionId);
+        var instructionId = InstructionId.Parse(acknowledgement.InstructionId);
             
         if (SubscribeInstructions.TryGetValue(instructionId, out var subscribeSubscriptionId)
             && AllSubscriptions.TryGetValue(subscribeSubscriptionId, out var subscribeSubscription))
@@ -79,7 +79,7 @@ public class QuerySubscriptions
             {
                 if (acknowledgement.Success)
                 {
-                    if (completionSource.SignalSuccess())
+                    if (completionSource.TrySignalSuccess())
                     {
                         SubscribeCompletionSources.Remove(subscribeSubscription.QueryHandlerId);
                     }
@@ -91,7 +91,7 @@ public class QuerySubscriptions
                         acknowledgement.Error.Message,
                         acknowledgement.Error.Location,
                         acknowledgement.Error.Details);
-                    if (completionSource.SignalFault(exception))
+                    if (completionSource.TrySignalFailure(exception))
                     {
                         SubscribeCompletionSources.Remove(subscribeSubscription.QueryHandlerId);
                     }
@@ -129,7 +129,7 @@ public class QuerySubscriptions
             {
                 if (acknowledgement.Success)
                 {
-                    if (completionSource.SignalSuccess())
+                    if (completionSource.TrySignalSuccess())
                     {
                         UnsubscribeCompletionSources.Remove(unsubscribeSubscription.QueryHandlerId);
                         AllQueryHandlers.Remove(unsubscribeSubscription.QueryHandlerId);
@@ -142,7 +142,7 @@ public class QuerySubscriptions
                         acknowledgement.Error.Message,
                         acknowledgement.Error.Location,
                         acknowledgement.Error.Details);
-                    if (completionSource.SignalFault(exception))
+                    if (completionSource.TrySignalFailure(exception))
                     {
                         UnsubscribeCompletionSources.Remove(unsubscribeSubscription.QueryHandlerId);
                         AllQueryHandlers.Remove(unsubscribeSubscription.QueryHandlerId);

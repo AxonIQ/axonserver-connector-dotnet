@@ -13,7 +13,7 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
     private readonly Task _consumer;
     
     private TState _state;
-    private bool _disposed;
+    private long _disposed;
 
     public AxonActor(
         Func<TMessage, TState, CancellationToken, Task<TState>> receiver, 
@@ -73,14 +73,14 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
             if (_logger.IsEnabled(LogLevel.Debug))
             {
                 _logger.LogDebug(exception,
-                    $"Actor protocol loop is exciting because an operation was cancelled");    
+                    $"Actor protocol loop is exciting gracefully because an operation was cancelled");    
             }
         }
         catch (Exception exception)
         {
             _logger.LogCritical(
                 exception,
-                "Actor protocol loop is exciting because of an unexpected exception");
+                "Actor protocol loop is exciting unexpectedly because of an exception");
         }
     }
 
@@ -138,29 +138,18 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
 
     private void ThrowIfDisposed()
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(AxonActor<TMessage, TState>));
+        if (Interlocked.Read(ref _disposed) == Disposed.Yes) throw new ObjectDisposedException(nameof(AxonActor<TMessage, TState>));
     }
     
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        
-        if (_logger.IsEnabled(LogLevel.Debug))
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
-            _logger.LogDebug("Disposing actor");
+            _inboxCancellation.Cancel();
+            _inbox.Writer.Complete();
+            await _consumer.ConfigureAwait(false);
+            _inboxCancellation.Dispose();
+            _consumer.Dispose();
         }
-        
-        _inboxCancellation.Cancel();
-        _inbox.Writer.Complete();
-        await _consumer.ConfigureAwait(false);
-        _inboxCancellation.Dispose();
-        _consumer.Dispose();
-        
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug("Disposed actor");
-        }
-
-        _disposed = true;
     }
 }

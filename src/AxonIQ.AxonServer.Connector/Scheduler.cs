@@ -5,7 +5,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 public class Scheduler : IScheduler
 {
-    public static readonly TimeSpan Frequency = TimeSpan.FromMilliseconds(10);
+    public static readonly TimeSpan DefaultTickFrequency = TimeSpan.FromMilliseconds(10);
     
     private readonly Func<DateTimeOffset> _clock;
     private readonly TimeSpan _frequency;
@@ -16,10 +16,7 @@ public class Scheduler : IScheduler
     private readonly Task _consumer;
     private readonly Timer _timer;
 
-    public Scheduler(Func<DateTimeOffset> clock, ILogger<Scheduler> logger)
-        : this(clock, Frequency, logger)
-    {
-    }
+    private long _disposed;
 
     public Scheduler(Func<DateTimeOffset> clock, TimeSpan frequency, ILogger<Scheduler> logger)
     {
@@ -164,24 +161,29 @@ public class Scheduler : IScheduler
 
         public record ScheduleTask(Func<ValueTask> Task, DateTimeOffset Due) : Message;
     }
-
-    public ValueTask ScheduleTaskAsync(Func<ValueTask> task, DateTimeOffset due)
-    {
-        return _inbox.Writer.WriteAsync(new Message.ScheduleTask(task, due));
-    }
     
     public ValueTask ScheduleTaskAsync(Func<ValueTask> task, TimeSpan due)
     {
+        ThrowIfDisposed();
         return _inbox.Writer.WriteAsync(new Message.ScheduleTask(task, _clock().Add(due)));
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (Interlocked.Read(ref _disposed) == Disposed.Yes) 
+            throw new ObjectDisposedException(nameof(Scheduler));
     }
 
     public async ValueTask DisposeAsync()
     {
-        _inboxCancellation.Cancel();
-        _inbox.Writer.Complete();
-        await _consumer.ConfigureAwait(false);
-        await _timer.DisposeAsync().ConfigureAwait(false);
-        _inboxCancellation.Dispose();
-        _consumer.Dispose();
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
+        {
+            _inboxCancellation.Cancel();
+            _inbox.Writer.Complete();
+            await _consumer.ConfigureAwait(false);
+            await _timer.DisposeAsync().ConfigureAwait(false);
+            _inboxCancellation.Dispose();
+            _consumer.Dispose();
+        }
     }
 }

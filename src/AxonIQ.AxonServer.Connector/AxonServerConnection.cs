@@ -18,9 +18,6 @@ internal class AxonServerConnection : IAxonServerConnection
     private readonly Lazy<CommandChannel> _commandChannel;
     private readonly Lazy<QueryChannel> _queryChannel;
     private readonly Lazy<EventChannel> _eventChannel;
-
-    private const long NotDisposed = 0L;
-    private const long Disposed = 1L;
     
     private long _disposed;
 
@@ -48,10 +45,8 @@ internal class AxonServerConnection : IAxonServerConnection
             factory.ChannelFactory.ClientIdentity,
             CallInvoker));
         _commandChannel = new Lazy<CommandChannel>(() => new CommandChannel(
-            factory.ChannelFactory.ClientIdentity,
-            _context,
+            this,
             factory.Scheduler,
-            CallInvoker,
             factory.CommandPermits,
             new PermitCount(factory.CommandPermits.ToInt64() / 4L),
             factory.ReconnectOptions,
@@ -324,12 +319,12 @@ internal class AxonServerConnection : IAxonServerConnection
         }
     }
 
-    public bool IsConnected => Interlocked.Read(ref _disposed) == NotDisposed && _actor.State is State.Connected;
+    public bool IsConnected => Interlocked.Read(ref _disposed) == Disposed.No && _actor.State is State.Connected;
 
-    public bool IsClosed => Interlocked.Read(ref _disposed) == Disposed;
+    public bool IsClosed => Interlocked.Read(ref _disposed) == Disposed.Yes;
 
     public bool IsReady =>
-        Interlocked.Read(ref _disposed) == NotDisposed 
+        Interlocked.Read(ref _disposed) == Disposed.No 
         && IsConnected
         && _controlChannel.IsConnected
         // _adminChannel does not have this notion
@@ -419,7 +414,7 @@ internal class AxonServerConnection : IAxonServerConnection
 
     private void ThrowIfDisposed()
     {
-        if (Interlocked.Read(ref _disposed) == Disposed) 
+        if (Interlocked.Read(ref _disposed) == Disposed.Yes) 
             throw new ObjectDisposedException(nameof(AxonServerConnection));
     }
     
@@ -427,7 +422,7 @@ internal class AxonServerConnection : IAxonServerConnection
     
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.CompareExchange(ref _disposed, Disposed, NotDisposed) == NotDisposed)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
             await _controlChannel.DisposeAsync().ConfigureAwait(false);
             if (_commandChannel.IsValueCreated)

@@ -1,0 +1,15 @@
+@startuml CommandChannel state machine
+[*] --> Disconnected
+
+Disconnected-->Disconnected: RegisterCommandHandler / Connect \n UnregisterCommandHandler \n PurgeOverdueInstructions
+Disconnected-->Connecting: Connect / OpenStream 
+Connecting-->Connecting: OpenStream / StreamOpened \n StreamOpened(Error) / Schedule(OpenSteam) \n RegisterCommandHandler \n UnregisterCommandHandler \n PurgeOverdueInstructions
+Connecting-->Connected: StreamOpened(Ok) / ReceiveCommandProviderInbound, SendCommandProviderOutbound(FlowControl), OnConnected, [foreach registered command] SendCommandProviderOutbound(Subscribe)
+Connected-->Connected: ReceiveCommandProviderInbound(Ok) [Case=Command] / SendCommandProviderOutbound(Ack), [handler found] CommandHandled, [no handler found] SendCommandProviderOutbound(CommandResponse), [permits required] SendCommandProviderOutbound(FlowControl) \n ReceiveCommandProviderInbound(Ok) [Case=Ack] / SendCommandProviderOutbound(Ack), [permits required] SendCommandProviderOutbound(FlowControl) \n CommandHandled(Ok|Error) / SendCommandProviderOutbound(CommandResponse) \n SendCommandProviderOutbound / SendCommandProviderOutboundFaulted \n SendCommandProviderOutboundFaulted \n OnConnected \n RegisterCommandHandler / [has no registered commands] Schedule(PurgeOverdueInstructions), SendCommandProviderOutbound(Subscribe) \n UnregisterCommandHandler / SendCommandProviderOutbound(Unsubscribe) \n PurgeOverdueInstructions / [has registered commands] Schedule(PurgeOverdueInstructions)
+Connected-->Faulted: ReceiveCommandProviderInbound(Error)
+Faulted-->Faulted: RegisterCommandHandler \n UnregisterCommandHandler \n PurgeOverdueInstructions
+
+Connecting --> [*]: Close
+Connected --> [*]: Close
+Faulted --> [*]: Close
+@enduml

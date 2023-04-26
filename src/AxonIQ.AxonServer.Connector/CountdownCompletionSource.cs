@@ -24,7 +24,7 @@ public class CountdownCompletionSource
 
     public Task Completion => _completion;
 
-    public bool SignalFault(Exception exception)
+    public bool TrySignalFailure(Exception exception)
     {
         if (_source.Task.IsCompleted) return false;
 
@@ -34,7 +34,7 @@ public class CountdownCompletionSource
         return CurrentCount == InitialCount && _source.TrySetException(_exceptions);
     }
 
-    public bool SignalSuccess()
+    public bool TrySignalSuccess()
     {
         if (_source.Task.IsCompleted) return false;
 

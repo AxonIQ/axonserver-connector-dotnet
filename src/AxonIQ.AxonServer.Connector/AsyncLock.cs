@@ -30,12 +30,12 @@ internal class AsyncLock : IAsyncDisposable
 
     private void ThrowIfDisposed()
     {
-        if (Interlocked.Read(ref _disposed) == 1L) throw new ObjectDisposedException(nameof(AsyncLock));
+        if (Interlocked.Read(ref _disposed) == Disposed.Yes) throw new ObjectDisposedException(nameof(AsyncLock));
     }
     
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.CompareExchange(ref _disposed, 1L, 0L) == 0L)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
             await _semaphore.WaitAsync();
             _semaphore.Dispose();

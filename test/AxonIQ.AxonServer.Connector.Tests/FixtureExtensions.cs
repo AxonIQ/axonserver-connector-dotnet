@@ -37,6 +37,14 @@ public static class FixtureExtensions
                 .OmitAutoProperties());
     }
     
+    public static void CustomizeRegisteredCommandId(this IFixture fixture)
+    {
+        fixture.Customize<RegisteredCommandId>(composer =>
+            composer
+                .FromFactory(RegisteredCommandId.New)
+                .OmitAutoProperties());
+    }
+    
     public static void CustomizeSubscriptionId(this IFixture fixture)
     {
         fixture.Customize<SubscriptionId>(composer =>
