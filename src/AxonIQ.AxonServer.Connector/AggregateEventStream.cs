@@ -4,12 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class AggregateEventStream : IAggregateEventStream
+internal class AggregateEventStream : IAggregateEventStream
 {
     private readonly AsyncServerStreamingCall<Event> _call;
     private readonly ILogger<AggregateEventStream> _logger;
 
-    internal AggregateEventStream(AsyncServerStreamingCall<Event> call,
+    public AggregateEventStream(AsyncServerStreamingCall<Event> call,
         ILogger<AggregateEventStream> logger)
     {
         _call = call ?? throw new ArgumentNullException(nameof(call));

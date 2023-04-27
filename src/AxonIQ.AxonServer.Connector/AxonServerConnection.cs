@@ -60,10 +60,8 @@ internal class AxonServerConnection : IAxonServerConnection
             new PermitCount(factory.QueryPermits.ToInt64() / 4L),
             factory.LoggerFactory));
         _eventChannel = new Lazy<EventChannel>(() => new EventChannel(
-            factory.ChannelFactory.ClientIdentity,
-            _context,
+            this,
             factory.Scheduler.Clock,
-            CallInvoker,
             factory.LoggerFactory));
     }
 
@@ -236,11 +234,6 @@ internal class AxonServerConnection : IAxonServerConnection
                 if (_queryChannel.IsValueCreated)
                 {
                     await _queryChannel.Value.Reconnect().ConfigureAwait(false);
-                }
-
-                if (_eventChannel.IsValueCreated)
-                {
-                    await _eventChannel.Value.Reconnect().ConfigureAwait(false);
                 }
 
                 break;

@@ -1,42 +1,31 @@
 using Google.Protobuf.WellKnownTypes;
-using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Event;
 using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class EventChannel : IEventChannel
+internal class EventChannel : IEventChannel
 {
+    private readonly AxonServerConnection _connection;
+    private readonly Func<DateTimeOffset> _clock;
     private readonly ILoggerFactory _loggerFactory;
 
     public EventChannel(
-        ClientIdentity clientIdentity,
-        Context context,
+        AxonServerConnection connection,
         Func<DateTimeOffset> clock,
-        CallInvoker callInvoker,
         ILoggerFactory loggerFactory)
     {
-        ClientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
-        Context = context;
-        Clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
 
-        EventStore = new EventStore.EventStoreClient(callInvoker);
-        EventScheduler = new EventScheduler.EventSchedulerClient(callInvoker);
+        EventStore = new EventStore.EventStoreClient(connection.CallInvoker);
+        EventScheduler = new EventScheduler.EventSchedulerClient(connection.CallInvoker);
     }
     
-    public ClientIdentity ClientIdentity { get; }
-    public Context Context { get; }
-    public Func<DateTimeOffset> Clock { get; }
     public EventStore.EventStoreClient EventStore { get; }
     public EventScheduler.EventSchedulerClient EventScheduler { get; }
-    
-    public ValueTask Reconnect()
-    {
-        //TODO
-        return ValueTask.CompletedTask;
-    }
     
     public IAppendEventsTransaction StartAppendEventsTransaction()
     {
@@ -46,7 +35,7 @@ public class EventChannel : IEventChannel
 
     public Task<ScheduledEventCancellationToken> ScheduleEventAsync(Duration duration, Event @event)
     {
-        return ScheduleEventAsync(Clock().Add(duration.ToTimeSpan()), @event);
+        return ScheduleEventAsync(_clock().Add(duration.ToTimeSpan()), @event);
     }
 
     public async Task<ScheduledEventCancellationToken> ScheduleEventAsync(DateTimeOffset instant, Event @event)
@@ -73,7 +62,7 @@ public class EventChannel : IEventChannel
 
     public Task<ScheduledEventCancellationToken> RescheduleAsync(ScheduledEventCancellationToken token, Duration duration, Event @event)
     {
-        return RescheduleAsync(token, Clock().Add(duration.ToTimeSpan()), @event);
+        return RescheduleAsync(token, _clock().Add(duration.ToTimeSpan()), @event);
     }
 
     public async Task<ScheduledEventCancellationToken> RescheduleAsync(ScheduledEventCancellationToken token, DateTimeOffset instant, Event @event)
@@ -185,12 +174,12 @@ public class EventChannel : IEventChannel
     public IAsyncEnumerable<IEventQueryResultEntry> QueryEvents(string expression, bool liveStream)
     {
         var call = EventStore.QueryEvents();
-        return new EventQueryResponseStream(expression, liveStream, false, call, _loggerFactory.CreateLogger<EventQueryResponseStream>());
+        return new EventQueryResponseStream(_connection.Context, expression, liveStream, false, call, _loggerFactory.CreateLogger<EventQueryResponseStream>());
     }
 
     public IAsyncEnumerable<IEventQueryResultEntry> QuerySnapshotEvents(string expression, bool liveStream)
     {
         var call = EventStore.QueryEvents();
-        return new EventQueryResponseStream(expression, liveStream, true, call, _loggerFactory.CreateLogger<EventQueryResponseStream>());
+        return new EventQueryResponseStream(_connection.Context, expression, liveStream, true, call, _loggerFactory.CreateLogger<EventQueryResponseStream>());
     }
 }

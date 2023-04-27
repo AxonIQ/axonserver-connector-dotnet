@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct ScheduledEventCancellationToken
+public readonly struct ScheduledEventCancellationToken : IEquatable<ScheduledEventCancellationToken>
 {
     private readonly string _value;
 

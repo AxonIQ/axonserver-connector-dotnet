@@ -593,7 +593,7 @@ public class QueryChannel : IQueryChannel, IAsyncDisposable
         var request = new QueryRequest(query);
         if (string.IsNullOrEmpty(request.MessageIdentifier))
         {
-            request.MessageIdentifier = Guid.NewGuid().ToString("D");
+            request.MessageIdentifier = InstructionId.New().ToString();
         }
         try
         {

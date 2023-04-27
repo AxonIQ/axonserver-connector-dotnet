@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct EventStreamToken
+public readonly struct EventStreamToken : IEquatable<EventStreamToken>
 {
     private readonly long _value;
 

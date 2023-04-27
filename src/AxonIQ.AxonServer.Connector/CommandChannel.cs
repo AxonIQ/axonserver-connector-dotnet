@@ -544,7 +544,7 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
         };
         if (string.IsNullOrEmpty(request.MessageIdentifier))
         {
-            request.MessageIdentifier = Guid.NewGuid().ToString("D");
+            request.MessageIdentifier = InstructionId.New().ToString();
         }
 
         if (request.ProcessingInstructions.All(instruction => instruction.Key != ProcessingKey.RoutingKey))
