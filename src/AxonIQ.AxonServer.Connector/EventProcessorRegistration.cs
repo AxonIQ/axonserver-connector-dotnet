@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public class EventProcessorRegistration : IEventProcessorRegistration
+internal class EventProcessorRegistration : IEventProcessorRegistration
 {
     private int _disposed;
     

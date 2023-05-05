@@ -9,7 +9,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
 [SuppressMessage("Reliability", "CA2016:Forward the \'CancellationToken\' parameter to methods")]
-public class QueryChannel : IQueryChannel, IAsyncDisposable
+internal class QueryChannel : IQueryChannel, IAsyncDisposable
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<QueryChannel> _logger;

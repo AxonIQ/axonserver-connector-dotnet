@@ -2,7 +2,7 @@ using Io.Axoniq.Axonserver.Grpc.Query;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class SubscriptionQueryUpdateResponseChannel : ISubscriptionQueryUpdateResponseChannel
+internal class SubscriptionQueryUpdateResponseChannel : ISubscriptionQueryUpdateResponseChannel
 {
     private readonly ClientIdentity _clientIdentity;
     private readonly SubscriptionIdentifier _subscriptionIdentifier;

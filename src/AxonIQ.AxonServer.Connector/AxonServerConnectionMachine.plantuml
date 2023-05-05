@@ -1,14 +1,14 @@
 @startuml AxonServerConnection state machine
 [*] --> Disconnected
-Disconnected --> Connecting: Connect [Attempt = 0] / GrpcChannelEstablished
-Connecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ConnectControlChannel
-Connecting --> Connecting: GrpcChannelEstablished(Ok channel) [channel null] / Schedule(Connect(Attempt + 1)) \n GrpcChannelEstablished(Error exception) / Schedule(Connect(Attempt + 1))
-Connected --> Reconnecting: Reconnect [Attempt = 0] / GrpcChannelEstablished
-Reconnecting --> Reconnecting: GrpcChannelEstablished(Ok channel) [channel null] / Schedule(Reconnect(Attempt + 1)) \n GrpcChannelEstablished(Error exception) / Schedule(Reconnect(Attempt + 1))
-Reconnecting --> Connected: GrpcChannelEstablished(Ok channel) [channel not null] / ReconnectChannels
-Connected --> Connected: ConnectControlChannel \n ReconnectChannels
-Connected --> Closed: Close
-Connecting --> Closed: Close
-Reconnecting --> Closed: Close
-Closed --> [*]
+Disconnected-->Disconnected: WaitUntilConnected \n WaitUntilReady \n CheckReadiness
+Disconnected-->Connecting: Connect(Attempt = 0) / GrpcChannelEstablished
+Connecting-->Connecting: Connect / GrpcChannelEstablished \n GrpcChannelEstablished(Ok) [channel == null] / Schedule(Connect(Attempt+1)) \n GrpcChannelEstablished(Error) / Schedule(Connect(Attempt+1)) \n WaitUntilConnected \n WaitUntilReady \n CheckReadiness
+Connecting-->Connected: GrpcChannelEstablished(Ok) [channel <> null] / ConnectControlChannel, OnConnected, CheckReadiness
+Connected-->Reconnecting: Reconnect((Attempt = 0) / GrpcChannelEstablished
+Reconnecting-->Reconnecting: Reconnect / GrpcChannelEstablished \n GrpcChannelEstablished(Ok) [channel == null] / Reconnect(Attempt+1) \n GrpcChannelEstablished(Error) / Reconnect(Attempt+1) \n WaitUntilConnected \n WaitUntilReady \n CheckReadiness
+Reconnecting-->Connected: GrpcChannelEstablished(Ok) [channel <> null] / ReconnectChannels, OnConnected, CheckReadiness
+Connected-->Connected: ConnectControlChannel \n ReconnectChannels \n WaitUntilConnected \n WaitUntilReady \n OnConnected \n CheckReadiness
+Connected --> [*]: Close
+Connecting --> [*]: Close
+Reconnecting --> [*]: Close
 @enduml

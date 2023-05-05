@@ -472,9 +472,11 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
             : State(CommandHandlers, Flow);
     }
     
-    public bool IsConnected => !_actor.State.CommandHandlers.HasRegisteredCommands || _actor.State is State.Connected;
+    public bool IsConnected => 
+        !_actor.State.CommandHandlers.HasRegisteredCommands 
+        || (_actor.State.CommandHandlers.HasRegisteredCommands && _actor.State is State.Connected);
 
-    public async ValueTask Reconnect()
+    internal async ValueTask Reconnect()
     {
         await _actor.TellAsync(new Message.Reconnect()).ConfigureAwait(false);
     }

@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-internal class AsyncLock : IAsyncDisposable
+internal class  AsyncLock : IAsyncDisposable
 {
     private long _disposed;
     

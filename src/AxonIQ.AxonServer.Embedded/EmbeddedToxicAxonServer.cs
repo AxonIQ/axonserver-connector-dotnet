@@ -143,6 +143,15 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
             _logger.LogDebug("Enabled gRPC proxy endpoint");
         }
     }
+    
+    public async Task ResetAsync()
+    {
+        if (_proxyConnection != null)
+        {
+            await _proxyConnection.Client().ResetAsync();
+            _logger.LogDebug("Reset gRPC proxy endpoint");
+        }
+    }
 
     public async Task<IAsyncDisposable> ResetPeerOnGrpcProxyEndpointAsync(int? timeout = default)
     {

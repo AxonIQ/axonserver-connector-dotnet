@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class Scheduler : IScheduler
+internal class Scheduler : IScheduler
 {
     public static readonly TimeSpan DefaultTickFrequency = TimeSpan.FromMilliseconds(10);
     

@@ -12,4 +12,5 @@ public interface IToxicAxonServer : IAxonServer
     Task EnableGrpcProxyEndpointAsync();
     Task<IAsyncDisposable> ResetPeerOnGrpcProxyEndpointAsync(int? timeout = default);
     Task<IAsyncDisposable> TimeoutEndpointAsync(int? timeout = default);
+    Task ResetAsync();
 }

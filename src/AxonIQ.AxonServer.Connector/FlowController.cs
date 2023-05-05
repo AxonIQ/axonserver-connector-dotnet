@@ -1,8 +1,6 @@
-using Io.Axoniq.Axonserver.Grpc;
-
 namespace AxonIQ.AxonServer.Connector;
 
-public class FlowController
+internal class FlowController
 {
     private PermitCounter _current;
     

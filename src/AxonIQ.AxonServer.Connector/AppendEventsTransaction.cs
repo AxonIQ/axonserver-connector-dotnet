@@ -4,14 +4,14 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class AppendEventsTransaction : IAppendEventsTransaction
+internal class AppendEventsTransaction : IAppendEventsTransaction
 {
     private readonly AsyncClientStreamingCall<Event, Confirmation> _call;
     private readonly ILogger<AppendEventsTransaction> _logger;
     private readonly Guid _transactionId;
-    private int _disposed;
+    private long _disposed;
 
-    internal AppendEventsTransaction(AsyncClientStreamingCall<Event, Confirmation> call, ILogger<AppendEventsTransaction> logger)
+    public AppendEventsTransaction(AsyncClientStreamingCall<Event, Confirmation> call, ILogger<AppendEventsTransaction> logger)
     {
         _call = call ?? throw new ArgumentNullException(nameof(call));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -26,17 +26,20 @@ public class AppendEventsTransaction : IAppendEventsTransaction
 
     public async Task<Confirmation> CommitAsync()
     {
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
             _logger.LogDebug("Committing transaction {TransactionId}", _transactionId.ToString("N"));
             await _call.RequestStream.CompleteAsync().ConfigureAwait(false);
         }
-        return await _call.ResponseAsync.ConfigureAwait(false);
+        var confirmation = await _call.ResponseAsync.ConfigureAwait(false);
+        _call.Dispose();
+        return confirmation;
     }
 
+    // TODO: No reason for this to be asynchronous.
     public Task RollbackAsync()
     {
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
             _logger.LogDebug("Rolling back transaction {TransactionId}", _transactionId.ToString("N"));
             _call.Dispose();
@@ -47,7 +50,7 @@ public class AppendEventsTransaction : IAppendEventsTransaction
 
     public void Dispose()
     {
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        if (Interlocked.CompareExchange(ref _disposed, Disposed.Yes, Disposed.No) == Disposed.No)
         {
             _call.Dispose();
         }

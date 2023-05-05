@@ -79,4 +79,9 @@ public abstract class ToxicAxonServer : IToxicAxonServer
     {
         return Server.TimeoutEndpointAsync(timeout);
     }
+
+    public Task ResetAsync()
+    {
+        return Server.ResetAsync();
+    }
 }

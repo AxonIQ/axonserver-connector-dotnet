@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class QuerySubscriptionResult : IQuerySubscriptionResult
+internal class QuerySubscriptionResult : IQuerySubscriptionResult
 {
     private readonly ClientIdentity _clientIdentity;
     private readonly QueryRequest _request;
