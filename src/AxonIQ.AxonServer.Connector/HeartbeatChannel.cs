@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class HeartbeatChannel : IAsyncDisposable
+internal class HeartbeatChannel : IAsyncDisposable
 {
     public static readonly TimeSpan MinimumCheckInterval = TimeSpan.FromSeconds(1.0);
     public static readonly TimeSpan PurgeInterval = TimeSpan.FromMinutes(15);

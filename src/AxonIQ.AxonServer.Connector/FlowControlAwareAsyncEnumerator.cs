@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class FlowControlAwareAsyncEnumerator<TRequest, TResponse> : IAsyncEnumerator<TResponse>
+internal class FlowControlAwareAsyncEnumerator<TRequest, TResponse> : IAsyncEnumerator<TResponse>
 {
     private readonly Func<TRequest> _builder;
     private readonly IAsyncStreamWriter<TRequest> _writer;

@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public class CommandHandlerRegistration : ICommandHandlerRegistration
+internal class CommandHandlerRegistration : ICommandHandlerRegistration
 {
     private long _disposed;
     

@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public class QueryHandlerRegistration : IQueryHandlerRegistration
+internal class QueryHandlerRegistration : IQueryHandlerRegistration
 {
     private int _disposed;
     

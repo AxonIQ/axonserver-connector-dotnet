@@ -2,7 +2,7 @@ using Grpc.Core;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class CallInvokerProxy : CallInvoker
+internal class CallInvokerProxy : CallInvoker
 {
     private readonly Func<CallInvoker?> _factory;
     private readonly CallInvoker _serviceNotAvailableCallInvoker;

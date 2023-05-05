@@ -23,7 +23,7 @@ public interface IEventChannel
 
     Task<EventSequenceNumber> FindHighestSequenceAsync(AggregateId id);
 
-    Task<IEventStream> OpenStreamAsync(EventStreamToken token, PermitCount bufferSize, PermitCount? refillBatch = default, bool forceReadFromLeader = false);
+    IEventStream OpenStream(EventStreamToken token, PermitCount bufferSize, PermitCount? refillBatch = default, bool forceReadFromLeader = false);
 
     IAggregateEventStream OpenStream(AggregateId id, bool allowSnapshots = true);
     IAggregateEventStream OpenStream(AggregateId id, EventSequenceNumber from, EventSequenceNumber? to = default);

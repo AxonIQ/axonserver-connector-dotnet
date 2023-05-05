@@ -2,7 +2,7 @@ using Io.Axoniq.Axonserver.Grpc;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class QuerySubscriptions
+internal class QuerySubscriptions
 {
     public record Subscription(
         RegistrationId QueryHandlerId,

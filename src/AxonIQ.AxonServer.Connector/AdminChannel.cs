@@ -6,22 +6,19 @@ using ApplicationId = Io.Axoniq.Axonserver.Grpc.Admin.ApplicationId;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class AdminChannel : IAdminChannel
+internal class AdminChannel : IAdminChannel
 {
-    public AdminChannel(ClientIdentity clientIdentity, CallInvoker callInvoker)
+    public AdminChannel(AxonServerConnection connection)
     {
-        if (clientIdentity == null) throw new ArgumentNullException(nameof(clientIdentity));
-        if (callInvoker == null) throw new ArgumentNullException(nameof(callInvoker));
-        
-        ClientIdentity = clientIdentity;
-        EventProcessorAdminService = new EventProcessorAdminService.EventProcessorAdminServiceClient(callInvoker);
-        ContextAdminService = new ContextAdminService.ContextAdminServiceClient(callInvoker);
-        ReplicationGroupAdminService = new ReplicationGroupAdminService.ReplicationGroupAdminServiceClient(callInvoker);
-        ApplicationAdminService = new ApplicationAdminService.ApplicationAdminServiceClient(callInvoker);
-        UserAdminService = new UserAdminService.UserAdminServiceClient(callInvoker);
+        if (connection == null) throw new ArgumentNullException(nameof(connection));
+
+        EventProcessorAdminService = new EventProcessorAdminService.EventProcessorAdminServiceClient(connection.CallInvoker);
+        ContextAdminService = new ContextAdminService.ContextAdminServiceClient(connection.CallInvoker);
+        ReplicationGroupAdminService = new ReplicationGroupAdminService.ReplicationGroupAdminServiceClient(connection.CallInvoker);
+        ApplicationAdminService = new ApplicationAdminService.ApplicationAdminServiceClient(connection.CallInvoker);
+        UserAdminService = new UserAdminService.UserAdminServiceClient(connection.CallInvoker);
     }
     
-    public ClientIdentity ClientIdentity { get; }
     public EventProcessorAdminService.EventProcessorAdminServiceClient EventProcessorAdminService { get; }
     public ContextAdminService.ContextAdminServiceClient ContextAdminService { get; }
     public ReplicationGroupAdminService.ReplicationGroupAdminServiceClient ReplicationGroupAdminService { get; }

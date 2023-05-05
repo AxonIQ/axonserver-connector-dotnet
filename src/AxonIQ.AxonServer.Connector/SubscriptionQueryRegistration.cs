@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public class SubscriptionQueryRegistration : ISubscriptionQueryRegistration
+internal class SubscriptionQueryRegistration : ISubscriptionQueryRegistration
 {
     private int _disposed;
     

@@ -150,7 +150,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         
         Assert.True((await transaction.CommitAsync()).Success);
 
-        using var stream = await sut.OpenStreamAsync(EventStreamToken.None, new PermitCount(18));
+        using var stream = sut.OpenStream(EventStreamToken.None, new PermitCount(18));
         var actual = await stream.Take(count).Select(@event => @event.Event).ToArrayAsync();
         
         Assert.Equal(expected, actual);
@@ -334,7 +334,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         Assert.True((await transaction.CommitAsync()).Success);
 
         var token = await sut.GetFirstTokenAsync();
-        using var stream = await sut.OpenStreamAsync(token, new PermitCount(10));
+        using var stream = sut.OpenStream(token, new PermitCount(10));
         var actual = await stream.Take(2).Select(@event => @event.Event).ToArrayAsync();
         Assert.Equal(expected, actual);
     }
@@ -365,11 +365,11 @@ public class EventChannelIntegrationTests : IAsyncLifetime
         Assert.True((await transaction.CommitAsync()).Success);
 
         var token = await sut.GetFirstTokenAsync();
-        using var stream1 = await sut.OpenStreamAsync(token, new PermitCount(10));
+        using var stream1 = sut.OpenStream(token, new PermitCount(10));
         var actual1 = await stream1.Take(1).SingleAsync();
         Assert.Equal(event1, actual1.Event);
         
-        using var stream2 = await sut.OpenStreamAsync(new EventStreamToken(actual1.Token), new PermitCount(10));
+        using var stream2 = sut.OpenStream(new EventStreamToken(actual1.Token), new PermitCount(10));
         var actual2 = await stream2.Take(1).Select(@event => @event.Event).SingleAsync();
         Assert.Equal(event2, actual2);
     }

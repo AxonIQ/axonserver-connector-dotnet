@@ -2,7 +2,7 @@ using Io.Axoniq.Axonserver.Grpc.Event;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class QueryEventsResponseToEventQueryResultEntryAdapter : IEventQueryResultEntry
+internal class QueryEventsResponseToEventQueryResultEntryAdapter : IEventQueryResultEntry
 {
     private readonly QueryEventsResponse _response;
 

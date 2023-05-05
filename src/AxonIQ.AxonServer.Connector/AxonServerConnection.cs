@@ -41,9 +41,7 @@ internal class AxonServerConnection : IAxonServerConnection
             factory.Scheduler,
             factory.EventProcessorUpdateFrequency,
             factory.LoggerFactory);
-        _adminChannel = new Lazy<AdminChannel>(() => new AdminChannel(
-            factory.ChannelFactory.ClientIdentity,
-            CallInvoker));
+        _adminChannel = new Lazy<AdminChannel>(() => new AdminChannel(this));
         _commandChannel = new Lazy<CommandChannel>(() => new CommandChannel(
             this,
             factory.Scheduler,
@@ -60,10 +58,8 @@ internal class AxonServerConnection : IAxonServerConnection
             new PermitCount(factory.QueryPermits.ToInt64() / 4L),
             factory.LoggerFactory));
         _eventChannel = new Lazy<EventChannel>(() => new EventChannel(
-            factory.ChannelFactory.ClientIdentity,
-            _context,
+            this,
             factory.Scheduler.Clock,
-            CallInvoker,
             factory.LoggerFactory));
     }
 
@@ -71,8 +67,6 @@ internal class AxonServerConnection : IAxonServerConnection
 
     public Context Context => _context;
 
-    //private GrpcChannel? Channel => _actor.State is State.Connected connected ? connected.Channel : null;
-    //internal ConnectivityState ConnectivityState => Channel?.State ?? ConnectivityState.Shutdown;
     internal CallInvoker CallInvoker => _callInvoker;
 
 #pragma warning disable CS4014
@@ -233,14 +227,14 @@ internal class AxonServerConnection : IAxonServerConnection
                     await _commandChannel.Value.Reconnect().ConfigureAwait(false);
                 }
 
+                if (_eventChannel.IsValueCreated)
+                {
+                    _eventChannel.Value.Reconnect();
+                }
+                
                 if (_queryChannel.IsValueCreated)
                 {
                     await _queryChannel.Value.Reconnect().ConfigureAwait(false);
-                }
-
-                if (_eventChannel.IsValueCreated)
-                {
-                    await _eventChannel.Value.Reconnect().ConfigureAwait(false);
                 }
 
                 break;
@@ -265,7 +259,7 @@ internal class AxonServerConnection : IAxonServerConnection
                 if (IsReady) state.WaitUntil.OnReady();
                 break;
             
-            case (_, Message.OnConnected):
+            case (State.Connected, Message.OnConnected):
                 state.WaitUntil.OnConnected();
                 break;
             default:
@@ -290,6 +284,7 @@ internal class AxonServerConnection : IAxonServerConnection
             new Message.CheckReadiness()
         ).ConfigureAwait(false);
     }
+    
     internal async Task ConnectAsync()
     {
         await _actor.TellAsync(

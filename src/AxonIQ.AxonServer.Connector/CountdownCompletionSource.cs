@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public class CountdownCompletionSource
+internal class CountdownCompletionSource
 {
     private readonly TaskCompletionSource _source;
     private readonly List<Exception> _exceptions;

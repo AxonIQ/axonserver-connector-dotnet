@@ -3,7 +3,7 @@ using Io.Axoniq.Axonserver.Grpc.Query;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class QueryResponseChannel : IQueryResponseChannel
+internal class QueryResponseChannel : IQueryResponseChannel
 {
     private readonly QueryRequest _request;
     private readonly WriteQueryProviderOutbound _writer;

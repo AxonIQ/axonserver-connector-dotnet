@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public class QueryTask : IDisposable
+internal class QueryTask : IDisposable
 {
     private readonly Task _task;
 

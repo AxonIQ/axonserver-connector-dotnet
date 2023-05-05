@@ -3,7 +3,7 @@ using Io.Axoniq.Axonserver.Grpc.Query;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class SubscriptionQueryInitialResultResponseChannel : IQueryResponseChannel
+internal class SubscriptionQueryInitialResultResponseChannel : IQueryResponseChannel
 {
     private readonly SubscriptionIdentifier _subscriptionIdentifier;
     private readonly QueryRequest _request;

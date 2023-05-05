@@ -2,7 +2,7 @@ using Grpc.Core;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class FaultyCallInvoker : CallInvoker
+internal class FaultyCallInvoker : CallInvoker
 {
     private readonly Status _status;
     private readonly Metadata _trailers;
