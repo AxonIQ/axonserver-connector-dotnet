@@ -29,6 +29,7 @@ jobs:
         run: make cd
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
       - name: publish test results
         uses: EnricoMi/publish-unit-test-result-action/composite@v2
         if: always()
