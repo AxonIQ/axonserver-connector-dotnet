@@ -8,8 +8,10 @@
         <Authors>Yves Reynhout</Authors>
         <Copyright>AxonIQ 2023</Copyright>
         <RepositoryUrl>https://github.com/AxonIQ/axonserver-connector-dotnet</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
         <Company>AxonIQ</Company>
         <Product>AxonServer</Product>
+        <PackageLicenseUrl>https://github.com/AxonIQ/axonserver-connector-dotnet/blob/master/LICENSE.txt</PackageLicenseUrl>
         <IsPackable>true</IsPackable>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
