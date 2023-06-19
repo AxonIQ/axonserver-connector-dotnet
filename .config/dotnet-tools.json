@@ -7,6 +7,12 @@
       "commands": [
         "dotnet-outdated"
       ]
+    },
+    "peek-at-changelog": {
+      "version": "1.0.0-preview.0.9",
+      "commands": [
+        "peek-at-changelog"
+      ]
     }
   }
 }

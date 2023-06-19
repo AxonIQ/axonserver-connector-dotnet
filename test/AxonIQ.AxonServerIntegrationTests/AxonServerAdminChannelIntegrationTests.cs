@@ -9,6 +9,7 @@ using Io.Axoniq.Axonserver.Grpc.Admin;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
+using AsyncEnumerable = System.Linq.AsyncEnumerable;
 
 namespace AxonIQ.AxonServerIntegrationTests;
 
@@ -106,7 +107,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await sut.GetEventProcessors().ToListAsync();
+        var actual = await AsyncEnumerable.ToListAsync(sut.GetEventProcessors());
         Assert.Empty(actual);
     }
     
@@ -116,7 +117,7 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var component = _fixture.Create<ComponentName>();
-        var actual = await sut.GetEventProcessorsByComponent(component).ToListAsync();
+        var actual = await AsyncEnumerable.ToListAsync(sut.GetEventProcessorsByComponent(component));
         Assert.Empty(actual);
     }
     

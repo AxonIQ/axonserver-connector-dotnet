@@ -9,6 +9,7 @@ using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
+using AsyncEnumerable = System.Linq.AsyncEnumerable;
 
 namespace AxonIQ.AxonServerIntegrationTests;
 
