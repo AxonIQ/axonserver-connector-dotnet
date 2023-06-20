@@ -13,6 +13,7 @@
         <Company>AxonIQ</Company>
         <Product>AxonServer</Product>
         <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageIconUrl>https://github.com/AxonIQ/axonserver-connector-dotnet/blob/master/icon.png</PackageIconUrl>
         <IsPackable>true</IsPackable>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <PackageReadmeFile>README.md</PackageReadmeFile>
