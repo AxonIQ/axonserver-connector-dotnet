@@ -7,35 +7,35 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class AxonServerConnectionFactoryOptions
+public class AxonServerConnectorOptions
 {
-    public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName)
+    public static IAxonServerConnectorOptionsBuilder For(ComponentName componentName)
     {
         return new Builder(componentName, ClientInstanceId.GenerateFrom(componentName));
     }
 
-    public static IAxonServerConnectionFactoryOptionsBuilder For(ComponentName componentName,
+    public static IAxonServerConnectorOptionsBuilder For(ComponentName componentName,
         ClientInstanceId clientInstanceId)
     {
         return new Builder(componentName, clientInstanceId);
     }
 
-    public static IAxonServerConnectionFactoryOptionsBuilder FromConfiguration(IConfiguration configuration)
+    public static IAxonServerConnectorOptionsBuilder FromConfiguration(IConfiguration configuration)
     {
         if (configuration == null) throw new ArgumentNullException(nameof(configuration));
         var componentName =
-            configuration[AxonServerConnectionFactoryConfiguration.ComponentName] == null
+            configuration[AxonServerConnectorConfiguration.ComponentName] == null
                 ? ComponentName.GenerateRandomName()
-                : new ComponentName(configuration[AxonServerConnectionFactoryConfiguration.ComponentName]);
+                : new ComponentName(configuration[AxonServerConnectorConfiguration.ComponentName]);
         var clientInstanceId =
-            configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId] == null
+            configuration[AxonServerConnectorConfiguration.ClientInstanceId] == null
                 ? ClientInstanceId.GenerateFrom(componentName)
-                : new ClientInstanceId(configuration[AxonServerConnectionFactoryConfiguration.ClientInstanceId]);
+                : new ClientInstanceId(configuration[AxonServerConnectorConfiguration.ClientInstanceId]);
 
         return new Builder(componentName, clientInstanceId);
     }
 
-    private AxonServerConnectionFactoryOptions(
+    private AxonServerConnectorOptions(
         ComponentName componentName,
         ClientInstanceId clientInstanceId,
         IReadOnlyList<DnsEndPoint> routingServers,
@@ -120,7 +120,7 @@ public class AxonServerConnectionFactoryOptions
 
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
-    private class Builder : IAxonServerConnectionFactoryOptionsBuilder
+    private class Builder : IAxonServerConnectorOptionsBuilder
     {
         private ComponentName _componentName;
         private ClientInstanceId _clientInstanceId;
@@ -140,9 +140,9 @@ public class AxonServerConnectionFactoryOptions
         {
             _componentName = componentName;
             _clientInstanceId = clientInstanceId;
-            _routingServers = new List<DnsEndPoint>(AxonServerConnectionFactoryDefaults.RoutingServers);
+            _routingServers = new List<DnsEndPoint>(AxonServerConnectionDefaults.RoutingServers);
             _clientTags = new Dictionary<string, string>();
-            foreach (var (key, value) in AxonServerConnectionFactoryDefaults.ClientTags)
+            foreach (var (key, value) in AxonServerConnectionDefaults.ClientTags)
             {
                 _clientTags.Add(key, value);
             }
@@ -152,41 +152,31 @@ public class AxonServerConnectionFactoryOptions
             _clock = null;
             _grpcChannelOptions = null;
             _interceptors = new List<Interceptor>();
-            _commandPermits = AxonServerConnectionFactoryDefaults.DefaultCommandPermits;
-            _queryPermits = AxonServerConnectionFactoryDefaults.DefaultQueryPermits;
-            _eventProcessorUpdateFrequency = AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency;
-            _reconnectOptions = AxonServerConnectionFactoryDefaults.DefaultReconnectOptions;
+            _commandPermits = AxonServerConnectionDefaults.DefaultCommandPermits;
+            _queryPermits = AxonServerConnectionDefaults.DefaultQueryPermits;
+            _eventProcessorUpdateFrequency = AxonServerConnectionDefaults.DefaultEventProcessorUpdateFrequency;
+            _reconnectOptions = AxonServerConnectionDefaults.DefaultReconnectOptions;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder AsComponentName(ComponentName name)
+        public IAxonServerConnectorOptionsBuilder AsComponentName(ComponentName name)
         {
             _componentName = name;
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder AsClientInstanceId(ClientInstanceId id)
+        public IAxonServerConnectorOptionsBuilder AsClientInstanceId(ClientInstanceId id)
         {
             _clientInstanceId = id;
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithDefaultRoutingServers()
+        public IAxonServerConnectorOptionsBuilder WithDefaultRoutingServers()
         {
             _routingServers.Clear();
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithRoutingServers(params DnsEndPoint[] servers)
-        {
-            if (servers == null) throw new ArgumentNullException(nameof(servers));
-
-            _routingServers.Clear();
-            _routingServers.AddRange(servers);
-
-            return this;
-        }
-
-        public IAxonServerConnectionFactoryOptionsBuilder WithRoutingServers(IEnumerable<DnsEndPoint> servers)
+        public IAxonServerConnectorOptionsBuilder WithRoutingServers(params DnsEndPoint[] servers)
         {
             if (servers == null) throw new ArgumentNullException(nameof(servers));
 
@@ -196,21 +186,31 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithoutAuthentication()
+        public IAxonServerConnectorOptionsBuilder WithRoutingServers(IEnumerable<DnsEndPoint> servers)
+        {
+            if (servers == null) throw new ArgumentNullException(nameof(servers));
+
+            _routingServers.Clear();
+            _routingServers.AddRange(servers);
+
+            return this;
+        }
+
+        public IAxonServerConnectorOptionsBuilder WithoutAuthentication()
         {
             _authentication = AxonServerAuthentication.None;
 
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithAuthenticationToken(string token)
+        public IAxonServerConnectorOptionsBuilder WithAuthenticationToken(string token)
         {
             _authentication = AxonServerAuthentication.UsingToken(token);
 
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithClientTag(string key, string value)
+        public IAxonServerConnectorOptionsBuilder WithClientTag(string key, string value)
         {
             if (key == null) throw new ArgumentNullException(nameof(key));
             if (value == null) throw new ArgumentNullException(nameof(value));
@@ -220,7 +220,7 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithClientTags(params KeyValuePair<string, string>[] tags)
+        public IAxonServerConnectorOptionsBuilder WithClientTags(params KeyValuePair<string, string>[] tags)
         {
             if (tags == null) throw new ArgumentNullException(nameof(tags));
 
@@ -232,7 +232,7 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithClientTags(IEnumerable<KeyValuePair<string, string>> tags)
+        public IAxonServerConnectorOptionsBuilder WithClientTags(IEnumerable<KeyValuePair<string, string>> tags)
         {
             if (tags == null) throw new ArgumentNullException(nameof(tags));
 
@@ -244,7 +244,7 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithLoggerFactory(ILoggerFactory loggerFactory)
+        public IAxonServerConnectorOptionsBuilder WithLoggerFactory(ILoggerFactory loggerFactory)
         {
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
@@ -253,14 +253,14 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
         
-        public IAxonServerConnectionFactoryOptionsBuilder WithoutLoggerFactory()
+        public IAxonServerConnectorOptionsBuilder WithoutLoggerFactory()
         {
             _loggerFactory = null;
             
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithClock(Func<DateTimeOffset> clock)
+        public IAxonServerConnectorOptionsBuilder WithClock(Func<DateTimeOffset> clock)
         {
             if (clock == null) throw new ArgumentNullException(nameof(clock));
 
@@ -269,7 +269,7 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithGrpcChannelOptions(GrpcChannelOptions grpcChannelOptions)
+        public IAxonServerConnectorOptionsBuilder WithGrpcChannelOptions(GrpcChannelOptions grpcChannelOptions)
         {
             if (grpcChannelOptions == null) throw new ArgumentNullException(nameof(grpcChannelOptions));
 
@@ -278,7 +278,7 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
         
-        public IAxonServerConnectionFactoryOptionsBuilder WithInterceptors(params Interceptor[] interceptors)
+        public IAxonServerConnectorOptionsBuilder WithInterceptors(params Interceptor[] interceptors)
         {
             if (interceptors == null) throw new ArgumentNullException(nameof(interceptors));
 
@@ -287,42 +287,42 @@ public class AxonServerConnectionFactoryOptions
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(PermitCount count)
+        public IAxonServerConnectorOptionsBuilder WithCommandPermits(PermitCount count)
         {
-            _commandPermits = PermitCount.Max(AxonServerConnectionFactoryDefaults.MinimumCommandPermits, count);
+            _commandPermits = PermitCount.Max(AxonServerConnectionDefaults.MinimumCommandPermits, count);
 
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithQueryPermits(PermitCount count)
+        public IAxonServerConnectorOptionsBuilder WithQueryPermits(PermitCount count)
         {
-            _queryPermits = PermitCount.Max(AxonServerConnectionFactoryDefaults.MinimumQueryPermits, count);
+            _queryPermits = PermitCount.Max(AxonServerConnectionDefaults.MinimumQueryPermits, count);
 
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithReconnectOptions(ReconnectOptions options)
+        public IAxonServerConnectorOptionsBuilder WithReconnectOptions(ReconnectOptions options)
         {
             _reconnectOptions = options ?? throw new ArgumentNullException(nameof(options));
             
             return this;
         }
 
-        public IAxonServerConnectionFactoryOptionsBuilder WithEventProcessorUpdateFrequency(TimeSpan frequency)
+        public IAxonServerConnectorOptionsBuilder WithEventProcessorUpdateFrequency(TimeSpan frequency)
         {
-            _eventProcessorUpdateFrequency = TimeSpanMath.Max(AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency, frequency);
+            _eventProcessorUpdateFrequency = TimeSpanMath.Max(AxonServerConnectionDefaults.DefaultEventProcessorUpdateFrequency, frequency);
 
             return this;
         }
 
-        public AxonServerConnectionFactoryOptions Build()
+        public AxonServerConnectorOptions Build()
         {
             if (_routingServers.Count == 0)
             {
-                _routingServers.AddRange(AxonServerConnectionFactoryDefaults.RoutingServers);
+                _routingServers.AddRange(AxonServerConnectionDefaults.RoutingServers);
             }
 
-            return new AxonServerConnectionFactoryOptions(
+            return new AxonServerConnectorOptions(
                 _componentName, 
                 _clientInstanceId, 
                 _routingServers,

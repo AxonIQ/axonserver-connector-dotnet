@@ -7,13 +7,13 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal class ControlChannel : IControlChannel, IAsyncDisposable
 {
-    private readonly AxonServerConnection _connection;
+    private readonly IOwnerAxonServerConnection _connection;
     private readonly TimeSpan _eventProcessorUpdateFrequency;
     private readonly ILogger<ControlChannel> _logger;
     private readonly AxonActor<Message, State> _actor;
 
     public ControlChannel(
-        AxonServerConnection connection,
+        IOwnerAxonServerConnection connection,
         IScheduler scheduler,
         TimeSpan eventProcessorUpdateFrequency,
         ILoggerFactory loggerFactory)

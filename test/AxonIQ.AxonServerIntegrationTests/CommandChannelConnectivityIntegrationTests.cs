@@ -30,12 +30,12 @@ public class CommandChannelConnectivityIntegrationTests
     }
 
     private Task<IAxonServerConnection> CreateSystemUnderTest(
-        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+        Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        var builder = AxonServerConnectionFactoryOptions.For(component, clientInstance)
+        var builder = AxonServerConnectorOptions.For(component, clientInstance)
             .WithRoutingServers(_container.GetGrpcProxyEndpoint())
             .WithLoggerFactory(_loggerFactory);
         configure?.Invoke(builder);
@@ -51,7 +51,7 @@ public class CommandChannelConnectivityIntegrationTests
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)))
             .ConfigureAwait(false);
@@ -125,7 +125,7 @@ public class CommandChannelConnectivityIntegrationTests
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();

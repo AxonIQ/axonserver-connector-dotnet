@@ -61,12 +61,12 @@ public class PingPongCommandBenchmark : IBenchmark
         var clientInstance1 = new ClientInstanceId("1");
         var clientInstance2 = new ClientInstanceId("2");
 
-        _pingFactory = new AxonServerConnectionFactory(AxonServerConnectionFactoryOptions
+        _pingFactory = new AxonServerConnectionFactory(AxonServerConnectorOptions
             .For(component, clientInstance1)
             .WithRoutingServers(_server.GetGrpcEndpoint())
             .WithLoggerFactory(new NullLoggerFactory())
             .Build());
-        _pongFactory = new AxonServerConnectionFactory(AxonServerConnectionFactoryOptions
+        _pongFactory = new AxonServerConnectionFactory(AxonServerConnectorOptions
             .For(component, clientInstance2)
             .WithRoutingServers(_server.GetGrpcEndpoint())
             .WithLoggerFactory(new NullLoggerFactory())

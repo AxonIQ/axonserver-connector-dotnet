@@ -5,14 +5,12 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConnection
+internal class SharedAxonServerConnection : IAxonServerConnection, IOwnerAxonServerConnection
 {
+    private readonly AxonServerConnectionFactory _factory;
     private readonly Context _context;
-    private readonly ClientIdentity _clientIdentity;
-    private readonly AxonServerGrpcChannelFactory _channelFactory;
-    private readonly IReadOnlyList<Interceptor> _interceptors;
     private readonly CallInvokerProxy _callInvoker;
-    private readonly ILogger<AxonServerConnection> _logger;
+    private readonly ILogger<SharedAxonServerConnection> _logger;
 
     private readonly AxonActor<Message, State> _actor;
     private readonly ControlChannel _controlChannel;
@@ -22,74 +20,50 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
     private readonly Lazy<EventChannel> _eventChannel;
     
     private long _disposed;
-    private long _connected;
 
-    public AxonServerConnection(Context context, AxonServerConnectorOptions options)
+    public SharedAxonServerConnection(AxonServerConnectionFactory factory, Context context)
     {
-        if (options == null) throw new ArgumentNullException(nameof(options));
-        
+        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         _context = context;
-        _interceptors = options.Interceptors;
-
-        var scheduler = new Scheduler(
-            options.Clock, 
-            TimeSpan.FromMilliseconds(100),
-            options.LoggerFactory.CreateLogger<Scheduler>());
-
-        _clientIdentity = new ClientIdentity(
-            options.ComponentName, 
-            options.ClientInstanceId, 
-            options.ClientTags, 
-            new Version(1, 0));
         
-        _channelFactory = new AxonServerGrpcChannelFactory(
-            _clientIdentity, 
-            options.Authentication, 
-            options.RoutingServers, 
-            options.LoggerFactory, 
-            options.Interceptors,
-            options.GrpcChannelOptions ?? new GrpcChannelOptions(),
-            options.Clock,
-            options.ReconnectOptions.ConnectionTimeout);
-        
-        _logger = options.LoggerFactory.CreateLogger<AxonServerConnection>();
+        _logger = factory.LoggerFactory.CreateLogger<SharedAxonServerConnection>();
         
         _actor = new AxonActor<Message, State>(
             Receive,
             new State.Disconnected(new WaitUntil()),
-            scheduler,
+            factory.Scheduler,
             _logger);
         
         _callInvoker = new CallInvokerProxy(() => _actor.State.CallInvoker);
         
         _controlChannel = new ControlChannel(
             this,
-            scheduler,
-            options.EventProcessorUpdateFrequency,
-            options.LoggerFactory);
+            factory.Scheduler,
+            factory.EventProcessorUpdateFrequency,
+            factory.LoggerFactory);
         _adminChannel = new Lazy<AdminChannel>(() => new AdminChannel(this));
         _commandChannel = new Lazy<CommandChannel>(() => new CommandChannel(
             this,
-            scheduler,
-            options.CommandPermits,
-            new PermitCount(options.CommandPermits.ToInt64() / 4L),
-            options.ReconnectOptions,
-            options.LoggerFactory));
+            factory.Scheduler,
+            factory.CommandPermits,
+            new PermitCount(factory.CommandPermits.ToInt64() / 4L),
+            factory.ReconnectOptions,
+            factory.LoggerFactory));
         _queryChannel = new Lazy<QueryChannel>(() => new QueryChannel(
-            _channelFactory.ClientIdentity,
+            factory.ChannelFactory.ClientIdentity,
             _context,
-            scheduler.Clock,
+            factory.Scheduler.Clock,
             _callInvoker,
-            options.QueryPermits,
-            new PermitCount(options.QueryPermits.ToInt64() / 4L),
-            options.LoggerFactory));
+            factory.QueryPermits,
+            new PermitCount(factory.QueryPermits.ToInt64() / 4L),
+            factory.LoggerFactory));
         _eventChannel = new Lazy<EventChannel>(() => new EventChannel(
             this,
-            scheduler.Clock,
-            options.LoggerFactory));
+            factory.Scheduler.Clock,
+            factory.LoggerFactory));
     }
 
-    public ClientIdentity ClientIdentity => _clientIdentity;
+    public ClientIdentity ClientIdentity => _factory.ChannelFactory.ClientIdentity;
 
     public Context Context => _context;
 
@@ -103,7 +77,7 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
             case (State.Disconnected disconnected, Message.Connect connect):
                 if (connect.Attempt == 0)
                 {
-                    _channelFactory
+                    _factory.ChannelFactory
                         .Create(_context)
                         .TellToAsync(_actor,
                             result => new Message.GrpcChannelEstablished(result),
@@ -114,7 +88,7 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
 
                 break;
             case (State.Connecting, Message.Connect):
-                _channelFactory
+                _factory.ChannelFactory
                     .Create(_context)
                     .TellToAsync(_actor,
                         result => new Message.GrpcChannelEstablished(result),
@@ -128,10 +102,10 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
                         {
                             var callInvoker = ok.Value
                                 .CreateCallInvoker()
-                                .Intercept(_interceptors.ToArray())
+                                .Intercept(_factory.Interceptors.ToArray())
                                 .Intercept(metadata =>
                                 {
-                                    _channelFactory.Authentication.WriteTo(metadata);
+                                    _factory.ChannelFactory.Authentication.WriteTo(metadata);
                                     _context.WriteTo(metadata);
                                     return metadata;
                                 });
@@ -177,7 +151,8 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
                     _logger.LogCritical(exception, "Failed to shut down channel");
                 }
                 
-                _channelFactory
+                _factory
+                    .ChannelFactory
                     .Create(_context)
                     .TellToAsync(_actor,
                         result => new Message.GrpcChannelEstablished(result),
@@ -187,7 +162,8 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
                 
                 break;
             case (State.Reconnecting, Message.Reconnect):
-                _channelFactory
+                _factory
+                    .ChannelFactory
                     .Create(_context)
                     .TellToAsync(_actor,
                         result => new Message.GrpcChannelEstablished(result),
@@ -202,10 +178,10 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
                         {
                             var callInvoker = ok.Value
                                 .CreateCallInvoker()
-                                .Intercept(_interceptors.ToArray())
+                                .Intercept(_factory.Interceptors.ToArray())
                                 .Intercept(metadata =>
                                 {
-                                    _channelFactory.Authentication.WriteTo(metadata);
+                                    _factory.ChannelFactory.Authentication.WriteTo(metadata);
                                     _context.WriteTo(metadata);
                                     return metadata;
                                 });
@@ -309,10 +285,16 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
         ).ConfigureAwait(false);
     }
 
+    internal async ValueTask ConnectAsync()
+    {
+        await _actor.TellAsync(
+            new Message.Connect(0)
+        ).ConfigureAwait(false);
+    }
+
     public async Task WaitUntilConnectedAsync()
     {
         ThrowIfDisposed();
-        TryConnect();
         if (!IsConnected)
         {
             var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -324,7 +306,6 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
     public async Task WaitUntilReadyAsync()
     {
         ThrowIfDisposed();
-        TryConnect();
         if (!IsReady)
         {
             var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -403,44 +384,33 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
 
     public IControlChannel ControlChannel
     {
-        get { ThrowIfDisposed(); TryConnect(); return _controlChannel; }
+        get { ThrowIfDisposed(); return _controlChannel; }
     }
 
     public IAdminChannel AdminChannel
     {
-        get { ThrowIfDisposed(); TryConnect(); return _adminChannel.Value; }
+        get { ThrowIfDisposed(); return _adminChannel.Value; }
     }
 
     public ICommandChannel CommandChannel
     {
-        get { ThrowIfDisposed(); TryConnect(); return _commandChannel.Value; }
+        get { ThrowIfDisposed(); return _commandChannel.Value; }
     }
 
     public IQueryChannel QueryChannel
     {
-        get { ThrowIfDisposed(); TryConnect(); return _queryChannel.Value; }
+        get { ThrowIfDisposed(); return _queryChannel.Value; }
     }
 
     public IEventChannel EventChannel
     {
-        get { ThrowIfDisposed(); TryConnect(); return _eventChannel.Value; }
+        get { ThrowIfDisposed(); return _eventChannel.Value; }
     }
 
     private void ThrowIfDisposed()
     {
         if (Interlocked.Read(ref _disposed) == Disposed.Yes) 
-            throw new ObjectDisposedException(nameof(AxonServerConnection));
-    }
-
-    private void TryConnect()
-    {
-        if (Interlocked.CompareExchange(ref _connected, Connected.Yes, Connected.No) == Connected.No)
-        {
-            if (!_actor.TryTell(new Message.Connect(0L)))
-            {
-                throw new ObjectDisposedException(nameof(AxonServerConnection));
-            }
-        }
+            throw new ObjectDisposedException(nameof(SharedAxonServerConnection));
     }
     
     public Task CloseAsync() => DisposeAsync().AsTask();
@@ -459,7 +429,7 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
             {
                 await _queryChannel.Value.DisposeAsync().ConfigureAwait(false);
             }
-            
+
             await _actor.DisposeAsync().ConfigureAwait(false);
             if (_actor.State is State.Connected connected)
             {
@@ -473,6 +443,8 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
                     _logger.LogCritical(exception, "Failed to shut down and dispose gRPC channel");
                 }
             }
+
+            await _factory.TryRemoveConnectionAsync(_context, this);
         }
     }
 }

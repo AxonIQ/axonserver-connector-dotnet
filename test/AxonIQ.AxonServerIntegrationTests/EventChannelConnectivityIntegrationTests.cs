@@ -32,12 +32,12 @@ public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
     }
     
     private Task<IAxonServerConnection> CreateSystemUnderTest(
-        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+        Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        var builder = AxonServerConnectionFactoryOptions.For(component, clientInstance)
+        var builder = AxonServerConnectorOptions.For(component, clientInstance)
             .WithRoutingServers(_container.GetGrpcProxyEndpoint())
             .WithLoggerFactory(_loggerFactory);
         configure?.Invoke(builder);
@@ -84,7 +84,7 @@ public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();
@@ -147,7 +147,7 @@ public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();
@@ -210,7 +210,7 @@ public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();
@@ -274,7 +274,7 @@ public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();
@@ -343,7 +343,7 @@ public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();
@@ -410,7 +410,7 @@ public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();

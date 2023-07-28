@@ -31,7 +31,7 @@ public class AxonServerConnectionFactoryTests
         var tags = _fixture.CreateMany<KeyValuePair<string, string>>(Random.Shared.Next(1, 5)).ToArray();
         var token = _fixture.Create<string>();
         var builder =
-            AxonServerConnectionFactoryOptions
+            AxonServerConnectorOptions
                 .For(component, clientInstanceId)
                 .WithRoutingServers(servers)
                 .WithClientTags(tags)

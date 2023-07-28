@@ -9,13 +9,13 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
 {
     public static readonly TimeSpan PurgeInterval = TimeSpan.FromSeconds(15);
     
-    private readonly AxonServerConnection _connection;
+    private readonly IOwnerAxonServerConnection _connection;
     private readonly AxonActor<Message, State> _actor;
     private readonly TimeSpan _purgeInterval;
     private readonly ILogger<CommandChannel> _logger;
 
     public CommandChannel(
-        AxonServerConnection connection,
+        IOwnerAxonServerConnection connection,
         IScheduler scheduler,
         PermitCount permits,
         PermitCount permitsBatch,
@@ -26,7 +26,7 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
     }
 
     public CommandChannel(
-        AxonServerConnection connection,
+        IOwnerAxonServerConnection connection,
         IScheduler scheduler,
         PermitCount permits,
         PermitCount permitsBatch,

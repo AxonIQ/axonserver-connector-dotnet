@@ -85,7 +85,7 @@ public class PingDotNetPongJavaCommandInteropBenchmark : IBenchmark
         var component = new ComponentName(nameof(PingPongCommandBenchmark));
         var clientInstance1 = new ClientInstanceId("dotnet-client");
 
-        _pingFactory = new AxonServerConnectionFactory(AxonServerConnectionFactoryOptions
+        _pingFactory = new AxonServerConnectionFactory(AxonServerConnectorOptions
             .For(component, clientInstance1)
             .WithRoutingServers(_server.GetGrpcEndpoint())
             .WithLoggerFactory(_loggerFactory)

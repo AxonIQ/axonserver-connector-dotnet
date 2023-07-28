@@ -9,10 +9,10 @@ namespace AxonIQ.AxonServer.Connector;
 public class AxonServerConnectionFactory : IAsyncDisposable
 {
     private readonly AsyncLock _lock;
-    private readonly Dictionary<Context, AxonServerConnection> _connections;
+    private readonly Dictionary<Context, SharedAxonServerConnection> _connections;
     private long _disposed;
 
-    public AxonServerConnectionFactory(AxonServerConnectionFactoryOptions options)
+    public AxonServerConnectionFactory(AxonServerConnectorOptions options)
     {
         if (options == null)
             throw new ArgumentNullException(nameof(options));
@@ -50,7 +50,7 @@ public class AxonServerConnectionFactory : IAsyncDisposable
         ReconnectOptions = options.ReconnectOptions;
 
         _lock = new AsyncLock();
-        _connections = new Dictionary<Context, AxonServerConnection>();
+        _connections = new Dictionary<Context, SharedAxonServerConnection>();
     }
 
     internal ClientIdentity ClientIdentity { get; }
@@ -74,14 +74,14 @@ public class AxonServerConnectionFactory : IAsyncDisposable
         {
             if (_connections.TryGetValue(context, out var connection)) return connection;
             
-            connection = new AxonServerConnection(this, context);
+            connection = new SharedAxonServerConnection(this, context);
             await connection.ConnectAsync().ConfigureAwait(false);
             _connections.Add(context, connection);
             return connection;
         }
     }
 
-    internal async ValueTask TryRemoveConnectionAsync(Context context, AxonServerConnection connection)
+    internal async ValueTask TryRemoveConnectionAsync(Context context, SharedAxonServerConnection connection)
     {
         if (Interlocked.Read(ref _disposed) == Disposed.No)
         {

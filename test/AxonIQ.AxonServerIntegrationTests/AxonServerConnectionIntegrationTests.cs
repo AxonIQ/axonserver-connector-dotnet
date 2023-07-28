@@ -31,12 +31,12 @@ public class AxonServerConnectionIntegrationTests
     }
 
     private Task<IAxonServerConnection> CreateSystemUnderTest(
-        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+        Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        var builder = AxonServerConnectionFactoryOptions.For(component, clientInstance)
+        var builder = AxonServerConnectorOptions.For(component, clientInstance)
             .WithRoutingServers(_container.GetGrpcEndpoint())
             .WithLoggerFactory(new TestOutputHelperLoggerFactory(_output));
         configure?.Invoke(builder);
@@ -46,7 +46,7 @@ public class AxonServerConnectionIntegrationTests
     }
 
     private async Task<IAxonServerConnection> CreateDisposedSystemUnderTest(
-        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+        Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var sut = await CreateSystemUnderTest(configure);
         await sut.DisposeAsync().ConfigureAwait(false);
@@ -58,7 +58,7 @@ public class AxonServerConnectionIntegrationTests
     {
         var sut = await CreateSystemUnderTest(
             options => options.WithRoutingServers(
-                new DnsEndPoint("127.0.0.0", AxonServerConnectionFactoryDefaults.Port)));
+                new DnsEndPoint("127.0.0.0", AxonServerConnectionDefaults.Port)));
         var wait = sut.WaitUntilConnectedAsync().ConfigureAwait(false);
         await sut.DisposeAsync().ConfigureAwait(false);
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
@@ -69,7 +69,7 @@ public class AxonServerConnectionIntegrationTests
     {
         var sut = await CreateSystemUnderTest(
             options => options.WithRoutingServers(
-                new DnsEndPoint("127.0.0.0", AxonServerConnectionFactoryDefaults.Port)));
+                new DnsEndPoint("127.0.0.0", AxonServerConnectionDefaults.Port)));
         var wait = sut.WaitUntilReadyAsync().ConfigureAwait(false);
         await sut.DisposeAsync().ConfigureAwait(false);
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);

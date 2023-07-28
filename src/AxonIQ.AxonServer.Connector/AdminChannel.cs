@@ -8,7 +8,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal class AdminChannel : IAdminChannel
 {
-    public AdminChannel(AxonServerConnection connection)
+    public AdminChannel(IOwnerAxonServerConnection connection)
     {
         if (connection == null) throw new ArgumentNullException(nameof(connection));
 

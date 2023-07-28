@@ -14,8 +14,144 @@ public class ServiceCollectionExtensionsTests
     {
         _fixture = new Fixture();
         _fixture.CustomizeComponentName();
+        _fixture.CustomizeContext();
     }
 
+    [Fact]
+    public void AddAxonServerConnectionHasExpectedResult()
+    {
+        var services = new ServiceCollection();
+        var context = _fixture.Create<Context>();
+
+        var result = services.AddAxonServerConnection(context);
+
+        Assert.IsAssignableFrom<IServiceCollection>(result);
+
+        var provider = services.BuildServiceProvider();
+
+        var connection = provider.GetRequiredService<AxonServerConnection>();
+        Assert.Equal(context, connection.Context);
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
+            connection.ClientIdentity.ComponentName.ToString());
+        Assert.StartsWith(connection.ClientIdentity.ComponentName.ToString(),
+            connection.ClientIdentity.ClientInstanceId.ToString());
+    }
+    
+    [Fact]
+    public void AddAxonServerConnectionWithConfigurationCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new ServiceCollection().AddAxonServerConnection(_fixture.Create<Context>(), (IConfiguration)null!));
+    }
+    
+    [Fact]
+    public void AddAxonServerConnectionWithConfigurationHasExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var configuration = CreateMinimalConfiguration(component)
+            .GetRequiredSection(AxonServerConnectorConfiguration.DefaultSection);
+        var services = new ServiceCollection();
+
+        var context = _fixture.Create<Context>();
+
+        var result = services.AddAxonServerConnection(context, configuration);
+
+        Assert.IsAssignableFrom<IServiceCollection>(result);
+
+        var provider = services.BuildServiceProvider();
+
+        var connection = provider.GetRequiredService<AxonServerConnection>();
+        Assert.Equal(context, connection.Context);
+        Assert.Equal(component, connection.ClientIdentity.ComponentName);
+        Assert.StartsWith(connection.ClientIdentity.ComponentName.ToString(),
+            connection.ClientIdentity.ClientInstanceId.ToString());
+    }
+    
+    [Fact]
+    public void AddAxonServerConnectionWithoutConfigurationHasExpectedResult()
+    {
+        var configuration = new ConfigurationRoot(new List<IConfigurationProvider>());
+        var services = new ServiceCollection();
+
+        var context = _fixture.Create<Context>();
+
+        var result = services.AddAxonServerConnection(context, configuration);
+
+        Assert.IsAssignableFrom<IServiceCollection>(result);
+
+        var provider = services.BuildServiceProvider();
+
+        var connection = provider.GetRequiredService<AxonServerConnection>();
+        Assert.Equal(context, connection.Context);
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
+            connection.ClientIdentity.ComponentName.ToString());
+        Assert.StartsWith(connection.ClientIdentity.ComponentName.ToString(),
+            connection.ClientIdentity.ClientInstanceId.ToString());
+    }
+
+    [Fact]
+    public void AddAxonServerConnectionWithOptionsCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new ServiceCollection().AddAxonServerConnection(_fixture.Create<Context>(), (AxonServerConnectorOptions)null!));
+    }
+
+    [Fact]
+    public void AddAxonServerConnectionWithOptionsHasExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var options = AxonServerConnectorOptions
+            .For(component)
+            .Build();
+        var services = new ServiceCollection();
+        
+        var context = _fixture.Create<Context>();
+
+        var result = services.AddAxonServerConnection(context, options);
+
+        Assert.IsAssignableFrom<IServiceCollection>(result);
+
+        var provider = services.BuildServiceProvider();
+
+        var connection = provider.GetRequiredService<AxonServerConnection>();
+        Assert.Equal(context, connection.Context);
+        Assert.Equal(component, connection.ClientIdentity.ComponentName);
+        Assert.StartsWith(connection.ClientIdentity.ComponentName.ToString(),
+            connection.ClientIdentity.ClientInstanceId.ToString());
+    }
+
+    [Fact]
+    public void AddAxonServerConnectionWithOptionsBuilderCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new ServiceCollection().AddAxonServerConnection(
+                _fixture.Create<Context>(),
+                (Action<IAxonServerConnectorOptionsBuilder>)null!));
+    }
+
+    [Fact]
+    public void AddAxonServerConnectionWithOptionsBuilderHasExpectedResult()
+    {
+        var services = new ServiceCollection();
+
+        var context = _fixture.Create<Context>();
+        
+        var signal = new Signal();
+        var result = services.AddAxonServerConnection(context, _ => { signal.Signaled = true; });
+
+        Assert.IsAssignableFrom<IServiceCollection>(result);
+
+        var provider = services.BuildServiceProvider();
+
+        var connection = provider.GetRequiredService<AxonServerConnection>();
+        Assert.Equal(context, connection.Context);
+        Assert.True(signal.Signaled);
+        Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
+            connection.ClientIdentity.ComponentName.ToString());
+        Assert.StartsWith(connection.ClientIdentity.ComponentName.ToString(),
+            connection.ClientIdentity.ClientInstanceId.ToString());
+    }
+    
     [Fact]
     public void AddAxonServerConnectionFactoryHasExpectedResult()
     {
@@ -46,7 +182,7 @@ public class ServiceCollectionExtensionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var configuration = CreateMinimalConfiguration(component)
-            .GetRequiredSection(AxonServerConnectionFactoryConfiguration.DefaultSection);
+            .GetRequiredSection(AxonServerConnectorConfiguration.DefaultSection);
         var services = new ServiceCollection();
 
         var result = services.AddAxonServerConnectionFactory(configuration);
@@ -84,14 +220,14 @@ public class ServiceCollectionExtensionsTests
     public void AddAxonServerConnectionFactoryWithOptionsCanNotBeNull()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new ServiceCollection().AddAxonServerConnectionFactory((AxonServerConnectionFactoryOptions)null!));
+            new ServiceCollection().AddAxonServerConnectionFactory((AxonServerConnectorOptions)null!));
     }
 
     [Fact]
     public void AddAxonServerConnectionFactoryWithOptionsHasExpectedResult()
     {
         var component = _fixture.Create<ComponentName>();
-        var options = AxonServerConnectionFactoryOptions
+        var options = AxonServerConnectorOptions
             .For(component)
             .Build();
         var services = new ServiceCollection();
@@ -113,7 +249,7 @@ public class ServiceCollectionExtensionsTests
     {
         Assert.Throws<ArgumentNullException>(() =>
             new ServiceCollection().AddAxonServerConnectionFactory(
-                (Action<IAxonServerConnectionFactoryOptionsBuilder>)null!));
+                (Action<IAxonServerConnectorOptionsBuilder>)null!));
     }
 
     [Fact]
@@ -148,8 +284,8 @@ public class ServiceCollectionExtensionsTests
             InitialData = new KeyValuePair<string, string>[]
             {
                 new(
-                    AxonServerConnectionFactoryConfiguration.DefaultSection + ":" +
-                    AxonServerConnectionFactoryConfiguration.ComponentName, component.ToString())
+                    AxonServerConnectorConfiguration.DefaultSection + ":" +
+                    AxonServerConnectorConfiguration.ComponentName, component.ToString())
             }
         };
         var configuration = new ConfigurationRoot(new List<IConfigurationProvider>
