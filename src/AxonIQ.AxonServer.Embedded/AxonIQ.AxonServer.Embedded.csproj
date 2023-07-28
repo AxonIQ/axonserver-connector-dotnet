@@ -22,16 +22,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
-        <None Include="..\..\icon.png" Pack="true" PackagePath="\"/>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+        <None Include="..\..\icon.png" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Ductus.FluentDocker" Version="2.10.59" />
         <PackageReference Include="MinVer" Version="4.3.0" PrivateAssets="all" />
         <PackageReference Include="shortid" Version="4.0.0" />
-        <PackageReference Include="ToxiproxyNetCore" Version="1.0.23" />
-        <PackageReference Include="YamlDotNet" Version="13.0.2" />
+        <PackageReference Include="ToxiproxyNetCore" Version="1.0.35" />
+        <PackageReference Include="YamlDotNet" Version="13.1.1" />
     </ItemGroup>
 
     <ItemGroup>
@@ -39,7 +39,7 @@
     </ItemGroup>
 
     <Target Name="DiscoverPackageReleaseNotes" AfterTargets="MinVer" Condition="'$(DesignTimeBuild)' != 'true' AND '$(MinVerSkip)' != 'true'">
-        <Exec Command="dotnet peek-at-changelog --version $(MinVerVersion) --fallback $([MSBuild]::GetPathOfFileAbove('CHANGELOG.md'))" ConsoleToMSBuild="true" StandardOutputImportance="Low" >
+        <Exec Command="dotnet peek-at-changelog --version $(MinVerVersion) --fallback $([MSBuild]::GetPathOfFileAbove('CHANGELOG.md'))" ConsoleToMSBuild="true" StandardOutputImportance="Low">
             <Output TaskParameter="ConsoleOutput" ItemName="PeekAtChangelogConsoleOutput" />
         </Exec>
         <PropertyGroup>
