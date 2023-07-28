@@ -35,12 +35,12 @@ try
         var clientInstance1 = new ClientInstanceId("1");
         var clientInstance2 = new ClientInstanceId("2");
 
-        var instance1 = new AxonServerConnectionFactory(AxonServerConnectionFactoryOptions
+        var instance1 = new AxonServerConnectionFactory(AxonServerConnectorOptions
             .For(component, clientInstance1)
             .WithRoutingServers(server.GetGrpcEndpoint())
             .WithLoggerFactory(host.Services.GetRequiredService<ILoggerFactory>())
             .Build());
-        var instance2 = new AxonServerConnectionFactory(AxonServerConnectionFactoryOptions
+        var instance2 = new AxonServerConnectionFactory(AxonServerConnectorOptions
             .For(component, clientInstance2)
             .WithRoutingServers(server.GetGrpcEndpoint())
             .WithLoggerFactory(host.Services.GetRequiredService<ILoggerFactory>())

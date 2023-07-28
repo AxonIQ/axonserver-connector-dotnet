@@ -1,4 +1,5 @@
 using AxonIQ.AxonServer.Connector.Tests.Framework;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -12,11 +13,39 @@ public class SchedulerTests
     {
         _logger = new TestOutputHelperLogger<Scheduler>(output);
     }
+
+    [Fact]
+    public void ClockCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new Scheduler(null!, 
+                Scheduler.DefaultTickFrequency, 
+                new NullLogger<Scheduler>()));
+    }
+    
+    [Fact]
+    public void LoggerCanNotBeNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new Scheduler(() => DateTimeOffset.UtcNow, 
+                Scheduler.DefaultTickFrequency, 
+                null!));
+    }
+
+    [Fact]
+    public void FrequencyCanNotBeNegative()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new Scheduler(
+                () => DateTimeOffset.UtcNow,
+                TimeSpan.MinValue,
+                new NullLogger<Scheduler>()));
+    }
     
     [Fact]
     public async Task SchedulingTaskImmediatelyHasExpectedResult()
     {
-        var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5), _logger);
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5), _logger);
 
         var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await sut.ScheduleTaskAsync(() =>
@@ -29,9 +58,27 @@ public class SchedulerTests
     }
     
     [Fact]
+    public async Task SchedulingCancelledTaskHasExpectedResult()
+    {
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), _logger);
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await sut.ScheduleTaskAsync(() =>
+        {
+            source.TrySetResult();
+            cancellation.Token.ThrowIfCancellationRequested();
+            return ValueTask.CompletedTask;
+        }, TimeSpan.FromMilliseconds(200));
+        
+        Assert.True(source.Task.Wait(TimeSpan.FromMilliseconds(300)));
+    }
+    
+    [Fact]
     public async Task SchedulingTaskHasExpectedResult()
     {
-        var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
 
         var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await sut.ScheduleTaskAsync(() =>
@@ -44,9 +91,9 @@ public class SchedulerTests
     }
 
     [Fact]
-    public async Task SchedulingCancelledTaskDoesNotInterfereWithSubsequentScheduledTasks()
+    public async Task SchedulingCancelledTaskImmediatelyDoesNotInterfereWithSubsequentScheduledTasks()
     {
-        var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
 
         var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -54,6 +101,7 @@ public class SchedulerTests
         await sut.ScheduleTaskAsync(() =>
         {
             source1.TrySetResult();
+            cancellation.Token.ThrowIfCancellationRequested();
             return ValueTask.FromCanceled(cancellation.Token);
         }, TimeSpan.Zero);
         
@@ -69,9 +117,35 @@ public class SchedulerTests
     }
     
     [Fact]
-    public async Task SchedulingExceptionalTaskDoesNotInterfereWithSubsequentScheduledTasks()
+    public async Task SchedulingCancelledTaskDoesNotInterfereWithSubsequentScheduledTasks()
     {
-        var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), _logger);
+
+        var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var source1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await sut.ScheduleTaskAsync(() =>
+        {
+            source1.TrySetResult();
+            cancellation.Token.ThrowIfCancellationRequested();
+            return ValueTask.FromCanceled(cancellation.Token);
+        }, TimeSpan.FromMilliseconds(50));
+        
+        Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        
+        var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await sut.ScheduleTaskAsync(() =>
+        {
+            source2.TrySetResult();
+            return ValueTask.CompletedTask;
+        }, TimeSpan.FromMilliseconds(50));
+        Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
+    }
+    
+    [Fact]
+    public async Task SchedulingExceptionalTaskImmediatelyDoesNotInterfereWithSubsequentScheduledTasks()
+    {
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), _logger);
 
         var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -92,5 +166,47 @@ public class SchedulerTests
         }, TimeSpan.Zero);
         
         Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
+    }
+    
+    [Fact]
+    public async Task SchedulingExceptionalTaskDoesNotInterfereWithSubsequentScheduledTasks()
+    {
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), _logger);
+
+        var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var source1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await sut.ScheduleTaskAsync(() =>
+        {
+            source1.TrySetResult();
+            throw new Exception();
+        }, TimeSpan.FromMilliseconds(50));
+        
+        Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        
+        var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await sut.ScheduleTaskAsync(() =>
+        {
+            source2.TrySetResult();
+            return ValueTask.CompletedTask;
+        }, TimeSpan.FromMilliseconds(50));
+        
+        Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
+    }
+
+    [Fact]
+    public async Task SchedulingTaskOnDisposedSchedulerHasExpectedResult()
+    {
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
+        await sut.DisposeAsync();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => sut.ScheduleTaskAsync(() => ValueTask.CompletedTask, TimeSpan.Zero).AsTask());
+    }
+
+    [Fact]
+    public async Task ClockReturnsExpectedResult()
+    {
+        var clock = () => DateTimeOffset.UtcNow;
+        await using var sut = new Scheduler(clock, TimeSpan.FromMilliseconds(50), _logger);
+        Assert.Same(clock, sut.Clock);
     }
 }

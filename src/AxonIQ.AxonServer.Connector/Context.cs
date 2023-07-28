@@ -32,6 +32,6 @@ public readonly struct Context : IEquatable<Context>
     public void WriteTo(Metadata metadata)
     {
         if (metadata == null) throw new ArgumentNullException(nameof(metadata));
-        metadata.Add(AxonServerConnectionHeaders.Context, _value);
+        metadata.Add(AxonServerConnectorHeaders.Context, _value);
     }
 }

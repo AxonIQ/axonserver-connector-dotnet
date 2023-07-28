@@ -33,12 +33,12 @@ public class CommandChannelIntegrationTests
     }
     
     private Task<IAxonServerConnection> CreateSystemUnderTest(
-        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+        Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        var builder = AxonServerConnectionFactoryOptions.For(component, clientInstance)
+        var builder = AxonServerConnectorOptions.For(component, clientInstance)
             .WithRoutingServers(_container.GetGrpcEndpoint())
             .WithLoggerFactory(_loggerFactory);
         configure?.Invoke(builder);

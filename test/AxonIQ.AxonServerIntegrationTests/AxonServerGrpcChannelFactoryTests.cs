@@ -34,7 +34,7 @@ public class AxonServerGrpcChannelFactoryTests
         public async Task CreateReturnsExpectedResult()
         {
             var clock = () => DateTimeOffset.UtcNow;
-            var connectionTimeout = AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout;
+            var connectionTimeout = AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout;
             var clientIdentity = _fixture.Create<ClientIdentity>();
             var context = _fixture.Create<Context>();
             var routingServers = _fixture.CreateMany<DnsEndPoint>(Random.Shared.Next(1, 5)).ToArray();
@@ -79,7 +79,7 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
                 routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions(),
-                clock, AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout);
+                clock, AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout);
         }
 
         [Fact]
@@ -137,7 +137,7 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
                 routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions(),
-                clock, AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout);
+                clock, AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout);
         }
         
         private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers, IAxonServerAuthentication authentication)
@@ -145,7 +145,7 @@ public class AxonServerGrpcChannelFactoryTests
             var clock = () => DateTimeOffset.UtcNow;
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory, Array.Empty<Interceptor>(),
-                new GrpcChannelOptions(), clock, AxonServerConnectionFactoryDefaults.DefaultReconnectOptions.ConnectionTimeout);
+                new GrpcChannelOptions(), clock, AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout);
         }
         
         [Fact]

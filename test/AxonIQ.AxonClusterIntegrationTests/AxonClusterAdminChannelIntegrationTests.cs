@@ -32,12 +32,12 @@ public class AxonClusterAdminChannelIntegrationTests
     }
 
     private async Task<IAxonServerConnection> CreateSystemUnderTest(
-        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+        Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        var builder = AxonServerConnectionFactoryOptions.For(component, clientInstance)
+        var builder = AxonServerConnectorOptions.For(component, clientInstance)
             .WithRoutingServers(_cluster.GetRandomGrpcEndpoint())
             .WithLoggerFactory(_loggerFactory);
         configure?.Invoke(builder);

@@ -9,11 +9,11 @@ using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
-public class AxonServerConnectionFactoryOptionsTests
+public class AxonServerConnectorOptionsTests
 {
     private readonly IFixture _fixture;
 
-    public AxonServerConnectionFactoryOptionsTests()
+    public AxonServerConnectorOptionsTests()
     {
         _fixture = new Fixture();
         _fixture.CustomizeComponentName();
@@ -26,9 +26,9 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
 
-        var sut = AxonServerConnectionFactoryOptions.For(component);
+        var sut = AxonServerConnectorOptions.For(component);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -43,9 +43,9 @@ public class AxonServerConnectionFactoryOptionsTests
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -54,12 +54,12 @@ public class AxonServerConnectionFactoryOptionsTests
         Assert.Equal(clientInstance, result.ClientInstanceId);
     }
 
-    private IAxonServerConnectionFactoryOptionsBuilder CreateSystemUnderTest()
+    private IAxonServerConnectorOptionsBuilder CreateSystemUnderTest()
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        return AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        return AxonServerConnectorOptions.For(component, clientInstance);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .AsComponentName(component);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -87,7 +87,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .AsClientInstanceId(clientInstanceId);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -101,11 +101,11 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithDefaultRoutingServers();
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
-        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithRoutingServers(servers);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -139,11 +139,11 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithRoutingServers();
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
-        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithRoutingServers(servers);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -177,11 +177,11 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithRoutingServers(Enumerable.Empty<DnsEndPoint>());
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
-        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithoutAuthentication();
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -215,7 +215,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithAuthenticationToken(token);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -241,7 +241,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithClientTags(tags);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -264,7 +264,7 @@ public class AxonServerConnectionFactoryOptionsTests
                 .WithClientTags(writtenTags)
                 .WithClientTags(overwriteTags);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -289,7 +289,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithClientTags(tags);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -312,7 +312,7 @@ public class AxonServerConnectionFactoryOptionsTests
                 .WithClientTags(writtenTags)
                 .WithClientTags(overwriteTags);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
@@ -349,7 +349,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithClientTag(key, value);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
         var result = sut.Build();
 
         Assert.Equal(new Dictionary<string, string> { { key, value } }, result.ClientTags);
@@ -365,7 +365,7 @@ public class AxonServerConnectionFactoryOptionsTests
                 .WithClientTag(key, "1")
                 .WithClientTag(key, "2");
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
         var result = sut.Build();
 
         Assert.Equal(new Dictionary<string, string> { { key, "2" } }, result.ClientTags);
@@ -380,7 +380,7 @@ public class AxonServerConnectionFactoryOptionsTests
             CreateSystemUnderTest()
                 .WithQueryPermits(new PermitCount(value));
         
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
         var result = sut.Build();
         
         Assert.Equal(new PermitCount(expected), result.QueryPermits);
@@ -389,13 +389,13 @@ public class AxonServerConnectionFactoryOptionsTests
     [Fact]
     public void FromConfigurationCanNotBeNull()
     {
-        Assert.Throws<ArgumentNullException>(() => AxonServerConnectionFactoryOptions.FromConfiguration(null!));
+        Assert.Throws<ArgumentNullException>(() => AxonServerConnectorOptions.FromConfiguration(null!));
     }
 
     [Fact]
     public void FromConfigurationDefaultsToUnnamedComponentNameWhenComponentNameIsMissing()
     {
-        var sut = AxonServerConnectionFactoryOptions.FromConfiguration(
+        var sut = AxonServerConnectorOptions.FromConfiguration(
             new ConfigurationRoot(new List<IConfigurationProvider>()));
         var result = sut.Build();
         Assert.StartsWith(ComponentName.Default.SuffixWith("_").ToString(),
@@ -411,21 +411,21 @@ public class AxonServerConnectionFactoryOptionsTests
         {
             InitialData = new KeyValuePair<string, string>[]
             {
-                new(AxonServerConnectionFactoryConfiguration.ComponentName, component.ToString())
+                new(AxonServerConnectorConfiguration.ComponentName, component.ToString())
             }
         };
         var configuration = new ConfigurationRoot(new List<IConfigurationProvider>
             { new MemoryConfigurationProvider(source) });
 
-        var sut = AxonServerConnectionFactoryOptions.FromConfiguration(configuration);
+        var sut = AxonServerConnectorOptions.FromConfiguration(configuration);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
         Assert.Equal(component, result.ComponentName);
         Assert.StartsWith(result.ComponentName + "_", result.ClientInstanceId.ToString());
-        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
         Assert.Empty(result.ClientTags);
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
         Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
@@ -442,22 +442,22 @@ public class AxonServerConnectionFactoryOptionsTests
         {
             InitialData = new KeyValuePair<string, string>[]
             {
-                new(AxonServerConnectionFactoryConfiguration.ComponentName, component.ToString()),
-                new(AxonServerConnectionFactoryConfiguration.ClientInstanceId, clientInstance.ToString())
+                new(AxonServerConnectorConfiguration.ComponentName, component.ToString()),
+                new(AxonServerConnectorConfiguration.ClientInstanceId, clientInstance.ToString())
             }
         };
         var configuration = new ConfigurationRoot(new List<IConfigurationProvider>
             { new MemoryConfigurationProvider(source) });
 
-        var sut = AxonServerConnectionFactoryOptions.FromConfiguration(configuration);
+        var sut = AxonServerConnectorOptions.FromConfiguration(configuration);
 
-        Assert.IsAssignableFrom<IAxonServerConnectionFactoryOptionsBuilder>(sut);
+        Assert.IsAssignableFrom<IAxonServerConnectorOptionsBuilder>(sut);
 
         var result = sut.Build();
 
         Assert.Equal(component, result.ComponentName);
         Assert.Equal(clientInstance, result.ClientInstanceId);
-        Assert.Equal(AxonServerConnectionFactoryDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
         Assert.Empty(result.ClientTags);
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
         Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
@@ -476,7 +476,7 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var loggerFactory = new NullLoggerFactory();
         var result = sut.WithLoggerFactory(loggerFactory).Build();
         
@@ -488,7 +488,7 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.Build();
         
         Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
@@ -505,7 +505,7 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var options = new GrpcChannelOptions();
         var result = sut.WithGrpcChannelOptions(options).Build();
         
@@ -517,7 +517,7 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.Build();
         
         Assert.Null(result.GrpcChannelOptions);
@@ -534,7 +534,7 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var interceptors = new Interceptor[]
         {
             new FakeInterceptor()
@@ -549,7 +549,7 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.Build();
         
         Assert.Empty(result.Interceptors);
@@ -561,7 +561,7 @@ public class AxonServerConnectionFactoryOptionsTests
         var options = _fixture.Create<ReconnectOptions>();
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.WithReconnectOptions(options).Build();
         
         Assert.Equal(options, result.ReconnectOptions);
@@ -572,10 +572,10 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.Build();
         
-        Assert.Equal(AxonServerConnectionFactoryDefaults.DefaultReconnectOptions, result.ReconnectOptions);
+        Assert.Equal(AxonServerConnectorDefaults.DefaultReconnectOptions, result.ReconnectOptions);
     }
     
     [Fact]
@@ -584,7 +584,7 @@ public class AxonServerConnectionFactoryOptionsTests
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
         var frequency = TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000));
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.WithEventProcessorUpdateFrequency(frequency).Build();
         
         Assert.Equal(frequency, result.EventProcessorUpdateFrequency);
@@ -595,10 +595,10 @@ public class AxonServerConnectionFactoryOptionsTests
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
-        var sut = AxonServerConnectionFactoryOptions.For(component, clientInstance);
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.Build();
         
-        Assert.Equal(AxonServerConnectionFactoryDefaults.DefaultEventProcessorUpdateFrequency, result.EventProcessorUpdateFrequency);
+        Assert.Equal(AxonServerConnectorDefaults.DefaultEventProcessorUpdateFrequency, result.EventProcessorUpdateFrequency);
     }
     //TODO: Extend with tests that cover obtaining all other options from configuration
     

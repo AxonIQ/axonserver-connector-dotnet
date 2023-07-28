@@ -99,6 +99,12 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
         ThrowIfDisposed();
         return _scheduler.ScheduleTaskAsync(() => TellAsync(message, ct), due);
     }
+    
+    public bool TryTell(TMessage message)
+    {
+        ThrowIfDisposed();
+        return _inbox.Writer.TryWrite(message);
+    }
 
     public ValueTask TellAsync(TMessage message)
     {

@@ -2,12 +2,12 @@ using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
-public class AxonServerConnectionFactoryConfigurationTests
+public class AxonServerConnectorConfigurationTests
 {
     [Fact]
     public void DefaultSectionReturnsExpectedResult()
     {
-        var result = AxonServerConnectionFactoryConfiguration.DefaultSection;
+        var result = AxonServerConnectorConfiguration.DefaultSection;
 
         Assert.Equal("AxonIQ", result);
     }
@@ -15,7 +15,7 @@ public class AxonServerConnectionFactoryConfigurationTests
     [Fact]
     public void ComponentNameReturnsExpectedResult()
     {
-        var result = AxonServerConnectionFactoryConfiguration.ComponentName;
+        var result = AxonServerConnectorConfiguration.ComponentName;
 
         Assert.Equal("ComponentName", result);
     }
@@ -23,7 +23,7 @@ public class AxonServerConnectionFactoryConfigurationTests
     [Fact]
     public void ClientInstanceIdReturnsExpectedResult()
     {
-        var result = AxonServerConnectionFactoryConfiguration.ClientInstanceId;
+        var result = AxonServerConnectorConfiguration.ClientInstanceId;
 
         Assert.Equal("ClientInstanceId", result);
     }
@@ -31,7 +31,7 @@ public class AxonServerConnectionFactoryConfigurationTests
     [Fact]
     public void RoutingServersReturnsExpectedResult()
     {
-        var result = AxonServerConnectionFactoryConfiguration.RoutingServers;
+        var result = AxonServerConnectorConfiguration.RoutingServers;
 
         Assert.Equal("RoutingServers", result);
     }

@@ -40,7 +40,7 @@ public class AsyncLockTests
     [Fact]
     public async Task RaceBetweenAcquireAsyncAndDisposeAsyncHasExpectedResult()
     {
-        var source = new CancellationTokenSource();
+        using var source = new CancellationTokenSource();
         var sut = new AsyncLock();
 
         if (Random.Shared.Next() % 2 == 0)

@@ -7,7 +7,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal class EventChannel : IEventChannel, IDisposable
 {
-    private readonly AxonServerConnection _connection;
+    private readonly IOwnerAxonServerConnection _connection;
     private readonly Func<DateTimeOffset> _clock;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<EventChannel> _logger;
@@ -16,7 +16,7 @@ internal class EventChannel : IEventChannel, IDisposable
     private long _disposed;
 
     public EventChannel(
-        AxonServerConnection connection,
+        IOwnerAxonServerConnection connection,
         Func<DateTimeOffset> clock,
         ILoggerFactory loggerFactory)
     {

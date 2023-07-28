@@ -31,12 +31,12 @@ public class QueryChannelIntegrationTests
     }
     
     private Task<IAxonServerConnection> CreateSystemUnderTest(
-        Action<IAxonServerConnectionFactoryOptionsBuilder>? configure = default)
+        Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var component = _fixture.Create<ComponentName>();
         var clientInstance = _fixture.Create<ClientInstanceId>();
 
-        var builder = AxonServerConnectionFactoryOptions.For(component, clientInstance)
+        var builder = AxonServerConnectorOptions.For(component, clientInstance)
             .WithRoutingServers(_container.GetGrpcEndpoint())
             .WithLoggerFactory(_loggerFactory);
         configure?.Invoke(builder);
@@ -49,7 +49,7 @@ public class QueryChannelIntegrationTests
     public async Task RegisterQueryHandlerWhileDisconnectedHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest(builder =>
-            builder.WithRoutingServers(new DnsEndPoint("127.0.0.0", AxonServerConnectionFactoryDefaults.Port)));
+            builder.WithRoutingServers(new DnsEndPoint("127.0.0.0", AxonServerConnectorDefaults.Port)));
         var sut = connection.QueryChannel;
 
         var queries = new[]

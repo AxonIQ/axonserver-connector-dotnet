@@ -7,7 +7,7 @@ public class AxonServerConnectionHeadersTests
     [Fact]
     public void AccessTokenReturnsExpectedResult()
     {
-        var result = AxonServerConnectionHeaders.AccessToken;
+        var result = AxonServerConnectorHeaders.AccessToken;
 
         Assert.Equal("AxonIQ-Access-Token", result);
     }
@@ -15,7 +15,7 @@ public class AxonServerConnectionHeadersTests
     [Fact]
     public void ContextReturnsExpectedResult()
     {
-        var result = AxonServerConnectionHeaders.Context;
+        var result = AxonServerConnectorHeaders.Context;
 
         Assert.Equal("AxonIQ-Context", result);
     }
