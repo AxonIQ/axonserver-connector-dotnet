@@ -73,7 +73,7 @@ public class AxonServerAuthenticationTests
 
         Assert.Equal(new Metadata
         {
-            { AxonServerConnectionHeaders.AccessToken, token }
+            { AxonServerConnectorHeaders.AccessToken, token }
         }, metadata, new MetadataEntryKeyValueComparer());
     }
 }

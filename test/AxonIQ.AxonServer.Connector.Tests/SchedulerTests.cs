@@ -60,7 +60,7 @@ public class SchedulerTests
     [Fact]
     public async Task SchedulingCancelledTaskHasExpectedResult()
     {
-        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(100), _logger);
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), _logger);
 
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -171,7 +171,7 @@ public class SchedulerTests
     [Fact]
     public async Task SchedulingExceptionalTaskDoesNotInterfereWithSubsequentScheduledTasks()
     {
-        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(50), _logger);
+        await using var sut = new Scheduler(() => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), _logger);
 
         var cancellation = new CancellationTokenSource();
         cancellation.Cancel();

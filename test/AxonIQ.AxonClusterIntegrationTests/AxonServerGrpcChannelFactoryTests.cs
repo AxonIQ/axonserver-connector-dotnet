@@ -40,7 +40,7 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
                 routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions(),
-                clock, AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout);
+                clock, AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout);
         }
 
         [Fact]
@@ -100,7 +100,7 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, AxonServerAuthentication.None,
                 routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions(),
-                clock, AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout);
+                clock, AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout);
         }
         
         private AxonServerGrpcChannelFactory CreateSystemUnderTest(IReadOnlyList<DnsEndPoint> routingServers, IAxonServerAuthentication authentication)
@@ -109,7 +109,7 @@ public class AxonServerGrpcChannelFactoryTests
             var clientIdentity = _fixture.Create<ClientIdentity>();
             return new AxonServerGrpcChannelFactory(clientIdentity, authentication, routingServers, _loggerFactory, Array.Empty<Interceptor>(),
                 new GrpcChannelOptions(),
-                clock, AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout);
+                clock, AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout);
         }
 
         [Fact]
@@ -335,7 +335,7 @@ public class AxonServerGrpcChannelFactoryTests
                 var sut = new AxonServerGrpcChannelFactory(clientIdentity,
                     AxonServerAuthentication.UsingToken(template.Applications![0].Token!),
                     routingServers, _loggerFactory, Array.Empty<Interceptor>(), new GrpcChannelOptions(),
-                    clock, AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout);
+                    clock, AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout);
 
                 var result = await sut.Create(context);
 

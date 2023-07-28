@@ -140,9 +140,9 @@ public class AxonServerConnectorOptions
         {
             _componentName = componentName;
             _clientInstanceId = clientInstanceId;
-            _routingServers = new List<DnsEndPoint>(AxonServerConnectionDefaults.RoutingServers);
+            _routingServers = new List<DnsEndPoint>(AxonServerConnectorDefaults.RoutingServers);
             _clientTags = new Dictionary<string, string>();
-            foreach (var (key, value) in AxonServerConnectionDefaults.ClientTags)
+            foreach (var (key, value) in AxonServerConnectorDefaults.ClientTags)
             {
                 _clientTags.Add(key, value);
             }
@@ -152,10 +152,10 @@ public class AxonServerConnectorOptions
             _clock = null;
             _grpcChannelOptions = null;
             _interceptors = new List<Interceptor>();
-            _commandPermits = AxonServerConnectionDefaults.DefaultCommandPermits;
-            _queryPermits = AxonServerConnectionDefaults.DefaultQueryPermits;
-            _eventProcessorUpdateFrequency = AxonServerConnectionDefaults.DefaultEventProcessorUpdateFrequency;
-            _reconnectOptions = AxonServerConnectionDefaults.DefaultReconnectOptions;
+            _commandPermits = AxonServerConnectorDefaults.DefaultCommandPermits;
+            _queryPermits = AxonServerConnectorDefaults.DefaultQueryPermits;
+            _eventProcessorUpdateFrequency = AxonServerConnectorDefaults.DefaultEventProcessorUpdateFrequency;
+            _reconnectOptions = AxonServerConnectorDefaults.DefaultReconnectOptions;
         }
 
         public IAxonServerConnectorOptionsBuilder AsComponentName(ComponentName name)
@@ -289,14 +289,14 @@ public class AxonServerConnectorOptions
 
         public IAxonServerConnectorOptionsBuilder WithCommandPermits(PermitCount count)
         {
-            _commandPermits = PermitCount.Max(AxonServerConnectionDefaults.MinimumCommandPermits, count);
+            _commandPermits = PermitCount.Max(AxonServerConnectorDefaults.MinimumCommandPermits, count);
 
             return this;
         }
 
         public IAxonServerConnectorOptionsBuilder WithQueryPermits(PermitCount count)
         {
-            _queryPermits = PermitCount.Max(AxonServerConnectionDefaults.MinimumQueryPermits, count);
+            _queryPermits = PermitCount.Max(AxonServerConnectorDefaults.MinimumQueryPermits, count);
 
             return this;
         }
@@ -310,7 +310,7 @@ public class AxonServerConnectorOptions
 
         public IAxonServerConnectorOptionsBuilder WithEventProcessorUpdateFrequency(TimeSpan frequency)
         {
-            _eventProcessorUpdateFrequency = TimeSpanMath.Max(AxonServerConnectionDefaults.DefaultEventProcessorUpdateFrequency, frequency);
+            _eventProcessorUpdateFrequency = TimeSpanMath.Max(AxonServerConnectorDefaults.DefaultEventProcessorUpdateFrequency, frequency);
 
             return this;
         }
@@ -319,7 +319,7 @@ public class AxonServerConnectorOptions
         {
             if (_routingServers.Count == 0)
             {
-                _routingServers.AddRange(AxonServerConnectionDefaults.RoutingServers);
+                _routingServers.AddRange(AxonServerConnectorDefaults.RoutingServers);
             }
 
             return new AxonServerConnectorOptions(

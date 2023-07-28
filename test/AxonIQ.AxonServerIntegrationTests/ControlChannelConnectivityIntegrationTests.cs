@@ -49,7 +49,7 @@ public class ControlChannelConnectivityIntegrationTests
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();
@@ -94,7 +94,7 @@ public class ControlChannelConnectivityIntegrationTests
             options
                 .WithReconnectOptions(
                     new ReconnectOptions(
-                        AxonServerConnectionDefaults.DefaultReconnectOptions.ConnectionTimeout, 
+                        AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)));
         await connection.WaitUntilReadyAsync();

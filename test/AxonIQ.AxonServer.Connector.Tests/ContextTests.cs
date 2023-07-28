@@ -82,7 +82,7 @@ public class ContextTests
 
         Assert.Equal(new Metadata
         {
-            { AxonServerConnectionHeaders.Context, context }
+            { AxonServerConnectorHeaders.Context, context }
         }, metadata, new MetadataEntryKeyValueComparer());
     }
 }

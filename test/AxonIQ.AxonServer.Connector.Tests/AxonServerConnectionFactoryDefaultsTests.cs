@@ -8,7 +8,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void PortReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.Port;
+        var result = AxonServerConnectorDefaults.Port;
 
         Assert.Equal(8124, result);
     }
@@ -16,7 +16,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void RoutingServersReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.RoutingServers;
+        var result = AxonServerConnectorDefaults.RoutingServers;
 
         Assert.Equal(new List<DnsEndPoint>
         {
@@ -27,7 +27,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void ClientTagsReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.ClientTags;
+        var result = AxonServerConnectorDefaults.ClientTags;
 
         Assert.Empty(result);
     }
@@ -35,7 +35,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void AuthenticationReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.Authentication;
+        var result = AxonServerConnectorDefaults.Authentication;
 
         Assert.Same(AxonServerAuthentication.None, result);
     }
@@ -43,7 +43,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void MinimumCommandPermitsReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.MinimumCommandPermits;
+        var result = AxonServerConnectorDefaults.MinimumCommandPermits;
 
         Assert.Equal(new PermitCount(16), result);
     }
@@ -51,7 +51,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void DefaultCommandPermitsReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.DefaultCommandPermits;
+        var result = AxonServerConnectorDefaults.DefaultCommandPermits;
 
         Assert.Equal(new PermitCount(5_000), result);
     }
@@ -59,7 +59,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void MinimumQueryPermitsReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.MinimumQueryPermits;
+        var result = AxonServerConnectorDefaults.MinimumQueryPermits;
 
         Assert.Equal(new PermitCount(16), result);
     }
@@ -67,7 +67,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void DefaultQueryPermitsReturnsExpectedResult()
     {
-        var result = AxonServerConnectionDefaults.DefaultQueryPermits;
+        var result = AxonServerConnectorDefaults.DefaultQueryPermits;
 
         Assert.Equal(new PermitCount(5_000), result);
     }
@@ -75,7 +75,7 @@ public class AxonServerConnectionFactoryDefaultsTests
     [Fact]
     public void DefaultReconnectOptions()
     {
-        var result = AxonServerConnectionDefaults.DefaultReconnectOptions;
+        var result = AxonServerConnectorDefaults.DefaultReconnectOptions;
         
         Assert.Equal(new ReconnectOptions(
             TimeSpan.FromMilliseconds(10000),

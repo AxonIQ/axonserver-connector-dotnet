@@ -49,7 +49,7 @@ public class QueryChannelIntegrationTests
     public async Task RegisterQueryHandlerWhileDisconnectedHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest(builder =>
-            builder.WithRoutingServers(new DnsEndPoint("127.0.0.0", AxonServerConnectionDefaults.Port)));
+            builder.WithRoutingServers(new DnsEndPoint("127.0.0.0", AxonServerConnectorDefaults.Port)));
         var sut = connection.QueryChannel;
 
         var queries = new[]

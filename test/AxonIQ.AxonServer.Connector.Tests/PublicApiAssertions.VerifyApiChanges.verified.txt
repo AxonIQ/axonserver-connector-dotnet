@@ -18,20 +18,38 @@ namespace AxonIQ.AxonServer.Connector
         public static readonly AxonIQ.AxonServer.Connector.IAxonServerAuthentication None;
         public static AxonIQ.AxonServer.Connector.IAxonServerAuthentication UsingToken(string token) { }
     }
+    public class AxonServerConnection : AxonIQ.AxonServer.Connector.IAxonServerConnection, System.IAsyncDisposable
+    {
+        public AxonServerConnection(AxonIQ.AxonServer.Connector.Context context, AxonIQ.AxonServer.Connector.AxonServerConnectorOptions options) { }
+        public AxonIQ.AxonServer.Connector.IAdminChannel AdminChannel { get; }
+        public AxonIQ.AxonServer.Connector.ClientIdentity ClientIdentity { get; }
+        public AxonIQ.AxonServer.Connector.ICommandChannel CommandChannel { get; }
+        public AxonIQ.AxonServer.Connector.Context Context { get; }
+        public AxonIQ.AxonServer.Connector.IControlChannel ControlChannel { get; }
+        public AxonIQ.AxonServer.Connector.IEventChannel EventChannel { get; }
+        public bool IsClosed { get; }
+        public bool IsConnected { get; }
+        public bool IsReady { get; }
+        public AxonIQ.AxonServer.Connector.IQueryChannel QueryChannel { get; }
+        public System.Threading.Tasks.Task CloseAsync() { }
+        public System.Threading.Tasks.ValueTask DisposeAsync() { }
+        public System.Threading.Tasks.Task WaitUntilConnectedAsync() { }
+        public System.Threading.Tasks.Task WaitUntilReadyAsync() { }
+    }
     public class AxonServerConnectionFactory : System.IAsyncDisposable
     {
-        public AxonServerConnectionFactory(AxonIQ.AxonServer.Connector.AxonServerConnectionFactoryOptions options) { }
+        public AxonServerConnectionFactory(AxonIQ.AxonServer.Connector.AxonServerConnectorOptions options) { }
         public System.Threading.Tasks.Task<AxonIQ.AxonServer.Connector.IAxonServerConnection> ConnectAsync(AxonIQ.AxonServer.Connector.Context context, System.Threading.CancellationToken ct = default) { }
         public System.Threading.Tasks.ValueTask DisposeAsync() { }
     }
-    public static class AxonServerConnectionFactoryConfiguration
+    public static class AxonServerConnectorConfiguration
     {
         public const string ClientInstanceId = "ClientInstanceId";
         public const string ComponentName = "ComponentName";
         public const string DefaultSection = "AxonIQ";
         public const string RoutingServers = "RoutingServers";
     }
-    public static class AxonServerConnectionFactoryDefaults
+    public static class AxonServerConnectorDefaults
     {
         public static readonly AxonIQ.AxonServer.Connector.IAxonServerAuthentication Authentication;
         public static readonly System.Collections.Generic.IReadOnlyDictionary<string, string> ClientTags;
@@ -44,7 +62,12 @@ namespace AxonIQ.AxonServer.Connector
         public static readonly int Port;
         public static readonly System.Collections.Generic.IReadOnlyCollection<System.Net.DnsEndPoint> RoutingServers;
     }
-    public class AxonServerConnectionFactoryOptions
+    public static class AxonServerConnectorHeaders
+    {
+        public const string AccessToken = "AxonIQ-Access-Token";
+        public const string Context = "AxonIQ-Context";
+    }
+    public class AxonServerConnectorOptions
     {
         public AxonIQ.AxonServer.Connector.IAxonServerAuthentication Authentication { get; }
         public AxonIQ.AxonServer.Connector.ClientInstanceId ClientInstanceId { get; }
@@ -59,14 +82,9 @@ namespace AxonIQ.AxonServer.Connector
         public AxonIQ.AxonServer.Connector.PermitCount QueryPermits { get; }
         public AxonIQ.AxonServer.Connector.ReconnectOptions ReconnectOptions { get; }
         public System.Collections.Generic.IReadOnlyList<System.Net.DnsEndPoint> RoutingServers { get; }
-        public static AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder For(AxonIQ.AxonServer.Connector.ComponentName componentName) { }
-        public static AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder For(AxonIQ.AxonServer.Connector.ComponentName componentName, AxonIQ.AxonServer.Connector.ClientInstanceId clientInstanceId) { }
-        public static AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder FromConfiguration(Microsoft.Extensions.Configuration.IConfiguration configuration) { }
-    }
-    public static class AxonServerConnectionHeaders
-    {
-        public const string AccessToken = "AxonIQ-Access-Token";
-        public const string Context = "AxonIQ-Context";
+        public static AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder For(AxonIQ.AxonServer.Connector.ComponentName componentName) { }
+        public static AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder For(AxonIQ.AxonServer.Connector.ComponentName componentName, AxonIQ.AxonServer.Connector.ClientInstanceId clientInstanceId) { }
+        public static AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder FromConfiguration(Microsoft.Extensions.Configuration.IConfiguration configuration) { }
     }
     public class AxonServerException : System.Exception
     {
@@ -274,27 +292,27 @@ namespace AxonIQ.AxonServer.Connector
         System.Threading.Tasks.Task WaitUntilReadyAsync();
         System.Threading.Tasks.Task WaitUntilReadyAsync(System.TimeSpan timeout);
     }
-    public interface IAxonServerConnectionFactoryOptionsBuilder
+    public interface IAxonServerConnectorOptionsBuilder
     {
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder AsClientInstanceId(AxonIQ.AxonServer.Connector.ClientInstanceId id);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder AsComponentName(AxonIQ.AxonServer.Connector.ComponentName name);
-        AxonIQ.AxonServer.Connector.AxonServerConnectionFactoryOptions Build();
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithAuthenticationToken(string token);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithClientTag(string key, string value);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithClientTags(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> tags);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithClientTags(params System.Collections.Generic.KeyValuePair<string, string>[] tags);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithClock(System.Func<System.DateTimeOffset> clock);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithCommandPermits(AxonIQ.AxonServer.Connector.PermitCount count);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithDefaultRoutingServers();
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithEventProcessorUpdateFrequency(System.TimeSpan frequency);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithGrpcChannelOptions(Grpc.Net.Client.GrpcChannelOptions grpcChannelOptions);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithInterceptors(params Grpc.Core.Interceptors.Interceptor[] interceptors);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithLoggerFactory(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithQueryPermits(AxonIQ.AxonServer.Connector.PermitCount count);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithReconnectOptions(AxonIQ.AxonServer.Connector.ReconnectOptions options);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithRoutingServers(System.Collections.Generic.IEnumerable<System.Net.DnsEndPoint> servers);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithRoutingServers(params System.Net.DnsEndPoint[] servers);
-        AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder WithoutAuthentication();
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder AsClientInstanceId(AxonIQ.AxonServer.Connector.ClientInstanceId id);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder AsComponentName(AxonIQ.AxonServer.Connector.ComponentName name);
+        AxonIQ.AxonServer.Connector.AxonServerConnectorOptions Build();
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithAuthenticationToken(string token);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithClientTag(string key, string value);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithClientTags(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> tags);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithClientTags(params System.Collections.Generic.KeyValuePair<string, string>[] tags);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithClock(System.Func<System.DateTimeOffset> clock);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithCommandPermits(AxonIQ.AxonServer.Connector.PermitCount count);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithDefaultRoutingServers();
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithEventProcessorUpdateFrequency(System.TimeSpan frequency);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithGrpcChannelOptions(Grpc.Net.Client.GrpcChannelOptions grpcChannelOptions);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithInterceptors(params Grpc.Core.Interceptors.Interceptor[] interceptors);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithLoggerFactory(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithQueryPermits(AxonIQ.AxonServer.Connector.PermitCount count);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithReconnectOptions(AxonIQ.AxonServer.Connector.ReconnectOptions options);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithRoutingServers(System.Collections.Generic.IEnumerable<System.Net.DnsEndPoint> servers);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithRoutingServers(params System.Net.DnsEndPoint[] servers);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithoutAuthentication();
     }
     public interface ICommandChannel
     {
@@ -542,10 +560,14 @@ namespace AxonIQ.AxonServer.Connector
     public delegate System.Threading.Tasks.ValueTask SendHeartbeat(AxonIQ.AxonServer.Connector.ReceiveHeartbeatAcknowledgement responder, System.TimeSpan timeout);
     public static class ServiceCollectionExtensions
     {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnection(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, AxonIQ.AxonServer.Connector.Context context) { }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnection(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, AxonIQ.AxonServer.Connector.Context context, AxonIQ.AxonServer.Connector.AxonServerConnectorOptions options) { }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnection(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, AxonIQ.AxonServer.Connector.Context context, Microsoft.Extensions.Configuration.IConfiguration configuration) { }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnection(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, AxonIQ.AxonServer.Connector.Context context, System.Action<AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder> configure) { }
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { }
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, AxonIQ.AxonServer.Connector.AxonServerConnectionFactoryOptions options) { }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, AxonIQ.AxonServer.Connector.AxonServerConnectorOptions options) { }
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration) { }
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AxonIQ.AxonServer.Connector.IAxonServerConnectionFactoryOptionsBuilder> configure) { }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder> configure) { }
     }
     public readonly struct SubscriptionId
     {

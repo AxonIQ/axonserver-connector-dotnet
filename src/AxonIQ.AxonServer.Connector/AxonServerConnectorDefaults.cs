@@ -2,7 +2,7 @@ using System.Net;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public static class AxonServerConnectionDefaults
+public static class AxonServerConnectorDefaults
 {
     public static readonly int Port = 8124;
     

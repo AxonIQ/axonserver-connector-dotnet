@@ -58,7 +58,7 @@ public class AxonServerConnectionIntegrationTests
     {
         var sut = await CreateSystemUnderTest(
             options => options.WithRoutingServers(
-                new DnsEndPoint("127.0.0.0", AxonServerConnectionDefaults.Port)));
+                new DnsEndPoint("127.0.0.0", AxonServerConnectorDefaults.Port)));
         var wait = sut.WaitUntilConnectedAsync().ConfigureAwait(false);
         await sut.DisposeAsync().ConfigureAwait(false);
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
@@ -69,7 +69,7 @@ public class AxonServerConnectionIntegrationTests
     {
         var sut = await CreateSystemUnderTest(
             options => options.WithRoutingServers(
-                new DnsEndPoint("127.0.0.0", AxonServerConnectionDefaults.Port)));
+                new DnsEndPoint("127.0.0.0", AxonServerConnectorDefaults.Port)));
         var wait = sut.WaitUntilReadyAsync().ConfigureAwait(false);
         await sut.DisposeAsync().ConfigureAwait(false);
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);

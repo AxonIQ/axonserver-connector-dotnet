@@ -105,7 +105,7 @@ public class AxonServerConnectorOptionsTests
 
         var result = sut.Build();
 
-        Assert.Equal(AxonServerConnectionDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class AxonServerConnectorOptionsTests
 
         var result = sut.Build();
 
-        Assert.Equal(AxonServerConnectionDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public class AxonServerConnectorOptionsTests
 
         var result = sut.Build();
 
-        Assert.Equal(AxonServerConnectionDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
     }
 
     [Fact]
@@ -425,7 +425,7 @@ public class AxonServerConnectorOptionsTests
 
         Assert.Equal(component, result.ComponentName);
         Assert.StartsWith(result.ComponentName + "_", result.ClientInstanceId.ToString());
-        Assert.Equal(AxonServerConnectionDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
         Assert.Empty(result.ClientTags);
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
         Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
@@ -457,7 +457,7 @@ public class AxonServerConnectorOptionsTests
 
         Assert.Equal(component, result.ComponentName);
         Assert.Equal(clientInstance, result.ClientInstanceId);
-        Assert.Equal(AxonServerConnectionDefaults.RoutingServers, result.RoutingServers);
+        Assert.Equal(AxonServerConnectorDefaults.RoutingServers, result.RoutingServers);
         Assert.Empty(result.ClientTags);
         Assert.Same(AxonServerAuthentication.None, result.Authentication);
         Assert.IsType<NullLoggerFactory>(result.LoggerFactory);
@@ -575,7 +575,7 @@ public class AxonServerConnectorOptionsTests
         var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.Build();
         
-        Assert.Equal(AxonServerConnectionDefaults.DefaultReconnectOptions, result.ReconnectOptions);
+        Assert.Equal(AxonServerConnectorDefaults.DefaultReconnectOptions, result.ReconnectOptions);
     }
     
     [Fact]
@@ -598,7 +598,7 @@ public class AxonServerConnectorOptionsTests
         var sut = AxonServerConnectorOptions.For(component, clientInstance);
         var result = sut.Build();
         
-        Assert.Equal(AxonServerConnectionDefaults.DefaultEventProcessorUpdateFrequency, result.EventProcessorUpdateFrequency);
+        Assert.Equal(AxonServerConnectorDefaults.DefaultEventProcessorUpdateFrequency, result.EventProcessorUpdateFrequency);
     }
     //TODO: Extend with tests that cover obtaining all other options from configuration
     
