@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Initial version2
+- Public API generation and verification
+- Initial version
 
 [unreleased]: https://github.com/AxonIQ/axonserver-connector-dotnet/compare/ORIGIN...HEAD
