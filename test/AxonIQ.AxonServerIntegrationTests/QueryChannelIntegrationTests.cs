@@ -6,6 +6,8 @@ using AxonIQ.AxonServer.Connector.Tests.Framework;
 using AxonIQ.AxonServer.Embedded;
 using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Google.Protobuf;
+using Grpc.Core;
+using Grpc.Net.Client;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Query;
 using Microsoft.Extensions.Logging;
@@ -114,7 +116,7 @@ public class QueryChannelIntegrationTests
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
-        await using var registration = await sut.RegisterQueryHandlerAsync(
+        var registration = await sut.RegisterQueryHandlerAsync(
             new PingPongQueryHandler(responseId), 
             queries);
     
@@ -237,7 +239,7 @@ public class QueryChannelIntegrationTests
 
     private class QueryHandler : IQueryHandler
     {
-        public Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
+        public Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
             return Task.CompletedTask;
         }
@@ -258,7 +260,7 @@ public class QueryChannelIntegrationTests
             _responseId = responseId;
         }
         
-        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
+        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
             if (request.Query == "Ping")
             {
@@ -272,8 +274,8 @@ public class QueryChannelIntegrationTests
                         Revision = "0",
                         Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
                     }
-                });
-                await responseChannel.CompleteAsync();
+                }, ct);
+                await responseChannel.CompleteAsync(ct);
             }
         }
 
@@ -293,7 +295,7 @@ public class QueryChannelIntegrationTests
             _responseIds = responseIds;
         }
         
-        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
+        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
             if (request.Query == "Ping")
             {
@@ -309,10 +311,10 @@ public class QueryChannelIntegrationTests
                             Revision = "0",
                             Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
                         }
-                    });
+                    }, ct);
                 }
 
-                await responseChannel.CompleteAsync();
+                await responseChannel.CompleteAsync(ct);
             }
         }
 

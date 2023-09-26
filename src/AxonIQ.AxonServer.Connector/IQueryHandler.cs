@@ -4,7 +4,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface IQueryHandler
 {
-    Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel);
+    Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct);
 
     ISubscriptionQueryRegistration? RegisterSubscriptionQuery(
         SubscriptionQuery query,

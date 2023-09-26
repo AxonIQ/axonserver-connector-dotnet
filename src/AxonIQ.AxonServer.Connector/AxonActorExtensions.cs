@@ -2,7 +2,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal static class AxonActorExtensions
 {
-    public static ValueTask TellAsync<T, TMessage>(
+    public static ValueTask TellToAsync<T, TMessage>(
         this IAxonActor<TMessage> actor,
         Func<T> function,
         Func<TaskResult<T>, TMessage> translate,
@@ -11,10 +11,10 @@ internal static class AxonActorExtensions
         if (actor == null) throw new ArgumentNullException(nameof(actor));
         if (translate == null) throw new ArgumentNullException(nameof(translate));
 
-        return TellAsyncCore(actor, function, translate, ct);
+        return TellToAsyncCore(actor, function, translate, ct);
     }
 
-    private static async ValueTask TellAsyncCore<T, TMessage>(
+    private static async ValueTask TellToAsyncCore<T, TMessage>(
         IAxonActor<TMessage> actor,
         Func<T> function, Func<TaskResult<T>, TMessage> translate,
         CancellationToken ct)

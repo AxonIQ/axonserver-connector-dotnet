@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct QueryName
+public readonly struct QueryName : IEquatable<QueryName>
 {
     private readonly string _value;
 
@@ -23,4 +23,7 @@ public readonly struct QueryName
     public override bool Equals(object? obj) => obj is QueryName other && other.Equals(this);
     public override int GetHashCode() => HashCode.Combine(_value);
     public override string ToString() => _value;
+
+    public static bool operator ==(QueryName left, QueryName right) => left.Equals(right);
+    public static bool operator !=(QueryName left, QueryName right) => !(left == right);
 }

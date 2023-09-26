@@ -67,7 +67,7 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
                 state = new State.Connecting(disconnected.CommandHandlers, disconnected.Flow);
                 break;
             case (State.Connecting, Message.OpenStream):
-                await _actor.TellAsync(
+                await _actor.TellToAsync(
                     () => Service.OpenStream(cancellationToken: ct),
                     result => new Message.StreamOpened(result),
                     ct);

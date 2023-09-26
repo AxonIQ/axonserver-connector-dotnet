@@ -67,7 +67,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                 await HeartbeatChannel.Pause().ConfigureAwait(false);
                 break;
             case (State.Reconnecting.StreamClosed, Message.OpenStream):
-                await _actor.TellAsync(
+                await _actor.TellToAsync(
                     () => Service.OpenStream(cancellationToken: ct),
                     result => new Message.StreamOpened(result),
                     ct);    
@@ -153,7 +153,7 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
                 }
                 break;
             case (State.Connecting.StreamClosed, Message.OpenStream):
-                await _actor.TellAsync(
+                await _actor.TellToAsync(
                     () => Service.OpenStream(cancellationToken: ct),
                     result => new Message.StreamOpened(result),
                     ct);

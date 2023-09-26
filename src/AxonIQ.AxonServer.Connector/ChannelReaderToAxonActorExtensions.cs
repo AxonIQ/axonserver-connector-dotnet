@@ -1,13 +1,15 @@
+using System.Threading.Channels;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-internal static class AsyncStreamReaderToAxonActorExtensions
+internal static class ChannelReaderToAxonActorExtensions
 {
-    public static Task TellToAsync<T, TMessage>(this IAsyncStreamReader<T> reader,
+    public static Task TellToAsync<T, TMessage>(this ChannelReader<T> reader,
         IAxonActor<TMessage> actor,
         Func<TaskResult<T>, TMessage> translate,
+        int count,
         ILogger logger,
         CancellationToken ct = default)
     {
@@ -17,14 +19,16 @@ internal static class AsyncStreamReaderToAxonActorExtensions
         
         return TellToCore(
             reader, 
-            actor, 
+            actor,
+            count, 
             value => translate(new TaskResult<T>.Ok(value)), 
             exception => translate(new TaskResult<T>.Error(exception)), 
             logger, ct);
     }
     
-    private static async Task TellToCore<T, TMessage>(IAsyncStreamReader<T> reader,
+    private static async Task TellToCore<T, TMessage>(ChannelReader<T> reader,
         IAxonActor<TMessage> actor,
+        int count,
         Func<T, TMessage> success,
         Func<Exception, TMessage> failure,
         ILogger logger,
@@ -32,11 +36,20 @@ internal static class AsyncStreamReaderToAxonActorExtensions
     {
         try
         {
-            await foreach (var response in reader.ReadAllAsync(ct).ConfigureAwait(false))
+            var read = 0;
+            while (read < count && await reader.WaitToReadAsync(ct))
             {
-                await actor
-                    .TellAsync(success(response), ct)
-                    .ConfigureAwait(false);
+                while (read < count && reader.TryRead(out var response))
+                {
+                    if (response != null)
+                    {
+                        await actor
+                            .TellAsync(success(response), ct)
+                            .ConfigureAwait(false);
+                    }
+
+                    read++;
+                }
             }
         }
         catch (OperationCanceledException exception)
@@ -57,21 +70,6 @@ internal static class AsyncStreamReaderToAxonActorExtensions
                 logger.LogDebug(exception,
                     "The channel stream is no longer being read because an operation was cancelled");
             }
-        }
-        catch (RpcException exception) when (exception is { StatusCode: StatusCode.Cancelled, InnerException: OperationCanceledException inner } && inner.CancellationToken == ct)
-        {
-            logger.LogDebug(exception,
-                "The channel stream is no longer being read because an operation was cancelled");
-        }
-        catch (RpcException exception)
-        {
-            logger.LogWarning(
-                exception,
-                "The channel stream is no longer being read because of an RPC exception");
-            
-            await actor
-                .TellAsync(failure(exception), ct)
-                .ConfigureAwait(false);
         }
         catch (ObjectDisposedException exception)
         {

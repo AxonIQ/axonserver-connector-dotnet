@@ -50,10 +50,8 @@ internal class SharedAxonServerConnection : IAxonServerConnection, IOwnerAxonSer
             factory.ReconnectOptions,
             factory.LoggerFactory));
         _queryChannel = new Lazy<QueryChannel>(() => new QueryChannel(
-            factory.ChannelFactory.ClientIdentity,
-            _context,
-            factory.Scheduler.Clock,
-            _callInvoker,
+            this,
+            factory.Scheduler,
             factory.QueryPermits,
             new PermitCount(factory.QueryPermits.ToInt64() / 4L),
             factory.LoggerFactory));

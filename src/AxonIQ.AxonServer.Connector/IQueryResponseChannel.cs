@@ -5,19 +5,25 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface IQueryResponseChannel
 {
-    ValueTask SendAsync(QueryResponse response);
-    async ValueTask SendLastAsync(QueryResponse response)
+    ValueTask SendAsync(QueryResponse response, CancellationToken cancellationToken);
+    async ValueTask SendLastAsync(QueryResponse response, CancellationToken cancellationToken)
     {
         try
         {
-            await SendAsync(response).ConfigureAwait(false);
+            await SendAsync(response, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            await CompleteAsync().ConfigureAwait(false);
+            await CompleteAsync(cancellationToken).ConfigureAwait(false);
         }
     }
-    ValueTask CompleteAsync();
-    ValueTask CompleteWithErrorAsync(ErrorMessage errorMessage);
-    ValueTask CompleteWithErrorAsync(ErrorCategory errorCategory, ErrorMessage errorMessage);
+    ValueTask CompleteAsync(CancellationToken cancellationToken);
+    ValueTask CompleteWithErrorAsync(ErrorMessage error, CancellationToken cancellationToken);
+
+    ValueTask CompleteWithErrorAsync(ErrorCategory category, string message, CancellationToken cancellationToken) =>
+        CompleteWithErrorAsync(new ErrorMessage
+        {
+            ErrorCode = category.ToString(),
+            Message = message
+        }, cancellationToken);
 }

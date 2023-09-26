@@ -76,10 +76,8 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
             options.ReconnectOptions,
             options.LoggerFactory));
         _queryChannel = new Lazy<QueryChannel>(() => new QueryChannel(
-            _channelFactory.ClientIdentity,
-            _context,
-            scheduler.Clock,
-            _callInvoker,
+            this,
+            scheduler,
             options.QueryPermits,
             new PermitCount(options.QueryPermits.ToInt64() / 4L),
             options.LoggerFactory));
@@ -308,6 +306,16 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
             new Message.CheckReadiness()
         ).ConfigureAwait(false);
     }
+//     
+//     internal async Task ConnectAsync()
+//     {
+//         if (!IsConnected)
+//         {
+//             await _actor.TellAsync(
+//                 new Message.Connect(0)
+//             ).ConfigureAwait(false);
+//         }
+//     }
 
     public async Task WaitUntilConnectedAsync()
     {

@@ -1,0 +1,16 @@
+@startuml QueryChannel state machine
+[*] --> Disconnected
+
+Disconnected-->Disconnected: RegisterQueryHandler / Connect \n UnregisterQueryHandler \n PurgeOverdueInstructions
+Disconnected-->Connecting: Connect / OpenStream 
+Connecting-->Connecting: OpenStream / StreamOpened \n StreamOpened(Error) / Schedule(OpenSteam) \n RegisterQueryHandler \n UnregisterQueryHandler \n PurgeOverdueInstructions
+Connecting-->Connected: StreamOpened(Ok) / ReceiveQueryProviderInbound, SendQueryProviderOutbound(FlowControl), OnConnected, [foreach registered query] SendQueryProviderOutbound(Subscribe)
+Connected-->Connected: ReceiveQueryProviderInbound(Ok) [Case=Query] / SendQueryProviderOutbound(Ack), [handler found] QueryHandled, [no handler found] SendQueryProviderOutbound(QueryResponse), [permits required] SendQueryProviderOutbound(FlowControl) \n ReceiveQueryProviderInbound(Ok) [Case=Ack] / SendQueryProviderOutbound(Ack), [permits required] SendQueryProviderOutbound(FlowControl) \n QueryHandled(Ok|Error) / SendQueryProviderOutbound(QueryResponse) \n SendQueryProviderOutbound / SendQueryProviderOutboundFaulted \n SendQueryProviderOutboundFaulted \n OnConnected \n RegisterQueryHandler / [has no registered Querys] Schedule(PurgeOverdueInstructions), SendQueryProviderOutbound(Subscribe) \n UnregisterQueryHandler / SendQueryProviderOutbound(Unsubscribe) \n PurgeOverdueInstructions / [has registered Querys] Schedule(PurgeOverdueInstructions)
+Connected-->Faulted: ReceiveQueryProviderInbound(Error)
+Faulted-->Faulted: RegisterQueryHandler \n UnregisterQueryHandler \n PurgeOverdueInstructions
+Faulted-->Connecting: Reconnect / OpenStream
+
+Connecting --> [*]: Close
+Connected --> [*]: Close
+Faulted --> [*]: Close
+@enduml
