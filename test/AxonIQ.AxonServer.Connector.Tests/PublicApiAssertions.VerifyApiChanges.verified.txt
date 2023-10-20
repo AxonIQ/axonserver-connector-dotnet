@@ -5,13 +5,15 @@
 [assembly: System.Runtime.Versioning.TargetFramework(".NETCoreApp,Version=v6.0", FrameworkDisplayName="")]
 namespace AxonIQ.AxonServer.Connector
 {
-    public readonly struct AggregateId
+    public readonly struct AggregateId : System.IEquatable<AxonIQ.AxonServer.Connector.AggregateId>
     {
         public AggregateId(string value) { }
         public bool Equals(AxonIQ.AxonServer.Connector.AggregateId other) { }
         public override bool Equals(object? obj) { }
         public override int GetHashCode() { }
         public override string ToString() { }
+        public static bool operator !=(AxonIQ.AxonServer.Connector.AggregateId left, AxonIQ.AxonServer.Connector.AggregateId right) { }
+        public static bool operator ==(AxonIQ.AxonServer.Connector.AggregateId left, AxonIQ.AxonServer.Connector.AggregateId right) { }
     }
     public static class AxonServerAuthentication
     {
@@ -382,8 +384,8 @@ namespace AxonIQ.AxonServer.Connector
     }
     public interface IQueryHandler
     {
-        System.Threading.Tasks.Task HandleAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryRequest request, AxonIQ.AxonServer.Connector.IQueryResponseChannel responseChannel);
-        AxonIQ.AxonServer.Connector.ISubscriptionQueryRegistration? RegisterSubscriptionQuery(Io.Axoniq.Axonserver.Grpc.Query.SubscriptionQuery query, AxonIQ.AxonServer.Connector.ISubscriptionQueryUpdateResponseChannel responseChannel);
+        System.Threading.Tasks.Task HandleAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryRequest request, AxonIQ.AxonServer.Connector.IQueryResponseChannel responseChannel, System.Threading.CancellationToken ct);
+        System.Threading.Tasks.Task? TryHandleAsync(Io.Axoniq.Axonserver.Grpc.Query.SubscriptionQuery query, AxonIQ.AxonServer.Connector.ISubscriptionQueryUpdateResponseChannel responseChannel, System.Threading.CancellationToken ct);
     }
     public interface IQueryHandlerRegistration : System.IAsyncDisposable
     {
@@ -391,11 +393,11 @@ namespace AxonIQ.AxonServer.Connector
     }
     public interface IQueryResponseChannel
     {
-        System.Threading.Tasks.ValueTask CompleteAsync();
-        System.Threading.Tasks.ValueTask CompleteWithErrorAsync(Io.Axoniq.Axonserver.Grpc.ErrorMessage errorMessage);
-        System.Threading.Tasks.ValueTask CompleteWithErrorAsync(AxonIQ.AxonServer.Connector.ErrorCategory errorCategory, Io.Axoniq.Axonserver.Grpc.ErrorMessage errorMessage);
-        System.Threading.Tasks.ValueTask SendAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryResponse response);
-        System.Threading.Tasks.ValueTask SendLastAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryResponse response);
+        System.Threading.Tasks.ValueTask CompleteAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask CompleteWithErrorAsync(Io.Axoniq.Axonserver.Grpc.ErrorMessage error, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask CompleteWithErrorAsync(AxonIQ.AxonServer.Connector.ErrorCategory category, string message, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask SendAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryResponse response, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask SendLastAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryResponse response, System.Threading.CancellationToken cancellationToken);
     }
     public interface IQuerySubscriptionResult : System.IAsyncDisposable
     {
@@ -407,14 +409,10 @@ namespace AxonIQ.AxonServer.Connector
         System.Func<System.DateTimeOffset> Clock { get; }
         System.Threading.Tasks.ValueTask ScheduleTaskAsync(System.Func<System.Threading.Tasks.ValueTask> task, System.TimeSpan due);
     }
-    public interface ISubscriptionQueryRegistration : System.IAsyncDisposable
-    {
-        System.Threading.Tasks.Task WaitUntilCompletedAsync();
-    }
     public interface ISubscriptionQueryUpdateResponseChannel
     {
-        System.Threading.Tasks.ValueTask CompleteAsync();
-        System.Threading.Tasks.ValueTask SendUpdateAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryUpdate update);
+        System.Threading.Tasks.ValueTask CompleteAsync(System.Threading.CancellationToken ct);
+        System.Threading.Tasks.ValueTask SendUpdateAsync(Io.Axoniq.Axonserver.Grpc.Query.QueryUpdate update, System.Threading.CancellationToken ct);
     }
     public readonly struct InstructionId
     {
@@ -484,9 +482,9 @@ namespace AxonIQ.AxonServer.Connector
     }
     public class QueryDefinition : System.IEquatable<AxonIQ.AxonServer.Connector.QueryDefinition>
     {
-        public QueryDefinition(AxonIQ.AxonServer.Connector.QueryName QueryName, string ResultType) { }
+        public QueryDefinition(AxonIQ.AxonServer.Connector.QueryName QueryName, string ResultName) { }
         public AxonIQ.AxonServer.Connector.QueryName QueryName { get; init; }
-        public string ResultType { get; init; }
+        public string ResultName { get; init; }
     }
     public readonly struct QueryHandlerId
     {
@@ -497,13 +495,15 @@ namespace AxonIQ.AxonServer.Connector
         public override string ToString() { }
         public static AxonIQ.AxonServer.Connector.QueryHandlerId New() { }
     }
-    public readonly struct QueryName
+    public readonly struct QueryName : System.IEquatable<AxonIQ.AxonServer.Connector.QueryName>
     {
         public QueryName(string value) { }
         public bool Equals(AxonIQ.AxonServer.Connector.QueryName other) { }
         public override bool Equals(object? obj) { }
         public override int GetHashCode() { }
         public override string ToString() { }
+        public static bool operator !=(AxonIQ.AxonServer.Connector.QueryName left, AxonIQ.AxonServer.Connector.QueryName right) { }
+        public static bool operator ==(AxonIQ.AxonServer.Connector.QueryName left, AxonIQ.AxonServer.Connector.QueryName right) { }
     }
     public delegate System.Threading.Tasks.ValueTask ReceiveHeartbeatAcknowledgement(Io.Axoniq.Axonserver.Grpc.InstructionAck message);
     public class ReconnectOptions : System.IEquatable<AxonIQ.AxonServer.Connector.ReconnectOptions>
@@ -528,18 +528,16 @@ namespace AxonIQ.AxonServer.Connector
         public static bool operator !=(AxonIQ.AxonServer.Connector.RegisteredCommandId left, AxonIQ.AxonServer.Connector.RegisteredCommandId right) { }
         public static bool operator ==(AxonIQ.AxonServer.Connector.RegisteredCommandId left, AxonIQ.AxonServer.Connector.RegisteredCommandId right) { }
     }
-    public readonly struct RegistrationId
+    public readonly struct RegisteredQueryId : System.IEquatable<AxonIQ.AxonServer.Connector.RegisteredQueryId>
     {
-        public RegistrationId(string value) { }
-        public bool Equals(AxonIQ.AxonServer.Connector.RegistrationId other) { }
+        public bool Equals(AxonIQ.AxonServer.Connector.RegisteredQueryId other) { }
         public override bool Equals(object? obj) { }
         public override int GetHashCode() { }
         public override string ToString() { }
-        public static AxonIQ.AxonServer.Connector.RegistrationId New() { }
-        public static bool operator !=(AxonIQ.AxonServer.Connector.RegistrationId left, AxonIQ.AxonServer.Connector.RegistrationId right) { }
-        public static bool operator ==(AxonIQ.AxonServer.Connector.RegistrationId left, AxonIQ.AxonServer.Connector.RegistrationId right) { }
+        public static AxonIQ.AxonServer.Connector.RegisteredQueryId New() { }
+        public static bool operator !=(AxonIQ.AxonServer.Connector.RegisteredQueryId left, AxonIQ.AxonServer.Connector.RegisteredQueryId right) { }
+        public static bool operator ==(AxonIQ.AxonServer.Connector.RegisteredQueryId left, AxonIQ.AxonServer.Connector.RegisteredQueryId right) { }
     }
-    public delegate System.Threading.Tasks.ValueTask RequestReconnect();
     public readonly struct ScheduledEventCancellationToken : System.IEquatable<AxonIQ.AxonServer.Connector.ScheduledEventCancellationToken>
     {
         public ScheduledEventCancellationToken(string value) { }
@@ -547,8 +545,10 @@ namespace AxonIQ.AxonServer.Connector
         public override bool Equals(object? obj) { }
         public override int GetHashCode() { }
         public override string ToString() { }
+        public static bool operator !=(AxonIQ.AxonServer.Connector.ScheduledEventCancellationToken left, AxonIQ.AxonServer.Connector.ScheduledEventCancellationToken right) { }
+        public static bool operator ==(AxonIQ.AxonServer.Connector.ScheduledEventCancellationToken left, AxonIQ.AxonServer.Connector.ScheduledEventCancellationToken right) { }
     }
-    public readonly struct SegmentId
+    public readonly struct SegmentId : System.IEquatable<AxonIQ.AxonServer.Connector.SegmentId>
     {
         public SegmentId(int value) { }
         public bool Equals(AxonIQ.AxonServer.Connector.SegmentId other) { }
@@ -556,6 +556,8 @@ namespace AxonIQ.AxonServer.Connector
         public override int GetHashCode() { }
         public int ToInt32() { }
         public override string ToString() { }
+        public static bool operator !=(AxonIQ.AxonServer.Connector.SegmentId left, AxonIQ.AxonServer.Connector.SegmentId right) { }
+        public static bool operator ==(AxonIQ.AxonServer.Connector.SegmentId left, AxonIQ.AxonServer.Connector.SegmentId right) { }
     }
     public delegate System.Threading.Tasks.ValueTask SendHeartbeat(AxonIQ.AxonServer.Connector.ReceiveHeartbeatAcknowledgement responder, System.TimeSpan timeout);
     public static class ServiceCollectionExtensions
@@ -569,7 +571,7 @@ namespace AxonIQ.AxonServer.Connector
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration) { }
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAxonServerConnectionFactory(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder> configure) { }
     }
-    public readonly struct SubscriptionId
+    public readonly struct SubscriptionId : System.IEquatable<AxonIQ.AxonServer.Connector.SubscriptionId>
     {
         public SubscriptionId(string value) { }
         public bool Equals(AxonIQ.AxonServer.Connector.SubscriptionId other) { }
@@ -579,17 +581,6 @@ namespace AxonIQ.AxonServer.Connector
         public static AxonIQ.AxonServer.Connector.SubscriptionId New() { }
         public static bool operator !=(AxonIQ.AxonServer.Connector.SubscriptionId left, AxonIQ.AxonServer.Connector.SubscriptionId right) { }
         public static bool operator ==(AxonIQ.AxonServer.Connector.SubscriptionId left, AxonIQ.AxonServer.Connector.SubscriptionId right) { }
-    }
-    public readonly struct SubscriptionIdentifier
-    {
-        public SubscriptionIdentifier(string value) { }
-        public bool Equals(AxonIQ.AxonServer.Connector.SubscriptionIdentifier other) { }
-        public override bool Equals(object? obj) { }
-        public override int GetHashCode() { }
-        public override string ToString() { }
-        public static AxonIQ.AxonServer.Connector.SubscriptionIdentifier New() { }
-        public static bool operator !=(AxonIQ.AxonServer.Connector.SubscriptionIdentifier left, AxonIQ.AxonServer.Connector.SubscriptionIdentifier right) { }
-        public static bool operator ==(AxonIQ.AxonServer.Connector.SubscriptionIdentifier left, AxonIQ.AxonServer.Connector.SubscriptionIdentifier right) { }
     }
     public static class TimeSpanMath
     {
@@ -611,7 +602,6 @@ namespace AxonIQ.AxonServer.Connector
     {
         public static OpenTelemetry.Trace.TracerProviderBuilder AddAxonServerConnectorInstrumentation(this OpenTelemetry.Trace.TracerProviderBuilder builder) { }
     }
-    public delegate System.Threading.Tasks.ValueTask WriteCommandProviderOutbound(Io.Axoniq.Axonserver.Grpc.Command.CommandProviderOutbound instruction);
     public delegate System.Threading.Tasks.ValueTask WritePlatformInboundInstruction(Io.Axoniq.Axonserver.Grpc.Control.PlatformInboundInstruction instruction);
     public delegate System.Threading.Tasks.ValueTask WriteQueryProviderOutbound(Io.Axoniq.Axonserver.Grpc.Query.QueryProviderOutbound instruction);
 }

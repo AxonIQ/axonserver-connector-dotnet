@@ -135,7 +135,6 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                             ok.Value,
                             consumer,
                             consumerCancellationTokenSource,
-                            new OngoingQueryCollection(),
                             connecting.QueryHandlers, 
                             connecting.Flow,
                             connecting.QueryExecutions,
@@ -686,7 +685,6 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
             AsyncDuplexStreamingCall<QueryProviderOutbound, QueryProviderInbound> Call,
             Task ConsumeQueryProviderInboundInstructions,
             CancellationTokenSource ConsumeQueryProviderInboundInstructionsCancellationTokenSource,
-            OngoingQueryCollection OngoingQueries,
             QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions QueryExecutions, SubscriptionQueryExecutions SubscriptionQueryExecutions) : State(QueryHandlers, Flow, QueryExecutions, SubscriptionQueryExecutions);
         public record Faulted(QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions QueryExecutions, SubscriptionQueryExecutions SubscriptionQueryExecutions) : State(QueryHandlers, Flow, QueryExecutions, SubscriptionQueryExecutions);
     }
