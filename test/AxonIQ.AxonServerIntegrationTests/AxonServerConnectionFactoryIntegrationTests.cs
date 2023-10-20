@@ -41,7 +41,7 @@ public class AxonServerConnectionFactoryIntegrationTests
         var context = _fixture.Create<Context>();
         var sut = CreateSystemUnderTest();
 
-        var result = await sut.ConnectAsync(context).ConfigureAwait(false);
+        var result = await sut.ConnectAsync(context);
 
         Assert.NotNull(result);
     }
@@ -52,12 +52,12 @@ public class AxonServerConnectionFactoryIntegrationTests
         var context = _fixture.Create<Context>();
         var sut = CreateSystemUnderTest();
 
-        var first = await sut.ConnectAsync(context).ConfigureAwait(false);
-        var second = await sut.ConnectAsync(context).ConfigureAwait(false);
+        var first = await sut.ConnectAsync(context);
+        var second = await sut.ConnectAsync(context);
 
         Assert.Same(first, second);
         
-        await first.DisposeAsync().ConfigureAwait(false);
+        await first.DisposeAsync();
     }
     
     [Fact]
@@ -66,14 +66,14 @@ public class AxonServerConnectionFactoryIntegrationTests
         var context = _fixture.Create<Context>();
         var sut = CreateSystemUnderTest();
 
-        var first = await sut.ConnectAsync(context).ConfigureAwait(false);
-        await first.DisposeAsync().ConfigureAwait(false);
+        var first = await sut.ConnectAsync(context);
+        await first.DisposeAsync();
         
-        var second = await sut.ConnectAsync(context).ConfigureAwait(false);
+        var second = await sut.ConnectAsync(context);
 
         Assert.NotSame(first, second);
 
-        await second.DisposeAsync().ConfigureAwait(false);
+        await second.DisposeAsync();
     }
     
     [Fact]
@@ -81,10 +81,10 @@ public class AxonServerConnectionFactoryIntegrationTests
     {
         var sut = CreateSystemUnderTest();
 
-        var first = await sut.ConnectAsync(Context.Default).ConfigureAwait(false);
-        var second = await sut.ConnectAsync(Context.Admin).ConfigureAwait(false);
+        var first = await sut.ConnectAsync(Context.Default);
+        var second = await sut.ConnectAsync(Context.Admin);
 
-        await sut.DisposeAsync().ConfigureAwait(false);
+        await sut.DisposeAsync();
         
         Assert.Throws<ObjectDisposedException>(() => first.ControlChannel);
         Assert.Throws<ObjectDisposedException>(() => second.ControlChannel);

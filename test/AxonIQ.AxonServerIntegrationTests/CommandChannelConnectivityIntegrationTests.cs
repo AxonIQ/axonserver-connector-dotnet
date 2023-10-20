@@ -54,7 +54,7 @@ public class CommandChannelConnectivityIntegrationTests
                         AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)))
-            .ConfigureAwait(false);
+;
         await connection.WaitUntilReadyAsync();
         
         var responseId = InstructionId.New().ToString();
