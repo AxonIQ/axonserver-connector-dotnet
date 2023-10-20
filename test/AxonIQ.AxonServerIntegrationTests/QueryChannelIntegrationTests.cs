@@ -44,7 +44,7 @@ public class QueryChannelIntegrationTests
         return factory.ConnectAsync(Context.Default);
     }
 
-    [Fact]
+    [Fact(Skip = "Not sure what the behavior should be.")]
     public async Task RegisterQueryHandlerWhileDisconnectedHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest(builder =>

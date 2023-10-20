@@ -228,7 +228,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
                 Assert.NotEqual(199, @event.AggregateSequenceNumber);
             }
         }
-        catch (ObjectDisposedException exception) when (exception.ObjectName == "GrpcCall")
+        catch (ObjectDisposedException exception) when (exception.ObjectName.StartsWith("Grpc.Net.Client.Internal.GrpcCall"))
         {
             // Expected
         }
