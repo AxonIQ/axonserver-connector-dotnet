@@ -5,36 +5,36 @@ namespace AxonIQ.AxonServer.Connector;
 internal class SubscriptionQueryUpdateResponseChannel : ISubscriptionQueryUpdateResponseChannel
 {
     private readonly ClientIdentity _clientIdentity;
-    private readonly SubscriptionIdentifier _subscriptionIdentifier;
+    private readonly SubscriptionId _subscriptionId;
     private readonly WriteQueryProviderOutbound _writer;
 
-    public SubscriptionQueryUpdateResponseChannel(ClientIdentity clientIdentity, SubscriptionIdentifier subscriptionIdentifier, WriteQueryProviderOutbound writer)
+    public SubscriptionQueryUpdateResponseChannel(ClientIdentity clientIdentity, SubscriptionId subscriptionId, WriteQueryProviderOutbound writer)
     {
         _clientIdentity = clientIdentity ?? throw new ArgumentNullException(nameof(clientIdentity));
-        _subscriptionIdentifier = subscriptionIdentifier;
+        _subscriptionId = subscriptionId;
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
     }
     
-    public ValueTask SendUpdateAsync(QueryUpdate update)
+    public ValueTask SendUpdateAsync(QueryUpdate update, CancellationToken ct)
     {
         return _writer(new QueryProviderOutbound
         {
             SubscriptionQueryResponse = new SubscriptionQueryResponse
             {
-                SubscriptionIdentifier = _subscriptionIdentifier.ToString(),
+                SubscriptionIdentifier = _subscriptionId.ToString(),
                 Update = update,
                 MessageIdentifier = update.MessageIdentifier
             }
         });
     }
 
-    public ValueTask CompleteAsync()
+    public ValueTask CompleteAsync(CancellationToken ct)
     {
         return _writer(new QueryProviderOutbound
         {
             SubscriptionQueryResponse = new SubscriptionQueryResponse
             {
-                SubscriptionIdentifier = _subscriptionIdentifier.ToString(),
+                SubscriptionIdentifier = _subscriptionId.ToString(),
                 Complete = new QueryUpdateComplete
                 {
                     ClientId = _clientIdentity.ClientInstanceId.ToString(),

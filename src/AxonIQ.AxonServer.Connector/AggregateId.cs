@@ -1,6 +1,6 @@
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct AggregateId
+public readonly struct AggregateId : IEquatable<AggregateId>
 {
     private readonly string _value;
 
@@ -13,4 +13,6 @@ public readonly struct AggregateId
     public override bool Equals(object? obj) => obj is AggregateId other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(_value);
     public override string ToString() => _value;
+    public static bool operator ==(AggregateId left, AggregateId right) => left.Equals(right);
+    public static bool operator !=(AggregateId left, AggregateId right) => !left.Equals(right);
 }

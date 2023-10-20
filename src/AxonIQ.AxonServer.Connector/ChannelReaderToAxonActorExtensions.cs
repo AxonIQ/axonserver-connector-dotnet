@@ -1,5 +1,4 @@
 using System.Threading.Channels;
-using Grpc.Core;
 using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;

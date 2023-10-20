@@ -526,8 +526,14 @@ public class QueryHandlerCollectionTests
             return Task.CompletedTask;
         }
 
-        public ISubscriptionQueryRegistration? RegisterSubscriptionQuery(SubscriptionQuery query,
-            ISubscriptionQueryUpdateResponseChannel responseChannel)
+        public Task HandleAsync(SubscriptionQuery query, ISubscriptionQueryUpdateResponseChannel responseChannel,
+            CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task? TryHandleAsync(SubscriptionQuery query, ISubscriptionQueryUpdateResponseChannel responseChannel,
+            CancellationToken ct)
         {
             return null;
         }

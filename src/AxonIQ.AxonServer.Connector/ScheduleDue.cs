@@ -34,24 +34,6 @@ internal static class ScheduleDue
             case StatusCode.Unavailable:
                 after = TimeSpan.FromMilliseconds(50);
                 break;
-            // case StatusCode.OK:
-            //     break;
-            // case StatusCode.Cancelled:
-            //     break;
-            // case StatusCode.Unknown:
-            //     break;
-            // case StatusCode.DeadlineExceeded:
-            //     break;
-            // case StatusCode.AlreadyExists:
-            //     break;
-            // case StatusCode.Aborted:
-            //     break;
-            // case StatusCode.OutOfRange:
-            //     break;
-            // case StatusCode.Internal:
-            //     break;
-            // case StatusCode.DataLoss:
-            //     break;
         }
 
         return after;

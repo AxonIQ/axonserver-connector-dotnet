@@ -15,6 +15,7 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
     private readonly Task _consumer;
     private Task<QueryResponse>? _initialResult;
     private readonly ILogger<QuerySubscriptionResult> _logger;
+    private readonly CancellationTokenSource _cancellationTokenSource;
 
     public QuerySubscriptionResult(
         ClientIdentity clientIdentity,
@@ -33,7 +34,8 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
         _request = request;
         _call = call;
         _logger = loggerFactory.CreateLogger<QuerySubscriptionResult>();
-        _consumer = ConsumeResponseStream(_call.ResponseStream, ct);
+        _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _consumer = ConsumeResponseStream(_call.ResponseStream, _cancellationTokenSource.Token);
         _initialResultSource = new TaskCompletionSource<QueryResponse>();
         _initialResult = null;
         _updateChannel = Channel.CreateUnbounded<QueryUpdate>(new UnboundedChannelOptions
@@ -49,7 +51,7 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
                 }
             }, 
             _call.RequestStream,
-            _updateChannel.Reader.ReadAllAsync(ct),
+            _updateChannel.Reader.ReadAllAsync(_cancellationTokenSource.Token),
             loggerFactory);
     }
 
@@ -62,13 +64,15 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
                 switch (response.ResponseCase)
                 {
                     case SubscriptionQueryResponse.ResponseOneofCase.InitialResult:
-                        _logger.LogDebug("Received subscription query initial result. Subscription Id: {SubscriptionId}. Message Id: {MessageId}",
+                        _logger.LogDebug(
+                            "Received subscription query initial result. Subscription Id: {SubscriptionId}. Message Id: {MessageId}",
                             response.SubscriptionIdentifier,
                             response.MessageIdentifier);
                         _initialResultSource.TrySetResult(response.InitialResult);
                         break;
                     case SubscriptionQueryResponse.ResponseOneofCase.Update:
-                        _logger.LogDebug("Received subscription query update. Subscription Id: {SubscriptionId}. Message Id: {MessageId}",
+                        _logger.LogDebug(
+                            "Received subscription query update. Subscription Id: {SubscriptionId}. Message Id: {MessageId}",
                             response.SubscriptionIdentifier,
                             response.MessageIdentifier);
                         await _updateChannel.Writer.WriteAsync(response.Update, ct).ConfigureAwait(false);
@@ -76,24 +80,42 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
                     case SubscriptionQueryResponse.ResponseOneofCase.Complete:
                         _logger.LogDebug("Received subscription query complete. Subscription Id: {SubscriptionId}",
                             response.SubscriptionIdentifier);
-                        _updateChannel.Writer.Complete();
+                        _updateChannel.Writer.TryComplete();
                         break;
                     case SubscriptionQueryResponse.ResponseOneofCase.CompleteExceptionally:
-                        _logger.LogDebug("Received subscription query complete exceptionally. Subscription Id: {SubscriptionId}",
+                        _logger.LogDebug(
+                            "Received subscription query complete exceptionally. Subscription Id: {SubscriptionId}",
                             response.SubscriptionIdentifier);
                         var exception = new AxonServerException(
                             _clientIdentity,
                             ErrorCategory.Parse(response.CompleteExceptionally.ErrorCode),
                             response.CompleteExceptionally.ErrorMessage.Message
                         );
-                        _updateChannel.Writer.Complete(exception);
+                        _updateChannel.Writer.TryComplete(exception);
                         _initialResultSource.TrySetException(exception);
                         break;
                     default:
-                        _logger.LogInformation("Received unsupported message from subscription query. It doesn't declare one of the expected types");
+                        _logger.LogInformation(
+                            "Received unsupported message from subscription query. It doesn't declare one of the expected types");
                         break;
                 }
             }
+        }
+        catch (RpcException rpcException) when (rpcException.StatusCode == StatusCode.Cancelled &&
+                                                rpcException.Status.Detail ==
+                                                ErrorCategory.NoHandlerForQuery.ToString())
+        {
+            var exception = new AxonServerException(
+                _clientIdentity,
+                ErrorCategory.NoHandlerForQuery,
+                "No query handler");
+            _updateChannel.Writer.TryComplete(exception);
+            _initialResultSource.TrySetException(exception);
+        }
+        catch (RpcException exception) when (exception.StatusCode == StatusCode.Cancelled)
+        {
+            _logger.LogDebug(exception,
+                "The query subscription result stream is no longer being read because an RPC operation was cancelled");
         }
         catch (ObjectDisposedException exception)
         {
@@ -110,6 +132,11 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
             _logger.LogDebug(exception,
                 "The query subscription result stream is no longer being read because an operation was cancelled");
         }
+        catch (ChannelClosedException exception)
+        {
+            _logger.LogDebug(exception,
+                "The query subscription result stream is no longer being read because the update channel was closed");
+        }
         catch (Exception exception)
         {
             _logger.LogCritical(
@@ -122,14 +149,28 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
     {
         if (Interlocked.CompareExchange(ref _initialResult, _initialResultSource.Task, null) == null)
         {
-            await _call.RequestStream.WriteAsync(new SubscriptionQueryRequest
+            try
             {
-                GetInitialResult = new SubscriptionQuery
+                await _call.RequestStream.WriteAsync(new SubscriptionQueryRequest
                 {
-                    QueryRequest = _request,
-                    SubscriptionIdentifier = _request.MessageIdentifier
-                }
-            }).ConfigureAwait(false);
+                    GetInitialResult = new SubscriptionQuery
+                    {
+                        QueryRequest = _request,
+                        SubscriptionIdentifier = _request.MessageIdentifier
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch (RpcException rpcException) when (rpcException.StatusCode == StatusCode.Cancelled &&
+                                                    rpcException.Status.Detail ==
+                                                    ErrorCategory.NoHandlerForQuery.ToString())
+            {
+                var exception = new AxonServerException(
+                    _clientIdentity,
+                    ErrorCategory.NoHandlerForQuery,
+                    "No query handler");
+                _updateChannel.Writer.TryComplete(exception);
+                _initialResultSource.TrySetException(exception);
+            }
         }
 
         return await _initialResult;
@@ -142,7 +183,10 @@ internal class QuerySubscriptionResult : IQuerySubscriptionResult
     public async ValueTask DisposeAsync()
     {
         _call.Dispose();
-        await _consumer.ConfigureAwait(false);
+        _cancellationTokenSource.Cancel();
+        _updateChannel.Writer.TryComplete(new OperationCanceledException(_cancellationTokenSource.Token));
         _initialResultSource.TrySetCanceled();
+        await _consumer.ConfigureAwait(false);
+        _cancellationTokenSource.Dispose();
     }
 }

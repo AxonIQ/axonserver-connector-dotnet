@@ -1,4 +1,3 @@
-using Google.Protobuf.Reflection;
 using Io.Axoniq.Axonserver.Grpc;
 
 namespace AxonIQ.AxonServer.Connector;

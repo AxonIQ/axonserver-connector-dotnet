@@ -3,17 +3,20 @@ using Io.Axoniq.Axonserver.Grpc.Query;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
-public class QueryReplyTranslationTests
+public class SubscriptionQueryReplyTranslationTests
 {
+    private readonly SubscriptionId _subscriptionId;
     private readonly InstructionId _instructionId;
     private readonly QueryReplyTranslator _sut;
 
-    public QueryReplyTranslationTests()
+    public SubscriptionQueryReplyTranslationTests()
     {
+        _subscriptionId = SubscriptionId.New();
         _instructionId = InstructionId.New();
-        _sut = QueryReplyTranslation.ForQuery(new QueryRequest
+        _sut = QueryReplyTranslation.ForSubscriptionQuery(new SubscriptionQuery
             {
-                MessageIdentifier = _instructionId.ToString()
+                SubscriptionIdentifier = _subscriptionId.ToString(),
+                QueryRequest = new QueryRequest { MessageIdentifier = _instructionId.ToString() }
             }
         );
     }
@@ -28,9 +31,9 @@ public class QueryReplyTranslationTests
         }));
 
         var message = Assert.Single(actual);
-        Assert.NotEmpty(message.QueryResponse.MessageIdentifier);
+        Assert.NotEmpty(message.SubscriptionQueryResponse.MessageIdentifier);
         Assert.NotEmpty(message.InstructionId);
-        Assert.Equal(_instructionId.ToString(), message.QueryResponse.RequestIdentifier);
+        Assert.Equal(_subscriptionId.ToString(), message.SubscriptionQueryResponse.SubscriptionIdentifier);
     }
     
     [Fact]
@@ -38,21 +41,22 @@ public class QueryReplyTranslationTests
     {
         var instructionId = InstructionId.New();
         var payload = new SerializedObject();
-        var actual = _sut(new QueryReply.Send(new QueryResponse
+        var queryResponse = new QueryResponse
         {
             MessageIdentifier = instructionId.ToString(),
             Payload = payload
-        }));
+        };
+        var actual = _sut(new QueryReply.Send(queryResponse));
 
         Assert.Equal(new []
         {
             new QueryProviderOutbound
             {
-                QueryResponse = new QueryResponse
+                SubscriptionQueryResponse = new SubscriptionQueryResponse
                 {
+                    SubscriptionIdentifier = _subscriptionId.ToString(),
+                    InitialResult = queryResponse,
                     MessageIdentifier = instructionId.ToString(),
-                    Payload = payload,
-                    RequestIdentifier = _instructionId.ToString(),
                 },
                 InstructionId = instructionId.ToString()
                 

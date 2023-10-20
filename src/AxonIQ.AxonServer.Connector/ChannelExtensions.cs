@@ -26,7 +26,7 @@ internal static class ChannelExtensions
         }
     }
     
-    public static Task ReadFromAll<T>(this Channel<T> destination, IReadOnlyCollection<Channel<T>> sources, CancellationToken ct)
+    public static Task PipeFromAll<T>(this Channel<T> destination, IReadOnlyCollection<Channel<T>> sources, CancellationToken ct)
     {
         return sources.Count switch
         {

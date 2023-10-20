@@ -16,7 +16,7 @@ internal class FlowControlledChannel<T> : Channel<T>
             SingleWriter = false,
             AllowSynchronousContinuations = false
         });
-        Reader = _channel.Reader; // new FlowControlledChannelReader(this);
+        Reader = new FlowControlledChannelReader(this); //_channel.Reader; 
         Writer = new FlowControlledChannelWriter(this);
     }
     

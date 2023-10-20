@@ -232,10 +232,10 @@ internal class QueryHandlerCollection
                 }
                 else
                 {
+                    var exception = AxonServerException.FromErrorMessage(ClientIdentity, acknowledgement.Error);
                     foreach (var completionSource in completionSources)
                     {
-                        completionSource.TrySetException(
-                            AxonServerException.FromErrorMessage(ClientIdentity, acknowledgement.Error));
+                        completionSource.TrySetException(exception);
                     }
                 }
             }
@@ -268,10 +268,10 @@ internal class QueryHandlerCollection
                 }
                 else
                 {
+                    var exception = AxonServerException.FromErrorMessage(ClientIdentity, acknowledgement.Error);
                     foreach (var completionSource in completionSources)
                     {
-                        completionSource.TrySetException(
-                            AxonServerException.FromErrorMessage(ClientIdentity, acknowledgement.Error));
+                        completionSource.TrySetException(exception);
                     }
                 }
             }

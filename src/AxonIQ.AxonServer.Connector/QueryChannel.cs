@@ -51,7 +51,11 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
 
         _actor = new AxonPriorityActor<Message, State>(
             Receive,
-            new State.Disconnected(new QueryHandlerCollection(connection.ClientIdentity, scheduler.Clock), new FlowController(permits, permitsBatch), new QueryExecutions()),
+            new State.Disconnected(
+                new QueryHandlerCollection(connection.ClientIdentity, scheduler.Clock), 
+                new FlowController(permits, permitsBatch), 
+                new QueryExecutions(),
+                new SubscriptionQueryExecutions()),
             scheduler,
             _logger);
     }
@@ -65,7 +69,12 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
         {
             case (State.Disconnected disconnected, Message.Connect):
                 await _actor.TellAsync(new Message.OpenStream(), ct).ConfigureAwait(false);
-                state = new State.Connecting(new List<Message>(), disconnected.QueryHandlers, disconnected.Flow, disconnected.Executions);
+                state = new State.Connecting(
+                    new List<Message>(), 
+                    disconnected.QueryHandlers, 
+                    disconnected.Flow, 
+                    disconnected.QueryExecutions,
+                    disconnected.SubscriptionQueryExecutions);
                 break;
             case (State.Connecting, Message.OpenStream):
                 await _actor.TellToAsync(
@@ -129,7 +138,8 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                             new OngoingQueryCollection(),
                             connecting.QueryHandlers, 
                             connecting.Flow,
-                            connecting.Executions);
+                            connecting.QueryExecutions,
+                            connecting.SubscriptionQueryExecutions);
                         
                         break;
                     case TaskResult<AsyncDuplexStreamingCall<QueryProviderOutbound, QueryProviderInbound>>.Error error:
@@ -175,69 +185,216 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                 }
                                 break;
                             case QueryProviderInbound.RequestOneofCase.Query:
-                                var name = new QueryName(ok.Value.Query.Query);
+                            {
+                                var query = ok.Value.Query;
+                                var name = new QueryName(query.Query);
                                 var handlers = connected.QueryHandlers.ResolveQueryHandlers(name);
                                 switch (handlers.Count)
                                 {
                                     case 0:
-                                        await _actor.TellAsync(new Message.SendQueryProviderOutbound(new QueryProviderOutbound
-                                        {
-                                            QueryResponse = new QueryResponse
+                                        await _actor.TellAsync(new Message.SendQueryProviderOutbound(
+                                            new QueryProviderOutbound
                                             {
-                                                RequestIdentifier =
-                                                    ok.Value.Query.MessageIdentifier,
-                                                ErrorCode = ErrorCategory.NoHandlerForQuery.ToString(),
-                                                ErrorMessage = new ErrorMessage
-                                                    { Message = "No handler for query" }
-                                            }
-                                        }), ct);
+                                                QueryResponse = new QueryResponse
+                                                {
+                                                    RequestIdentifier =
+                                                        query.MessageIdentifier,
+                                                    ErrorCode = ErrorCategory.NoHandlerForQuery.ToString(),
+                                                    ErrorMessage = new ErrorMessage
+                                                        { Message = "No handler for query" }
+                                                }
+                                            }), ct);
                                         break;
                                     default:
                                     {
-                                        var translator = QueryReplyTranslation.ForQuery(ok.Value);
-                                        var requestId = InstructionId.Parse(ok.Value.Query.MessageIdentifier);
+                                        var translator = QueryReplyTranslation.ForQuery(query);
+                                        var requestId = InstructionId.Parse(query.MessageIdentifier);
                                         var flowControl = new ConcurrentFlowControl();
                                         var flowControlledChannel = new FlowControlledChannel<QueryReply>(flowControl);
-                                        var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                                        var cancellationTokenSource =
+                                            CancellationTokenSource.CreateLinkedTokenSource(ct);
                                         var buffers = new List<Channel<QueryReply>>(handlers.Count);
                                         foreach (var handler in handlers)
                                         {
                                             var buffer = Channels.CreateBounded<QueryReply>(32);
                                             var responseChannel = new BufferedQueryResponseChannel(buffer);
-                                            Task.Run(() => handler.HandleAsync(ok.Value.Query, responseChannel, cancellationTokenSource.Token), ct)
+                                            Task.Run(
+                                                    () => handler.HandleAsync(query, responseChannel,
+                                                        cancellationTokenSource.Token), ct)
                                                 .TellToAsync(
-                                                    _actor, 
+                                                    _actor,
                                                     result => new Message.QueryHandlerCompleted(requestId, result),
                                                     ct);
                                             buffers.Add(buffer);
                                         }
-                                        
+
                                         flowControlledChannel
-                                            .ReadFromAll(buffers, ct)
+                                            .PipeFromAll(buffers, ct)
                                             .TellToAsync(
                                                 _actor,
                                                 result => new Message.QueryReplyForwardingCompleted(requestId, result),
                                                 ct);
-                                        
+
                                         flowControlledChannel
                                             .TellQueryRepliesToAsync(
                                                 _actor,
-                                                reply => translator(reply).Select(instruction => new Message.SendQueryProviderOutbound(instruction)),
+                                                reply => translator(reply).Select(instruction =>
+                                                    new Message.SendQueryProviderOutbound(instruction)),
                                                 ct);
                                         
-                                        state.Executions.Add(requestId, new QueryExecution(requestId, flowControl, cancellationTokenSource));
+                                        if (!query.SupportsStreaming())
+                                        {
+                                            flowControl.Request(int.MaxValue);    
+                                        }
+
+                                        state.QueryExecutions.Add(requestId,
+                                            new QueryExecution(requestId, flowControl, cancellationTokenSource));
                                     }
                                         break;
                                 }
+                            }
                                 break;
                             case QueryProviderInbound.RequestOneofCase.SubscriptionQueryRequest:
+                            {
+                                var subscriptionQueryRequest = ok.Value.SubscriptionQueryRequest;
+                                switch (subscriptionQueryRequest.RequestCase)
+                                {
+                                    case SubscriptionQueryRequest.RequestOneofCase.Subscribe:
+                                    {
+                                        var id = new SubscriptionId(
+                                            subscriptionQueryRequest.Subscribe.SubscriptionIdentifier);
+                                        var name = new QueryName(subscriptionQueryRequest.Subscribe.QueryRequest.Query);
+                                        var handlers = connected.QueryHandlers.ResolveQueryHandlers(name);
+                                        var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                                        foreach (var handler in handlers)
+                                        {
+                                            Task.Run(async () =>
+                                            {
+                                                var handle =
+                                                    handler
+                                                        .TryHandleAsync(
+                                                            subscriptionQueryRequest.Subscribe,
+                                                            new SubscriptionQueryUpdateResponseChannel(
+                                                                _connection.ClientIdentity,
+                                                                id,
+                                                                instruction =>
+                                                                    _actor.TellAsync(
+                                                                        new Message.SendQueryProviderOutbound(
+                                                                            instruction),
+                                                                        cancellationTokenSource.Token)),
+                                                            cancellationTokenSource.Token);
+                                                if (handle != null)
+                                                {
+                                                    await handle
+                                                        .TellToAsync(_actor,
+                                                        result => new Message.SubscriptionQueryHandlerCompleted(id, result),
+                                                        ct);
+                                                }
+                                            }, cancellationTokenSource.Token);
+                                        }
+                                        connected.SubscriptionQueryExecutions.Add(id, new SubscriptionQueryExecution(id, cancellationTokenSource));
+                                    }
+                                        break;
+                                    case SubscriptionQueryRequest.RequestOneofCase.Unsubscribe:
+                                    {
+                                        var id = new SubscriptionId(
+                                            subscriptionQueryRequest.Unsubscribe.SubscriptionIdentifier);
+                                        if (connected.SubscriptionQueryExecutions.TryRemove(id, out var execution)
+                                            && execution != null)
+                                        {
+                                            execution.CancellationTokenSource.Cancel();
+                                            execution.CancellationTokenSource.Dispose();
+                                        }
+                                    }
+                                        break;
+                                    case SubscriptionQueryRequest.RequestOneofCase.GetInitialResult:
+                                    {
+                                        var getInitialResult = subscriptionQueryRequest.GetInitialResult;
+                                        var query = getInitialResult.QueryRequest;
+                                        var name = new QueryName(query.Query);
+                                        var handlers = connected.QueryHandlers.ResolveQueryHandlers(name);
+                                        switch (handlers.Count)
+                                        {
+                                            case 0:
+                                                await _actor.TellAsync(new Message.SendQueryProviderOutbound(
+                                                    new QueryProviderOutbound
+                                                    {
+                                                        QueryResponse = new QueryResponse
+                                                        {
+                                                            RequestIdentifier =
+                                                                query.MessageIdentifier,
+                                                            ErrorCode = ErrorCategory.NoHandlerForQuery.ToString(),
+                                                            ErrorMessage = new ErrorMessage
+                                                                { Message = "No handler for query" }
+                                                        }
+                                                    }), ct);
+                                                break;
+                                            default:
+                                            {
+                                                var translator = QueryReplyTranslation.ForSubscriptionQuery(getInitialResult);
+                                                var requestId = InstructionId.Parse(query.MessageIdentifier);
+                                                var flowControl = new ConcurrentFlowControl();
+                                                var flowControlledChannel =
+                                                    new FlowControlledChannel<QueryReply>(flowControl);
+                                                var cancellationTokenSource =
+                                                    CancellationTokenSource.CreateLinkedTokenSource(ct);
+                                                var buffers = new List<Channel<QueryReply>>(handlers.Count);
+                                                foreach (var handler in handlers)
+                                                {
+                                                    var buffer = Channels.CreateBounded<QueryReply>(32);
+                                                    var responseChannel = new BufferedQueryResponseChannel(buffer);
+                                                    Task.Run(
+                                                            () => handler.HandleAsync(query, responseChannel,
+                                                                cancellationTokenSource.Token), ct)
+                                                        .TellToAsync(
+                                                            _actor,
+                                                            result => new Message.QueryHandlerCompleted(requestId,
+                                                                result),
+                                                            ct);
+                                                    buffers.Add(buffer);
+                                                }
+
+                                                flowControlledChannel
+                                                    .PipeFromAll(buffers, ct)
+                                                    .TellToAsync(
+                                                        _actor,
+                                                        result => new Message.QueryReplyForwardingCompleted(requestId,
+                                                            result),
+                                                        ct);
+
+                                                flowControlledChannel
+                                                    .TellQueryRepliesToAsync(
+                                                        _actor,
+                                                        reply => translator(reply).Select(instruction =>
+                                                            new Message.SendQueryProviderOutbound(instruction)),
+                                                        ct);
+
+                                                if (!query.SupportsStreaming())
+                                                {
+                                                    flowControl.Request(int.MaxValue);    
+                                                }
+                                                
+                                                state.QueryExecutions.Add(
+                                                    requestId,
+                                                    new QueryExecution(
+                                                        requestId, 
+                                                        flowControl,
+                                                        cancellationTokenSource));
+                                            }
+                                                break;
+                                        }
+
+                                        break;
+                                    }
+                                }
+                            }
                                 break;
                             case QueryProviderInbound.RequestOneofCase.QueryCancel:
                             {
                                 if (InstructionId.TryParse(ok.Value.QueryCancel.RequestId,
                                         out var queryId))
                                 {
-                                    if (connected.Executions.TryGet(queryId, out var execution) && execution != null)
+                                    if (connected.QueryExecutions.TryGet(queryId, out var execution) && execution != null)
                                     {
                                         execution.FlowControl.Cancel();
                                         execution.CancellationTokenSource.Cancel();
@@ -255,7 +412,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                 if (InstructionId.TryParse(ok.Value.QueryFlowControl.QueryReference.RequestId,
                                         out var queryId))
                                 {
-                                    if (connected.Executions.TryGet(queryId, out var execution) && execution != null)
+                                    if (connected.QueryExecutions.TryGet(queryId, out var execution) && execution != null)
                                     {
                                         execution.FlowControl.Request(ok.Value.QueryFlowControl.Permits);
                                     }
@@ -295,7 +452,11 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                             _logger.LogError(exception, "Failed to clean up call resources");
                         }
 
-                        state = new State.Faulted(connected.QueryHandlers, connected.Flow, connected.Executions);
+                        state = new State.Faulted(
+                            connected.QueryHandlers, 
+                            connected.Flow, 
+                            connected.QueryExecutions, 
+                            connected.SubscriptionQueryExecutions);
                         break;
                 }
                 break;
@@ -325,7 +486,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                         break;
                 }
 
-                if (state.Executions.TryRemove(forwardingCompleted.RequestId, out var execution) && execution != null)
+                if (state.QueryExecutions.TryRemove(forwardingCompleted.RequestId, out var execution) && execution != null)
                 {
                     execution.CancellationTokenSource.Dispose();
                 }
@@ -360,25 +521,9 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                 {
                     register.CompletionSource.SetResult();
                 }
-
-                if (state.QueryHandlers.RegisteredQueryCount == 1)
-                {
-                    await _actor.ScheduleAsync(new Message.PurgeOverdueInstructions(), _purgeInterval, ct)
-                        .ConfigureAwait(false);
-                }
             }
                 break;
-            case (State.Connected connected, Message.SendQueryProviderOutbound send):
-                await connected.Call.RequestStream.WriteAsync(send.Instruction);
-                break;
-            case (State.Connecting connecting, Message.SendQueryProviderOutbound send):
-                connecting.DeferredMessages.Add(send);
-                _logger.LogWarning("Deferred send instruction '{InstructionId}' while connecting the query channel", send.Instruction.InstructionId);
-                break;
-            case (_, Message.SendQueryProviderOutbound send):
-                _logger.LogWarning("Cannot send instruction '{InstructionId}' because the query channel is not connected", send.Instruction.InstructionId);
-                break;
-            case (_, Message.RegisterQueryHandler register):
+            case (State.Connected, Message.RegisterQueryHandler register):
             {
                 state
                     .QueryHandlers
@@ -410,6 +555,42 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                         .ConfigureAwait(false);
                 }
             }
+                break;
+            case (_, Message.RegisterQueryHandler register):
+            {
+                state
+                    .QueryHandlers
+                    .RegisterQueryHandler(register.Id, register.Definition, register.Handler);
+
+                var instruction =
+                    state
+                        .QueryHandlers
+                        .TryBeginSubscribeToQueryInstruction(register.Definition);
+                if (instruction != null)
+                {
+                    state
+                        .QueryHandlers
+                        .RegisterSubscribeToQueryCompletionSource(register.Definition, register.CompletionSource);
+
+                    await _actor
+                        .TellAsync(new Message.SendQueryProviderOutbound(instruction), ct)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    register.CompletionSource.SetResult();
+                }
+            }
+                break;
+            case (State.Connected connected, Message.SendQueryProviderOutbound send):
+                await connected.Call.RequestStream.WriteAsync(send.Instruction);
+                break;
+            case (State.Connecting connecting, Message.SendQueryProviderOutbound send):
+                connecting.DeferredMessages.Add(send);
+                _logger.LogWarning("Deferred send instruction '{InstructionId}' while connecting the query channel", send.Instruction.InstructionId);
+                break;
+            case (_, Message.SendQueryProviderOutbound send):
+                _logger.LogWarning("Cannot send instruction '{InstructionId}' because the query channel is not connected", send.Instruction.InstructionId);
                 break;
             case (_, Message.UnregisterQueryHandler unregister):
             {
@@ -455,8 +636,6 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
     public PermitCount PermitsBatch { get; }
     public QueryService.QueryServiceClient Service { get; }
     
-    private record RegisteredQuery(RegistrationId SubscriptionId, QueryDefinition Query);
-    
     private abstract record Message
     {
         public record Connect : Message;
@@ -478,6 +657,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
 
         public record QueryCompleted(InstructionId RequestId, TaskResult Result) : Message;
         public record QueryHandlerCompleted(InstructionId RequestId, TaskResult Result) : Message;
+        public record SubscriptionQueryHandlerCompleted(SubscriptionId SubscriptionIdentifier, TaskResult Result) : Message;
 
         public record QueryReplyForwardingCompleted(InstructionId RequestId, TaskResult Result) : Message;
         
@@ -498,17 +678,17 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
         public record Reconnect : Message;
     }
 
-    private abstract record State(QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions Executions)
+    private abstract record State(QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions QueryExecutions, SubscriptionQueryExecutions SubscriptionQueryExecutions)
     {
-        public record Disconnected(QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions Executions) : State(QueryHandlers, Flow, Executions);
-        public record Connecting(List<Message> DeferredMessages, QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions Executions) : State(QueryHandlers, Flow, Executions);
+        public record Disconnected(QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions QueryExecutions, SubscriptionQueryExecutions SubscriptionQueryExecutions) : State(QueryHandlers, Flow, QueryExecutions, SubscriptionQueryExecutions);
+        public record Connecting(List<Message> DeferredMessages, QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions QueryExecutions, SubscriptionQueryExecutions SubscriptionQueryExecutions) : State(QueryHandlers, Flow, QueryExecutions, SubscriptionQueryExecutions);
         public record Connected(
             AsyncDuplexStreamingCall<QueryProviderOutbound, QueryProviderInbound> Call,
             Task ConsumeQueryProviderInboundInstructions,
             CancellationTokenSource ConsumeQueryProviderInboundInstructionsCancellationTokenSource,
             OngoingQueryCollection OngoingQueries,
-            QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions Executions) : State(QueryHandlers, Flow, Executions);
-        public record Faulted(QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions Executions) : State(QueryHandlers, Flow, Executions);
+            QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions QueryExecutions, SubscriptionQueryExecutions SubscriptionQueryExecutions) : State(QueryHandlers, Flow, QueryExecutions, SubscriptionQueryExecutions);
+        public record Faulted(QueryHandlerCollection QueryHandlers, FlowController Flow, QueryExecutions QueryExecutions, SubscriptionQueryExecutions SubscriptionQueryExecutions) : State(QueryHandlers, Flow, QueryExecutions, SubscriptionQueryExecutions);
     }
     
     public bool IsConnected => 
@@ -596,11 +776,18 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
         var request = new QueryRequest(query);
         if (string.IsNullOrEmpty(request.MessageIdentifier))
         {
-            request.MessageIdentifier = Guid.NewGuid().ToString("D");
+            request.MessageIdentifier = InstructionId.New().ToString();
         }
         try
         {
             var call = Service.Subscription(cancellationToken: ct);
+            await call.RequestStream.WriteAsync(new SubscriptionQueryRequest
+            {
+                FlowControl = new SubscriptionQuery
+                {
+                    NumberOfPermits = bufferSize.ToInt64()
+                }
+            }).ConfigureAwait(false);
             await call.RequestStream.WriteAsync(new SubscriptionQueryRequest
             {
                 Subscribe = new SubscriptionQuery
@@ -610,13 +797,6 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                     UpdateResponseType = updateType
                 }
             }).ConfigureAwait(false);
-            await call.RequestStream.WriteAsync(new SubscriptionQueryRequest
-            {
-                FlowControl = new SubscriptionQuery
-                {
-                    NumberOfPermits = bufferSize.ToInt64()
-                }
-            }).ConfigureAwait(false);
 
             return new QuerySubscriptionResult(
                 _connection.ClientIdentity, 
@@ -624,7 +804,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                 PermitsBatch, 
                 call,
                 _loggerFactory,
-                ct);
+                _actor.CancellationToken);
         }
         catch (Exception exception)
         {

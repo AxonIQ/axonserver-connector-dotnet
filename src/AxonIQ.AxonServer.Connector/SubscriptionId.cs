@@ -1,10 +1,8 @@
-using Microsoft.VisualBasic.CompilerServices;
-
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct SubscriptionId
+public readonly struct SubscriptionId : IEquatable<SubscriptionId>
 {
-    public static SubscriptionId New() => new SubscriptionId(Guid.NewGuid().ToString("D"));
+    public static SubscriptionId New() => new(Guid.NewGuid().ToString("D"));
     
     private readonly string _value;
 
@@ -28,5 +26,5 @@ public readonly struct SubscriptionId
     public override int GetHashCode() => HashCode.Combine(_value);
     public override string ToString() => _value;
     public static bool operator ==(SubscriptionId left, SubscriptionId right) => left.Equals(right);
-    public static bool operator !=(SubscriptionId left, SubscriptionId right) => !(left.Equals(right));
+    public static bool operator !=(SubscriptionId left, SubscriptionId right) => !left.Equals(right);
 }

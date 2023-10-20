@@ -25,5 +25,5 @@ public readonly struct QueryName : IEquatable<QueryName>
     public override string ToString() => _value;
 
     public static bool operator ==(QueryName left, QueryName right) => left.Equals(right);
-    public static bool operator !=(QueryName left, QueryName right) => !(left == right);
+    public static bool operator !=(QueryName left, QueryName right) => !left.Equals(right);
 }

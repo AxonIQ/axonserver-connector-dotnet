@@ -15,7 +15,7 @@ internal static class ChannelToActorExtensions
         if (destination == null) throw new ArgumentNullException(nameof(destination));
         if (translator == null) throw new ArgumentNullException(nameof(translator));
         
-        return TellQueryRepliesToAsyncCore(source, destination, translator, cancellationToken);
+        return TellQueryRepliesToAsyncCore(source.Reader, destination, translator, cancellationToken);
     }
 
     private static async Task TellQueryRepliesToAsyncCore<TOutput>(
