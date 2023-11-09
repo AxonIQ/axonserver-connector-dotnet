@@ -74,12 +74,16 @@ public class AxonServerConnection : IAxonServerConnection, IOwnerAxonServerConne
             options.CommandPermits,
             new PermitCount(options.CommandPermits.ToInt64() / 4L),
             options.ReconnectOptions,
+            options.CommandChannelInstructionPurgeFrequency,
+            options.CommandChannelInstructionTimeout,
             options.LoggerFactory));
         _queryChannel = new Lazy<QueryChannel>(() => new QueryChannel(
             this,
             scheduler,
             options.QueryPermits,
             new PermitCount(options.QueryPermits.ToInt64() / 4L),
+            options.QueryChannelInstructionPurgeFrequency,
+            options.QueryChannelInstructionTimeout,
             options.LoggerFactory));
         _eventChannel = new Lazy<EventChannel>(() => new EventChannel(
             this,

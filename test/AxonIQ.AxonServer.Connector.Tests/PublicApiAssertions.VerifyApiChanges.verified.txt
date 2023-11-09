@@ -55,6 +55,8 @@ namespace AxonIQ.AxonServer.Connector
     {
         public static readonly AxonIQ.AxonServer.Connector.IAxonServerAuthentication Authentication;
         public static readonly System.Collections.Generic.IReadOnlyDictionary<string, string> ClientTags;
+        public static readonly System.TimeSpan DefaultChannelInstructionPurgeFrequency;
+        public static readonly System.TimeSpan DefaultChannelInstructionTimeout;
         public static readonly AxonIQ.AxonServer.Connector.PermitCount DefaultCommandPermits;
         public static readonly System.TimeSpan DefaultEventProcessorUpdateFrequency;
         public static readonly AxonIQ.AxonServer.Connector.PermitCount DefaultQueryPermits;
@@ -75,12 +77,16 @@ namespace AxonIQ.AxonServer.Connector
         public AxonIQ.AxonServer.Connector.ClientInstanceId ClientInstanceId { get; }
         public System.Collections.Generic.IReadOnlyDictionary<string, string> ClientTags { get; }
         public System.Func<System.DateTimeOffset> Clock { get; }
+        public System.TimeSpan CommandChannelInstructionPurgeFrequency { get; }
+        public System.TimeSpan CommandChannelInstructionTimeout { get; }
         public AxonIQ.AxonServer.Connector.PermitCount CommandPermits { get; }
         public AxonIQ.AxonServer.Connector.ComponentName ComponentName { get; }
         public System.TimeSpan EventProcessorUpdateFrequency { get; }
         public Grpc.Net.Client.GrpcChannelOptions? GrpcChannelOptions { get; }
         public System.Collections.Generic.IReadOnlyList<Grpc.Core.Interceptors.Interceptor> Interceptors { get; }
         public Microsoft.Extensions.Logging.ILoggerFactory LoggerFactory { get; }
+        public System.TimeSpan QueryChannelInstructionPurgeFrequency { get; }
+        public System.TimeSpan QueryChannelInstructionTimeout { get; }
         public AxonIQ.AxonServer.Connector.PermitCount QueryPermits { get; }
         public AxonIQ.AxonServer.Connector.ReconnectOptions ReconnectOptions { get; }
         public System.Collections.Generic.IReadOnlyList<System.Net.DnsEndPoint> RoutingServers { get; }
@@ -304,12 +310,16 @@ namespace AxonIQ.AxonServer.Connector
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithClientTags(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> tags);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithClientTags(params System.Collections.Generic.KeyValuePair<string, string>[] tags);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithClock(System.Func<System.DateTimeOffset> clock);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithCommandChannelInstructionPurgeFrequency(System.TimeSpan frequency);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithCommandChannelInstructionTimeout(System.TimeSpan timeout);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithCommandPermits(AxonIQ.AxonServer.Connector.PermitCount count);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithDefaultRoutingServers();
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithEventProcessorUpdateFrequency(System.TimeSpan frequency);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithGrpcChannelOptions(Grpc.Net.Client.GrpcChannelOptions grpcChannelOptions);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithInterceptors(params Grpc.Core.Interceptors.Interceptor[] interceptors);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithLoggerFactory(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithQueryChannelInstructionPurgeFrequency(System.TimeSpan frequency);
+        AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithQueryChannelInstructionTimeout(System.TimeSpan timeout);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithQueryPermits(AxonIQ.AxonServer.Connector.PermitCount count);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithReconnectOptions(AxonIQ.AxonServer.Connector.ReconnectOptions options);
         AxonIQ.AxonServer.Connector.IAxonServerConnectorOptionsBuilder WithRoutingServers(System.Collections.Generic.IEnumerable<System.Net.DnsEndPoint> servers);

@@ -600,6 +600,99 @@ public class AxonServerConnectorOptionsTests
         
         Assert.Equal(AxonServerConnectorDefaults.DefaultEventProcessorUpdateFrequency, result.EventProcessorUpdateFrequency);
     }
+    
+    [Fact]
+    public void WithCommandChannelInstructionPurgeFrequencyReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var frequency = TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000));
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.WithCommandChannelInstructionPurgeFrequency(frequency).Build();
+        
+        Assert.Equal(frequency, result.CommandChannelInstructionPurgeFrequency);
+    }
+    
+    [Fact]
+    public void WithoutCommandChannelInstructionPurgeFrequencyReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.Equal(AxonServerConnectorDefaults.DefaultChannelInstructionPurgeFrequency, result.CommandChannelInstructionPurgeFrequency);
+    }
+    
+    [Fact]
+    public void WithCommandChannelInstructionTimeoutReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var timeout = TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000));
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.WithCommandChannelInstructionTimeout(timeout).Build();
+        
+        Assert.Equal(timeout, result.CommandChannelInstructionTimeout);
+    }
+    
+    [Fact]
+    public void WithoutCommandChannelInstructionTimeoutReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.Equal(AxonServerConnectorDefaults.DefaultChannelInstructionTimeout, result.CommandChannelInstructionTimeout);
+    }
+    
+    [Fact]
+    public void WithQueryChannelInstructionPurgeFrequencyReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var frequency = TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000));
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.WithQueryChannelInstructionPurgeFrequency(frequency).Build();
+        
+        Assert.Equal(frequency, result.QueryChannelInstructionPurgeFrequency);
+    }
+    
+    [Fact]
+    public void WithoutQueryChannelInstructionPurgeFrequencyReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.Equal(AxonServerConnectorDefaults.DefaultChannelInstructionPurgeFrequency, result.QueryChannelInstructionPurgeFrequency);
+    }
+    
+    [Fact]
+    public void WithQueryChannelInstructionTimeoutReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var timeout = TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000));
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.WithQueryChannelInstructionTimeout(timeout).Build();
+        
+        Assert.Equal(timeout, result.QueryChannelInstructionTimeout);
+    }
+    
+    [Fact]
+    public void WithoutQueryChannelInstructionTimeoutReturnsExpectedResult()
+    {
+        var component = _fixture.Create<ComponentName>();
+        var clientInstance = _fixture.Create<ClientInstanceId>();
+        var sut = AxonServerConnectorOptions.For(component, clientInstance);
+        var result = sut.Build();
+        
+        Assert.Equal(AxonServerConnectorDefaults.DefaultChannelInstructionTimeout, result.QueryChannelInstructionTimeout);
+    }
+    
     //TODO: Extend with tests that cover obtaining all other options from configuration
     
     private class FakeInterceptor : Interceptor { }

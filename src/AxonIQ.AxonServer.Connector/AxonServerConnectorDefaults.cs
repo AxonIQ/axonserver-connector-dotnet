@@ -18,6 +18,8 @@ public static class AxonServerConnectorDefaults
     public static readonly PermitCount DefaultQueryPermits = new(5000);
     public static readonly PermitCount DefaultCommandPermits = new(5000);
     public static readonly TimeSpan DefaultEventProcessorUpdateFrequency = TimeSpan.FromMilliseconds(2000);
+    public static readonly TimeSpan DefaultChannelInstructionPurgeFrequency = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan DefaultChannelInstructionTimeout = TimeSpan.FromSeconds(15);
 
     public static readonly ReconnectOptions DefaultReconnectOptions = new(
         TimeSpan.FromMilliseconds(10000),

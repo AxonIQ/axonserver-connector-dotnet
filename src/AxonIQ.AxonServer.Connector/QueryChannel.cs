@@ -19,15 +19,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
     private readonly ILogger<QueryChannel> _logger;
 
     private readonly AxonPriorityActor<Message, State> _actor;
-
-    public QueryChannel(
-        IOwnerAxonServerConnection connection,
-        IScheduler scheduler,
-        PermitCount permits,
-        PermitCount permitsBatch,
-        ILoggerFactory loggerFactory) : this(connection, scheduler, permits, permitsBatch, PurgeInterval, loggerFactory)
-    {
-    }
+    private readonly TimeSpan _timeout;
 
     public QueryChannel(
         IOwnerAxonServerConnection connection,
@@ -35,6 +27,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
         PermitCount permits,
         PermitCount permitsBatch,
         TimeSpan purgeInterval,
+        TimeSpan timeout,
         ILoggerFactory loggerFactory)
     {
         if (connection == null) throw new ArgumentNullException(nameof(connection));
@@ -43,6 +36,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
 
         _connection = connection;
         _purgeInterval = purgeInterval;
+        _timeout = timeout;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<QueryChannel>();
         
@@ -615,7 +609,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
             }
                 break;
             case (_, Message.PurgeOverdueInstructions):
-                state.QueryHandlers.Purge(_purgeInterval);
+                state.QueryHandlers.Purge(_timeout);
                 
                 if (state.QueryHandlers.HasRegisteredQueries)
                 {

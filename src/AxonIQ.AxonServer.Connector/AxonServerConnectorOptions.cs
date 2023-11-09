@@ -35,8 +35,7 @@ public class AxonServerConnectorOptions
         return new Builder(componentName, clientInstanceId);
     }
 
-    private AxonServerConnectorOptions(
-        ComponentName componentName,
+    private AxonServerConnectorOptions(ComponentName componentName,
         ClientInstanceId clientInstanceId,
         IReadOnlyList<DnsEndPoint> routingServers,
         IReadOnlyDictionary<string, string> clientTags,
@@ -48,7 +47,11 @@ public class AxonServerConnectorOptions
         PermitCount commandPermits,
         PermitCount queryPermits,
         TimeSpan eventProcessorUpdateFrequency,
-        ReconnectOptions reconnectOptions)
+        ReconnectOptions reconnectOptions,
+        TimeSpan commandChannelInstructionPurgeFrequency,
+        TimeSpan commandChannelInstructionTimeout,
+        TimeSpan queryChannelInstructionPurgeFrequency, 
+        TimeSpan queryChannelInstructionTimeout)
     {
         ComponentName = componentName;
         ClientInstanceId = clientInstanceId;
@@ -63,6 +66,10 @@ public class AxonServerConnectorOptions
         QueryPermits = queryPermits;
         EventProcessorUpdateFrequency = eventProcessorUpdateFrequency;
         ReconnectOptions = reconnectOptions;
+        CommandChannelInstructionPurgeFrequency = commandChannelInstructionPurgeFrequency;
+        CommandChannelInstructionTimeout = commandChannelInstructionTimeout;
+        QueryChannelInstructionPurgeFrequency = queryChannelInstructionPurgeFrequency;
+        QueryChannelInstructionTimeout = queryChannelInstructionTimeout;
     }
 
     /// <summary>
@@ -117,7 +124,25 @@ public class AxonServerConnectorOptions
     /// The options that control the connection timeout, reconnection interval and whether or not to force a platform reconnect.
     /// </summary>
     public ReconnectOptions ReconnectOptions { get; }
-
+    /// <summary>
+    /// The frequency at which the command channel scans for and purges unacknowledged instructions.
+    /// </summary>
+    public TimeSpan CommandChannelInstructionPurgeFrequency { get; }
+    /// <summary>
+    /// The time after which an unacknowledged command channel instruction is considered to have timed out.
+    /// </summary>
+    /// <remarks>This is an approximation and depends on the purge frequency.</remarks>
+    public TimeSpan CommandChannelInstructionTimeout { get; }
+    /// <summary>
+    /// The frequency at which the query channel scans for and purges unacknowledged instructions.
+    /// </summary>
+    public TimeSpan QueryChannelInstructionPurgeFrequency { get; }
+    /// <summary>
+    /// The time after which an unacknowledged query channel instruction is considered to have timed out.
+    /// </summary>
+    /// <remarks>This is an approximation and depends on the purge frequency.</remarks>
+    public TimeSpan QueryChannelInstructionTimeout { get; }
+    
     //TODO: Extend this with more options as we go - we'll need to port all of the Java ones that make sense in .NET.
 
     private class Builder : IAxonServerConnectorOptionsBuilder
@@ -135,6 +160,10 @@ public class AxonServerConnectorOptions
         private PermitCount _queryPermits;
         private TimeSpan _eventProcessorUpdateFrequency;
         private ReconnectOptions _reconnectOptions;
+        private TimeSpan _commandChannelInstructionPurgeFrequency;
+        private TimeSpan _commandChannelInstructionTimeout;
+        private TimeSpan _queryChannelInstructionPurgeFrequency;
+        private TimeSpan _queryChannelInstructionTimeout;
 
         internal Builder(ComponentName componentName, ClientInstanceId clientInstanceId)
         {
@@ -156,6 +185,12 @@ public class AxonServerConnectorOptions
             _queryPermits = AxonServerConnectorDefaults.DefaultQueryPermits;
             _eventProcessorUpdateFrequency = AxonServerConnectorDefaults.DefaultEventProcessorUpdateFrequency;
             _reconnectOptions = AxonServerConnectorDefaults.DefaultReconnectOptions;
+            _commandChannelInstructionPurgeFrequency =
+                AxonServerConnectorDefaults.DefaultChannelInstructionPurgeFrequency;
+            _commandChannelInstructionTimeout = AxonServerConnectorDefaults.DefaultChannelInstructionTimeout;
+            _queryChannelInstructionPurgeFrequency =
+                AxonServerConnectorDefaults.DefaultChannelInstructionPurgeFrequency;
+            _queryChannelInstructionTimeout = AxonServerConnectorDefaults.DefaultChannelInstructionTimeout;
         }
 
         public IAxonServerConnectorOptionsBuilder AsComponentName(ComponentName name)
@@ -315,6 +350,34 @@ public class AxonServerConnectorOptions
             return this;
         }
 
+        public IAxonServerConnectorOptionsBuilder WithCommandChannelInstructionPurgeFrequency(TimeSpan frequency)
+        {
+            _commandChannelInstructionPurgeFrequency = frequency;
+            
+            return this;
+        }
+
+        public IAxonServerConnectorOptionsBuilder WithCommandChannelInstructionTimeout(TimeSpan timeout)
+        {
+            _commandChannelInstructionTimeout = timeout;
+            
+            return this;
+        }
+
+        public IAxonServerConnectorOptionsBuilder WithQueryChannelInstructionPurgeFrequency(TimeSpan frequency)
+        {
+            _queryChannelInstructionPurgeFrequency = frequency;
+            
+            return this;
+        }
+
+        public IAxonServerConnectorOptionsBuilder WithQueryChannelInstructionTimeout(TimeSpan timeout)
+        {
+            _queryChannelInstructionTimeout = timeout;
+            
+            return this;
+        }
+
         public AxonServerConnectorOptions Build()
         {
             if (_routingServers.Count == 0)
@@ -335,7 +398,11 @@ public class AxonServerConnectorOptions
                 _commandPermits,
                 _queryPermits,
                 _eventProcessorUpdateFrequency,
-                _reconnectOptions);
+                _reconnectOptions, 
+                _commandChannelInstructionPurgeFrequency,
+                _commandChannelInstructionTimeout,
+                _queryChannelInstructionPurgeFrequency,
+                _queryChannelInstructionTimeout);
         }
     }
 }

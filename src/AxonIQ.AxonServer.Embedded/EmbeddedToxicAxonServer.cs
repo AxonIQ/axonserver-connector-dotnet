@@ -32,7 +32,8 @@ public class EmbeddedToxicAxonServer : IToxicAxonServer
         _logger.LogDebug("Embedded Toxic Axon Server is being initialized");
 
         _network = new Builder()
-            .UseNetwork($"axon-network-{AxonNetworkCounter.Next()}")
+            .UseNetwork($"axon-toxic-network-{AxonNetworkCounter.Next()}")
+            //.ReuseIfExist()
             .Build();
 
         await _server.StartAsync(_network);

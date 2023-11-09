@@ -53,15 +53,11 @@ internal class ControlChannel : IControlChannel, IAsyncDisposable
     {
         switch (state, message)
         {
-            case (State.Disconnected disconnected, Message.Connect):
+            case (State.Disconnected, Message.Connect):
+            case (State.Disconnected, Message.Reconnect):
                 await _actor.TellAsync(new Message.OpenStream(), ct);
 
-                state = new State.Connecting.StreamClosed(disconnected.EventProcessors);
-                break;
-            case (State.Disconnected disconnected, Message.Reconnect):
-                await _actor.TellAsync(new Message.OpenStream(), ct);
-
-                state = new State.Connecting.StreamClosed(disconnected.EventProcessors);
+                state = new State.Connecting.StreamClosed(state.EventProcessors);
                 break;
             case (_, Message.PauseHeartbeats):
                 await HeartbeatChannel.Pause().ConfigureAwait(false);

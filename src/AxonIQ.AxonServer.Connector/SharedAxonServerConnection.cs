@@ -2,6 +2,7 @@ using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AxonIQ.AxonServer.Connector;
 
@@ -48,12 +49,16 @@ internal class SharedAxonServerConnection : IAxonServerConnection, IOwnerAxonSer
             factory.CommandPermits,
             new PermitCount(factory.CommandPermits.ToInt64() / 4L),
             factory.ReconnectOptions,
+            factory.CommandChannelInstructionPurgeFrequency,
+            factory.CommandChannelInstructionTimeout,
             factory.LoggerFactory));
         _queryChannel = new Lazy<QueryChannel>(() => new QueryChannel(
             this,
             factory.Scheduler,
             factory.QueryPermits,
             new PermitCount(factory.QueryPermits.ToInt64() / 4L),
+            factory.QueryChannelInstructionPurgeFrequency,
+            factory.QueryChannelInstructionTimeout,
             factory.LoggerFactory));
         _eventChannel = new Lazy<EventChannel>(() => new EventChannel(
             this,

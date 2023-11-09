@@ -8,7 +8,7 @@ namespace AxonIQ.AxonServer.Embedded;
 
 public class EmbeddedAxonCluster : IAxonCluster
 {
-    private readonly int _id = AxonClusterCounter.Next();
+    private readonly string _id = AxonClusterCounter.Next();
     
     private readonly EmbeddedAxonClusterNode[] _nodes;
     private readonly ILogger<EmbeddedAxonCluster> _logger;
@@ -53,7 +53,7 @@ public class EmbeddedAxonCluster : IAxonCluster
     {
         _logger.LogDebug("[{ClusterId}]Embedded Axon Cluster is being initialized", _id);
 
-        _network = new Builder().UseNetwork($"axoniq-dotnet-{_id}").Build();
+        _network = new Builder().UseNetwork($"axon-cluster-network-{_id}").Build();
 
         foreach (var node in _nodes)
         {
