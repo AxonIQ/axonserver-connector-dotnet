@@ -14,6 +14,7 @@ using AsyncEnumerable = System.Linq.AsyncEnumerable;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "AdminChannel")]
 public class AxonServerAdminChannelIntegrationTests
 {
     private readonly IAxonServer _container;

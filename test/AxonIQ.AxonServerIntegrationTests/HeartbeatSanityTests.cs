@@ -9,6 +9,7 @@ using Xunit;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "HeartbeatChannel")]
 public class HeartbeatSanityCheckTests
 {
     private readonly IAxonServer _container;

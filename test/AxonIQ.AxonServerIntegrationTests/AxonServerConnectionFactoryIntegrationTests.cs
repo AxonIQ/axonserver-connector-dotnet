@@ -8,6 +8,7 @@ using Xunit;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "Connection")]
 public class AxonServerConnectionFactoryIntegrationTests
 {
     private readonly IAxonServer _container;

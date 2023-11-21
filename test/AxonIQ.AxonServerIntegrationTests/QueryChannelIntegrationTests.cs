@@ -14,6 +14,7 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "QueryChannel")]
 public class QueryChannelIntegrationTests
 {
     private readonly IAxonServer _container;

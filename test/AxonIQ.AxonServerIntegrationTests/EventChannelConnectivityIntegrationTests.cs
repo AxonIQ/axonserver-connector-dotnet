@@ -15,6 +15,7 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(ToxicAxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "EventChannel")]
 public class EventChannelConnectivityIntegrationTests : IAsyncLifetime
 {
     private readonly IToxicAxonServer _container;
