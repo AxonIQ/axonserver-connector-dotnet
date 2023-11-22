@@ -2,7 +2,6 @@ using AxonIQ.AxonServer.Connector.Tests.Framework;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Control;
 using Microsoft.Extensions.Logging;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
@@ -40,7 +39,7 @@ public class HeartbeatChannelTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
             
-            Assert.True(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -51,7 +50,7 @@ public class HeartbeatChannelTests
             
             await sut.Disable();
         
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -62,7 +61,7 @@ public class HeartbeatChannelTests
             
             await sut.Pause();
         
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -73,7 +72,7 @@ public class HeartbeatChannelTests
             
             await sut.Resume();
         
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
     }
 
@@ -108,7 +107,7 @@ public class HeartbeatChannelTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
     
-            Assert.True(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -119,7 +118,7 @@ public class HeartbeatChannelTests
     
             await sut.Disable();
     
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -130,7 +129,7 @@ public class HeartbeatChannelTests
     
             await sut.Pause();
     
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -141,7 +140,7 @@ public class HeartbeatChannelTests
     
             await sut.Resume();
     
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
     }
     
@@ -177,7 +176,7 @@ public class HeartbeatChannelTests
             WritePlatformInboundInstruction writer = _ => ValueTask.CompletedTask; 
             await using var sut = await CreateSystemUnderTest(writer, missed);
             
-            Assert.True(source.Task.Wait(TimeSpan.FromSeconds(1)));
+            Assert.True(await source.Task.WaitUntilTimeoutAsync(TimeSpan.FromSeconds(1)));
         }
         
         [Fact]
@@ -206,7 +205,7 @@ public class HeartbeatChannelTests
                 }
 
                 _logger.LogDebug("Waiting for heartbeat to be missed");
-                Assert.True(source.Task.Wait(TimeSpan.FromSeconds(1)));
+                Assert.True(await source.Task.WaitUntilTimeoutAsync(TimeSpan.FromSeconds(1)));
             }
         }
         
@@ -228,7 +227,7 @@ public class HeartbeatChannelTests
                 await sut.ReceiveClientHeartbeatAcknowledgement(new InstructionAck{ InstructionId = instruction.InstructionId, Success = true });    
             }
             
-            Assert.False(source.Task.Wait(TimeSpan.FromMilliseconds(500)));
+            Assert.False(await source.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(500)));
         }
         
         [Fact]
@@ -240,7 +239,7 @@ public class HeartbeatChannelTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             
-            Assert.True(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -252,7 +251,7 @@ public class HeartbeatChannelTests
         
             await sut.Disable();
             
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -264,7 +263,7 @@ public class HeartbeatChannelTests
         
             await sut.Pause();
             
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -276,7 +275,7 @@ public class HeartbeatChannelTests
         
             await sut.Resume();
             
-            Assert.True(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
     }
     
@@ -313,7 +312,7 @@ public class HeartbeatChannelTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             
-            Assert.True(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -324,7 +323,7 @@ public class HeartbeatChannelTests
     
             await sut.Disable();
             
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -335,7 +334,7 @@ public class HeartbeatChannelTests
     
             await sut.Pause();
             
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -346,7 +345,7 @@ public class HeartbeatChannelTests
     
             await sut.Resume();
             
-            Assert.True(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
     }
     
@@ -385,7 +384,7 @@ public class HeartbeatChannelTests
             
             await sut.Enable(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             
-            Assert.True(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -396,7 +395,7 @@ public class HeartbeatChannelTests
     
             await sut.Disable();
             
-            Assert.False(writer.Completed.Wait(TimeSpan.FromMilliseconds(50)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
         }
         
         [Fact]
@@ -407,7 +406,7 @@ public class HeartbeatChannelTests
     
             await sut.Pause();
             
-            Assert.False(writer.Completed.Wait(TimeSpan.FromSeconds(2)));
+            Assert.False(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromSeconds(2)));
         }
         
         [Fact]
@@ -418,7 +417,7 @@ public class HeartbeatChannelTests
     
             await sut.Resume();
             
-            Assert.True(writer.Completed.Wait(TimeSpan.FromSeconds(2)));
+            Assert.True(await writer.Completed.WaitUntilTimeoutAsync(TimeSpan.FromSeconds(2)));
         }
     }
     
@@ -452,7 +451,6 @@ public class HeartbeatChannelTests
             HeartbeatMissed missed = () => { source.TrySetResult(); return ValueTask.CompletedTask; };
             var writer = new CaptureClientHeartbeatInstructionWriter();
             await using var sut = await CreateSystemUnderTest(writer.Write, missed);
-    
             
             await source.Task.WaitAsync(TimeSpan.FromSeconds(5));
         }

@@ -54,7 +54,7 @@ public class SchedulerTests
             return ValueTask.CompletedTask;
         }, TimeSpan.Zero);
         
-        Assert.True(source.Task.Wait(TimeSpan.FromMilliseconds(50)));
+        Assert.True(await source.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(50)));
     }
     
     [Fact]
@@ -72,7 +72,7 @@ public class SchedulerTests
             return ValueTask.CompletedTask;
         }, TimeSpan.FromMilliseconds(200));
         
-        Assert.True(source.Task.Wait(TimeSpan.FromMilliseconds(300)));
+        Assert.True(await source.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(300)));
     }
     
     [Fact]
@@ -87,7 +87,7 @@ public class SchedulerTests
             return ValueTask.CompletedTask;
         }, TimeSpan.FromMilliseconds(100));
         
-        Assert.True(source.Task.Wait(TimeSpan.FromMilliseconds(200)));
+        Assert.True(await source.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(200)));
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public class SchedulerTests
             return ValueTask.FromCanceled(cancellation.Token);
         }, TimeSpan.Zero);
         
-        Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source1.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
         
         var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await sut.ScheduleTaskAsync(() =>
@@ -113,7 +113,7 @@ public class SchedulerTests
             source2.TrySetResult();
             return ValueTask.CompletedTask;
         }, TimeSpan.Zero);
-        Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source2.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
     }
     
     [Fact]
@@ -131,7 +131,7 @@ public class SchedulerTests
             return ValueTask.FromCanceled(cancellation.Token);
         }, TimeSpan.FromMilliseconds(50));
         
-        Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source1.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
         
         var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await sut.ScheduleTaskAsync(() =>
@@ -139,7 +139,7 @@ public class SchedulerTests
             source2.TrySetResult();
             return ValueTask.CompletedTask;
         }, TimeSpan.FromMilliseconds(50));
-        Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source2.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
     }
     
     [Fact]
@@ -156,7 +156,7 @@ public class SchedulerTests
             throw new Exception();
         }, TimeSpan.Zero);
         
-        Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source1.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
         
         var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await sut.ScheduleTaskAsync(() =>
@@ -165,7 +165,7 @@ public class SchedulerTests
             return ValueTask.CompletedTask;
         }, TimeSpan.Zero);
         
-        Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source2.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
     }
     
     [Fact]
@@ -182,7 +182,7 @@ public class SchedulerTests
             throw new Exception();
         }, TimeSpan.FromMilliseconds(50));
         
-        Assert.True(source1.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source1.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
         
         var source2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await sut.ScheduleTaskAsync(() =>
@@ -191,7 +191,7 @@ public class SchedulerTests
             return ValueTask.CompletedTask;
         }, TimeSpan.FromMilliseconds(50));
         
-        Assert.True(source2.Task.Wait(TimeSpan.FromMilliseconds(100)));
+        Assert.True(await source2.Task.WaitUntilTimeoutAsync(TimeSpan.FromMilliseconds(100)));
     }
 
     [Fact]
