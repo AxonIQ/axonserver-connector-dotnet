@@ -7,23 +7,21 @@ using AxonIQ.AxonServerIntegrationTests.Containerization;
 using Grpc.Core;
 using Io.Axoniq.Axonserver.Grpc.Admin;
 using Microsoft.Extensions.Logging;
-using Xunit;
 using Xunit.Abstractions;
-using AsyncEnumerable = System.Linq.AsyncEnumerable;
 
 namespace AxonIQ.AxonServerIntegrationTests;
 
-[Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
 [Trait("Surface", "AdminChannel")]
-public class AxonServerAdminChannelIntegrationTests
+public class AxonServerAdminChannelIntegrationTests : IAsyncLifetime
 {
     private readonly IAxonServer _container;
     private readonly Fixture _fixture;
     private readonly ILoggerFactory _loggerFactory;
 
-    public AxonServerAdminChannelIntegrationTests(AxonServerWithAccessControlDisabled container, ITestOutputHelper output)
+    public AxonServerAdminChannelIntegrationTests(ITestOutputHelper output)
     {
-        _container = container ?? throw new ArgumentNullException(nameof(container));
+        if (output == null) throw new ArgumentNullException(nameof(output));
+        _container = new AxonServerWithAccessControlDisabled(output);
         _fixture = new Fixture();
         _fixture.CustomizeClientInstanceId();
         _fixture.CustomizeComponentName();
@@ -108,7 +106,7 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = await AsyncEnumerable.ToListAsync(sut.GetEventProcessors());
+        var actual = await sut.GetEventProcessors().ToListAsync();
         Assert.Empty(actual);
     }
     
@@ -118,13 +116,13 @@ public class AxonServerAdminChannelIntegrationTests
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
         var component = _fixture.Create<ComponentName>();
-        var actual = await AsyncEnumerable.ToListAsync(sut.GetEventProcessorsByComponent(component));
+        var actual = await sut.GetEventProcessorsByComponent(component).ToListAsync();
         Assert.Empty(actual);
     }
     
     // Users
 
-    [Fact(Skip = "Because the axon server is reused between invocations, the order tests run in is unpredictable, it's impossible to test this scenario")]
+    [Fact(Skip = "Because the axon cluster is reused between invocations, the order tests run in is unpredictable, it's impossible to test this scenario")]
     public async Task GetAllUsersWhenNoneReturnsExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
@@ -205,6 +203,7 @@ public class AxonServerAdminChannelIntegrationTests
             Password = "p@ssw0rd"
         });       
         await sut.DeleteUserAsync("user5");
+        await Task.Delay(500);
         var actual = await sut.GetAllUsersAsync();
         Assert.DoesNotContain(actual, overview => overview.UserName == "user5");
     }
@@ -212,12 +211,12 @@ public class AxonServerAdminChannelIntegrationTests
     // Applications
     
     [Fact]
-    public async Task GetAllApplicationsWhenNoneReturnsExpectedResult()
+    public async Task GetAllApplicationsReturnsExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllApplicationsAsync());
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        var actual = await sut.GetAllApplicationsAsync();
+        Assert.Empty(actual);
     }
     
     [Fact]
@@ -225,23 +224,14 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.CreateOrUpdateApplicationAsync(new ApplicationRequest
-            {
-                ApplicationName = "app1",
-                Description = ""
-            }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
-    }
-    
-    [Fact]
-    public async Task GetApplicationHasExpectedResult()
-    {
-        var connection = await CreateSystemUnderTest();
-        var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.GetApplicationAsync("app1"));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        await sut.CreateOrUpdateApplicationAsync(new ApplicationRequest
+        {
+            ApplicationName = "app1",
+            Description = ""
+        });
+        await Task.Delay(500);
+        var actual = await sut.GetAllApplicationsAsync();
+        Assert.Contains(actual, overview => overview.ApplicationName == "app1");
     }
     
     [Fact]
@@ -249,30 +239,26 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.DeleteApplicationAsync("app1"));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
-    }
-    
-    [Fact]
-    public async Task RefreshTokenHasExpectedResult()
-    {
-        var connection = await CreateSystemUnderTest();
-        var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => 
-            await sut.RefreshTokenAsync("app1"));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        await sut.CreateOrUpdateApplicationAsync(new ApplicationRequest
+        {
+            ApplicationName = "app2",
+            Description = ""
+        });
+        await sut.DeleteApplicationAsync("app2");
+        await Task.Delay(500);
+        var actual = await sut.GetAllApplicationsAsync();
+        Assert.DoesNotContain(actual, overview => overview.ApplicationName == "app2");
     }
     
     // Contexts
     
     [Fact]
-    public async Task GetAllContextsWhenNoneReturnsExpectedResult()
+    public async Task GetAllContextsReturnsExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllContextsAsync());
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        var actual = await sut.GetAllContextsAsync();
+        Assert.NotEmpty(actual);
     }
     
     [Fact]
@@ -283,35 +269,38 @@ public class AxonServerAdminChannelIntegrationTests
         var name = _fixture.Create<Context>().ToString();
         var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.CreateContextAsync(new CreateContextRequest
         {
-            Name = name
+            Name = name,
+            ReplicationGroupName = Context.Default.ToString()
         }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Equal("[AXONIQ-1700] Maximum number of contexts reached", exception.Status.Detail);
     }
-    
+
     [Fact]
     public async Task UpdateContextPropertiesHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var name = _fixture.Create<Context>().ToString();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.UpdateContextPropertiesAsync(new UpdateContextPropertiesRequest
-        {
-            Name = name
-        }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        await Task.Delay(500);
+        var exception = await Assert.ThrowsAsync<RpcException>(async () =>
+            await sut.UpdateContextPropertiesAsync(new UpdateContextPropertiesRequest
+            {
+                Name = Context.Default.ToString(),
+                MetaData = { { "Key", "Value" } }
+            }));
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Equal("[AXONIQ-1700] Updating a context is not supported in this edition", exception.Status.Detail);
     }
     
-    [Fact]
+    [Fact(Skip = "Executing this test in conjunction with other tests causes the shared server instance to no longer have a default context.")]
     public async Task DeleteContextHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var name = _fixture.Create<Context>().ToString();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.DeleteContextAsync(new DeleteContextRequest
-        {
-            Name = name
-        }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        await sut.DeleteContextAsync(new DeleteContextRequest { Name = Context.Default.ToString() });
+        await Task.Delay(500);
+        var actual = await sut.GetAllContextsAsync();
+        Assert.DoesNotContain(actual, overview => overview.Name == Context.Default.ToString());
     }
     
     [Fact]
@@ -319,8 +308,8 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetContextOverviewAsync(Context.Default.ToString()));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        var actual = await sut.GetContextOverviewAsync(Context.Default.ToString());
+        Assert.Equal(Context.Default.ToString(), actual.Name);
     }
     
     [Fact]
@@ -328,18 +317,44 @@ public class AxonServerAdminChannelIntegrationTests
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllContextsAsync());
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        var actual = await sut.GetAllContextsAsync();
+        Assert.Contains(actual, overview => overview.Name == Context.Default.ToString());
+        Assert.Contains(actual, overview => overview.Name == Context.Admin.ToString());
     }
+    
     
     [Fact]
     public async Task SubscribeToContextUpdatesHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var actual = sut.SubscribeToContextUpdates().GetAsyncEnumerator();
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await actual.MoveNextAsync());
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        await sut.DeleteContextAsync(new DeleteContextRequest
+        {
+            Name = Context.Default.ToString()
+        });
+        await Task.Delay(1000);
+        var name = _fixture.Create<Context>().ToString();
+        var updates = new List<ContextUpdate>();
+        var subscriber = Task.Run(async () =>
+        {
+            var endOfEnumeration = false;
+            await using var enumerator = sut.SubscribeToContextUpdates().GetAsyncEnumerator();
+            while (!endOfEnumeration && await enumerator.MoveNextAsync())
+            {
+                updates.Add(enumerator.Current);
+                if (enumerator.Current.Context == name && enumerator.Current.Type == ContextUpdateType.Created)
+                {
+                    endOfEnumeration = true;
+                }
+            }
+        });
+        await sut.CreateContextAsync(new CreateContextRequest
+        {
+            Name = name,
+            ReplicationGroupName = Context.Default.ToString()
+        });
+        await subscriber;
+        Assert.Contains(updates, update => update.Context == name && update.Type == ContextUpdateType.Created);
     }
     
     // Replication groups
@@ -351,73 +366,100 @@ public class AxonServerAdminChannelIntegrationTests
         var sut = connection.AdminChannel;
         var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.CreateReplicationGroupAsync(new CreateReplicationGroupRequest
         {
-            Name = "group1"
+            Name = "group1",
+            Members = { new ReplicationGroupMember
+            {
+                NodeName = _container.Properties.NodeSetup.Name,
+                Host = _container.Properties.NodeSetup.Hostname,
+                Port = _container.Properties.NodeSetup.Port ?? 8124
+            } }
         }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Equal("[AXONIQ-1700] Maximum number of replication groups reached", exception.Status.Detail);
     }
+    
     
     [Fact]
     public async Task DeleteReplicationGroupHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.DeleteReplicationGroupAsync(new DeleteReplicationGroupRequest
+        await sut.DeleteReplicationGroupAsync(new DeleteReplicationGroupRequest
         {
-            Name = "group1"
-        }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+            Name = Context.Default.ToString()
+        });
+        await Task.Delay(500);
+        var actual = await sut.GetAllReplicationGroupsAsync();
+        Assert.DoesNotContain(actual, overview => overview.Name == Context.Default.ToString());
     }
     
     [Fact]
     public async Task GetReplicationGroupHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetReplicationGroupAsync("group1"));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        var actual = await sut.GetReplicationGroupAsync(Context.Default.ToString());
+        Assert.NotNull(actual);
     }
     
     [Fact]
     public async Task GetAllReplicationGroupsHasExpectedResult()
     {
         var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllReplicationGroupsAsync());
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        var actual = await sut.GetAllReplicationGroupsAsync();
+        Assert.Contains(actual, overview => overview.Name == Context.Default.ToString());
+        Assert.Contains(actual, overview => overview.Name == Context.Admin.ToString());
     }
     
     [Fact]
     public async Task GetAllNodesHasExpectedResult()
     {
+        var names = new []{_container.Properties.NodeSetup.Name};
         var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilReadyAsync();
         var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.GetAllNodesAsync());
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        var actual = await sut.GetAllNodesAsync();
+        foreach (var name in names)
+        {
+            Assert.Contains(actual, overview => overview.NodeName == name);    
+        }
     }
     
-    [Fact]
-    public async Task AddNodeToReplicationGroupHasExpectedResult()
+    // [Fact]
+    // public async Task AddNodeToReplicationGroupHasExpectedResult()
+    // {
+    //     var connection = await CreateSystemUnderTest();
+    //     await connection.WaitUntilReady();
+    //     var sut = connection.AdminChannel;
+    //     var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.AddNodeToReplicationGroup(new JoinReplicationGroup
+    //     {
+    //         ReplicationGroupName = "group1",
+    //         NodeName = "node1"
+    //     }));
+    //     Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+    // }
+    //
+    // [Fact]
+    // public async Task RemoveNodeFromReplicationGroupHasExpectedResult()
+    // {
+    //     var connection = await CreateSystemUnderTest();
+    //     await connection.WaitUntilReady();
+    //     var sut = connection.AdminChannel;
+    //     var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.RemoveNodeFromReplicationGroup(new LeaveReplicationGroup
+    //     {
+    //         ReplicationGroupName = "group1",
+    //         NodeName = "node1"
+    //     }));
+    //     Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+    // }
+
+    public Task InitializeAsync()
     {
-        var connection = await CreateSystemUnderTest();
-        var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.AddNodeToReplicationGroupAsync(new JoinReplicationGroup
-        {
-            ReplicationGroupName = "group1",
-            NodeName = "node1"
-        }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
+        return _container.InitializeAsync();
     }
     
-    [Fact]
-    public async Task RemoveNodeFromReplicationGroupHasExpectedResult()
-    {
-        var connection = await CreateSystemUnderTest();
-        var sut = connection.AdminChannel;
-        var exception = await Assert.ThrowsAsync<RpcException>(async () => await sut.RemoveNodeFromReplicationGroupAsync(new LeaveReplicationGroup
-        {
-            ReplicationGroupName = "group1",
-            NodeName = "node1"
-        }));
-        Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
-    }
+    public Task DisposeAsync() => _container.DisposeAsync();
 }

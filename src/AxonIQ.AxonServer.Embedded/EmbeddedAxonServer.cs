@@ -238,7 +238,8 @@ public class EmbeddedAxonServer : IAxonServer
                 Name = $"axonserver-{suffix}",
                 InternalHostname = $"axonserver-{suffix}",
                 Hostname = "localhost",
-                DevModeEnabled = true
+                DevModeEnabled = true,
+                Standalone = false
             },
             ClusterSetup =
             {
