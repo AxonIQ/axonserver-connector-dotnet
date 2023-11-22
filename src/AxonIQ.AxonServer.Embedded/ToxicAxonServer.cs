@@ -34,15 +34,9 @@ public abstract class ToxicAxonServer : IToxicAxonServer
         return Server.GetGrpcEndpoint();
     }
 
-    public GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options = default)
+    public GrpcChannel CreateGrpcChannel(GrpcChannelOptions? options)
     {
         return Server.CreateGrpcChannel(options);
-    }
-
-    public async Task PurgeEvents()
-    {
-        using var client = Server.CreateHttpClient();
-        (await client.DeleteAsync("v1/devmode/purge-events")).EnsureSuccessStatusCode();
     }
 
     public Task DisposeAsync()

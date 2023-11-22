@@ -101,6 +101,16 @@ public class EmbeddedAxonServer : IAxonServer
             Port = endpoint.Port,
             Path = "actuator/health"
         }.Uri;
+        
+        //Only test the raft status of contexts this node is hosting a replication group for 
+        var contexts =
+            Template
+                .ReplicationGroups?
+                .Where(replicationGroup =>
+                    replicationGroup.Roles?.Any(role => role.Node == Properties.NodeSetup.Name) ?? false)
+                .SelectMany(replicationGroup => replicationGroup.Contexts?.Where(context => context.Name != null)
+                    .Select(context => new Context(context.Name!)) ?? Array.Empty<Context>())
+                .ToArray() ?? Array.Empty<Context>();
 
         var watch = Stopwatch.StartNew();
         while (!available && watch.Elapsed < (maximumWaitTime ?? DefaultMaximumWaitTime))
@@ -113,8 +123,13 @@ public class EmbeddedAxonServer : IAxonServer
                 var response = (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
                 var json = await response.Content.ReadAsStringAsync();
                 var document = JsonDocument.Parse(json);
-                var property = document.RootElement.GetProperty("status");
-                if (property.GetString() == "UP")
+                if (document.RootElement.GetProperty("status").GetString() == "UP" &&
+                    document.RootElement.GetProperty("components").GetProperty("raft").GetProperty("status").GetString() == "UP" &&
+                    contexts.All(context => 
+                        document.RootElement
+                            .GetProperty("components").GetProperty("raft").GetProperty("details")
+                            .GetProperty($"{context.ToString()}.leader").GetString() != null 
+                    ))
                 {
                     available = true;
                 }
