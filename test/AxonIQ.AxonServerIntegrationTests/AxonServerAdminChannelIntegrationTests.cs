@@ -21,7 +21,7 @@ public class AxonServerAdminChannelIntegrationTests : IAsyncLifetime
     public AxonServerAdminChannelIntegrationTests(ITestOutputHelper output)
     {
         if (output == null) throw new ArgumentNullException(nameof(output));
-        _container = new AxonServerWithAccessControlDisabled(output);
+        _container = EmbeddedAxonServer.WithAccessControlDisabled(new TestOutputHelperLogger<EmbeddedAxonServer>(output));
         _fixture = new Fixture();
         _fixture.CustomizeClientInstanceId();
         _fixture.CustomizeComponentName();
@@ -456,9 +456,10 @@ public class AxonServerAdminChannelIntegrationTests : IAsyncLifetime
     //     Assert.Equal(StatusCode.Unimplemented, exception.StatusCode);
     // }
 
-    public Task InitializeAsync()
+    public async Task InitializeAsync()
     {
-        return _container.InitializeAsync();
+        await _container.InitializeAsync();
+        await _container.WaitUntilAvailableAsync();
     }
     
     public Task DisposeAsync() => _container.DisposeAsync();

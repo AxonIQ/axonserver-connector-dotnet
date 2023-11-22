@@ -15,14 +15,6 @@ public class AxonServerWithAccessControlDisabled : AxonServer.Embedded.AxonServe
         logger.LogDebug("Using Embedded Axon Server with access control disabled");
         Server = EmbeddedAxonServer.WithAccessControlDisabled(logger);
     }
-    
-    public AxonServerWithAccessControlDisabled(ITestOutputHelper output)
-    {
-        if (output == null) throw new ArgumentNullException(nameof(output));
-        var logger = new TestOutputHelperLogger<EmbeddedAxonServer>(output);
-        logger.LogDebug("Using Embedded Axon Server with access control disabled");
-        Server = EmbeddedAxonServer.WithAccessControlDisabled(logger);
-    }
 
     protected override IAxonServer Server { get; }
 
