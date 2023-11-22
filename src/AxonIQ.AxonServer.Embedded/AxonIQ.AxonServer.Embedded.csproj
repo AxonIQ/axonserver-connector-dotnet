@@ -31,7 +31,7 @@
         <PackageReference Include="MinVer" Version="4.3.0" PrivateAssets="all" />
         <PackageReference Include="shortid" Version="4.0.0" />
         <PackageReference Include="ToxiproxyNetCore" Version="1.0.35" />
-        <PackageReference Include="YamlDotNet" Version="13.1.1" />
+        <PackageReference Include="YamlDotNet" Version="13.7.1" />
     </ItemGroup>
 
     <ItemGroup>

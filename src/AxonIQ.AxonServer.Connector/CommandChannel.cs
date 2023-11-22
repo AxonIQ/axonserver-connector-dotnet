@@ -7,11 +7,10 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal class CommandChannel : ICommandChannel, IAsyncDisposable
 {
-    public static readonly TimeSpan PurgeInterval = TimeSpan.FromSeconds(15);
-    
     private readonly IOwnerAxonServerConnection _connection;
     private readonly AxonActor<Message, State> _actor;
     private readonly TimeSpan _purgeInterval;
+    private readonly TimeSpan _timeout;
     private readonly ILogger<CommandChannel> _logger;
 
     public CommandChannel(
@@ -20,18 +19,8 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
         PermitCount permits,
         PermitCount permitsBatch,
         ReconnectOptions reconnectOptions,
-        ILoggerFactory loggerFactory)
-        : this(connection, scheduler, permits, permitsBatch, reconnectOptions, PurgeInterval, loggerFactory)
-    {
-    }
-
-    public CommandChannel(
-        IOwnerAxonServerConnection connection,
-        IScheduler scheduler,
-        PermitCount permits,
-        PermitCount permitsBatch,
-        ReconnectOptions reconnectOptions,
         TimeSpan purgeInterval,
+        TimeSpan timeout,
         ILoggerFactory loggerFactory)
     {
         if (connection == null) throw new ArgumentNullException(nameof(connection));
@@ -41,6 +30,7 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
         
         _connection = connection;
         _purgeInterval = purgeInterval;
+        _timeout = timeout;
 
         ReconnectOptions = reconnectOptions;
         Service = new CommandService.CommandServiceClient(connection.CallInvoker);
@@ -67,7 +57,7 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
                 state = new State.Connecting(disconnected.CommandHandlers, disconnected.Flow);
                 break;
             case (State.Connecting, Message.OpenStream):
-                await _actor.TellAsync(
+                await _actor.TellToAsync(
                     () => Service.OpenStream(cancellationToken: ct),
                     result => new Message.StreamOpened(result),
                     ct);
@@ -386,7 +376,7 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
                         "Unable to send instruction: no connection to AxonServer"));
                 break;
             case(State.Connected connected, Message.PurgeOverdueInstructions purge):
-                state.CommandHandlers.Purge(_purgeInterval);
+                state.CommandHandlers.Purge(_timeout);
 
                 if (connected.CommandHandlers.RegisteredCommands.Count != 0)
                 {
@@ -396,7 +386,7 @@ internal class CommandChannel : ICommandChannel, IAsyncDisposable
             case(State.Connecting, Message.PurgeOverdueInstructions):
             case(State.Disconnected, Message.PurgeOverdueInstructions):
             case(State.Faulted, Message.PurgeOverdueInstructions):
-                state.CommandHandlers.Purge(_purgeInterval);
+                state.CommandHandlers.Purge(_timeout);
                 break;
             case (State.Faulted faulted, Message.Reconnect):
                 await _actor.TellAsync(new Message.OpenStream(), ct).ConfigureAwait(false);

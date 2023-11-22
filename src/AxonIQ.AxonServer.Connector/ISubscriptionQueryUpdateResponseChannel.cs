@@ -4,6 +4,6 @@ namespace AxonIQ.AxonServer.Connector;
 
 public interface ISubscriptionQueryUpdateResponseChannel
 {
-    ValueTask SendUpdateAsync(QueryUpdate update);
-    ValueTask CompleteAsync();
+    ValueTask SendUpdateAsync(QueryUpdate update, CancellationToken ct);
+    ValueTask CompleteAsync(CancellationToken ct);
 }

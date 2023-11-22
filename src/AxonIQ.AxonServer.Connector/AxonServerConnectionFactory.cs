@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net;
 using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
@@ -47,12 +46,15 @@ public class AxonServerConnectionFactory : IAsyncDisposable
         CommandPermits = options.CommandPermits;
         QueryPermits = options.QueryPermits;
         EventProcessorUpdateFrequency = options.EventProcessorUpdateFrequency;
+        CommandChannelInstructionTimeout = options.CommandChannelInstructionTimeout;
+        CommandChannelInstructionPurgeFrequency = options.CommandChannelInstructionPurgeFrequency;
+        QueryChannelInstructionTimeout = options.QueryChannelInstructionTimeout;
+        QueryChannelInstructionPurgeFrequency = options.QueryChannelInstructionPurgeFrequency;
         ReconnectOptions = options.ReconnectOptions;
 
         _lock = new AsyncLock();
         _connections = new Dictionary<Context, SharedAxonServerConnection>();
     }
-
     internal ClientIdentity ClientIdentity { get; }
     internal IReadOnlyList<DnsEndPoint> RoutingServers { get; }
     internal IAxonServerAuthentication Authentication { get; }
@@ -62,6 +64,10 @@ public class AxonServerConnectionFactory : IAsyncDisposable
     internal PermitCount CommandPermits { get; }
     internal PermitCount QueryPermits { get; }
     internal TimeSpan EventProcessorUpdateFrequency { get; }
+    internal TimeSpan CommandChannelInstructionTimeout { get; }
+    internal TimeSpan CommandChannelInstructionPurgeFrequency { get; }
+    internal TimeSpan QueryChannelInstructionTimeout { get; }
+    internal TimeSpan QueryChannelInstructionPurgeFrequency { get; }
     internal ReconnectOptions ReconnectOptions { get; }
     internal ILoggerFactory LoggerFactory { get; }
 

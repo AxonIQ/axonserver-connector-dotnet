@@ -18,18 +18,16 @@ internal static class AsyncStreamReaderToAxonActorExtensions
         return TellToCore(
             reader, 
             actor, 
-            logger, 
             value => translate(new TaskResult<T>.Ok(value)), 
             exception => translate(new TaskResult<T>.Error(exception)), 
-            ct);
+            logger, ct);
     }
     
-    private static async Task TellToCore<T, TMessage>(
-        IAsyncStreamReader<T> reader, 
+    private static async Task TellToCore<T, TMessage>(IAsyncStreamReader<T> reader,
         IAxonActor<TMessage> actor,
-        ILogger logger,
         Func<T, TMessage> success,
         Func<Exception, TMessage> failure,
+        ILogger logger,
         CancellationToken ct)
     {
         try

@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "Connection")]
 public class AxonServerConnectionIntegrationTests
 {
     private readonly IAxonServer _container;
@@ -49,7 +50,7 @@ public class AxonServerConnectionIntegrationTests
         Action<IAxonServerConnectorOptionsBuilder>? configure = default)
     {
         var sut = await CreateSystemUnderTest(configure);
-        await sut.DisposeAsync().ConfigureAwait(false);
+        await sut.DisposeAsync();
         return sut;
     }
 
@@ -59,9 +60,9 @@ public class AxonServerConnectionIntegrationTests
         var sut = await CreateSystemUnderTest(
             options => options.WithRoutingServers(
                 new DnsEndPoint("127.0.0.0", AxonServerConnectorDefaults.Port)));
-        var wait = sut.WaitUntilConnectedAsync().ConfigureAwait(false);
-        await sut.DisposeAsync().ConfigureAwait(false);
-        await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
+        var wait = sut.WaitUntilConnectedAsync();
+        await sut.DisposeAsync();
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait);
     }
     
     [Fact]
@@ -70,9 +71,9 @@ public class AxonServerConnectionIntegrationTests
         var sut = await CreateSystemUnderTest(
             options => options.WithRoutingServers(
                 new DnsEndPoint("127.0.0.0", AxonServerConnectorDefaults.Port)));
-        var wait = sut.WaitUntilReadyAsync().ConfigureAwait(false);
-        await sut.DisposeAsync().ConfigureAwait(false);
-        await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait).ConfigureAwait(false);
+        var wait = sut.WaitUntilReadyAsync();
+        await sut.DisposeAsync();
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await wait);
     }
     
     [Fact]
@@ -100,21 +101,21 @@ public class AxonServerConnectionIntegrationTests
     public async Task WhenDisposedWaitUntilConnectedAsyncReturnsExpectedResult()
     {
         await using var sut = await CreateDisposedSystemUnderTest();
-        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await sut.WaitUntilConnectedAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await sut.WaitUntilConnectedAsync());
     }
     
     [Fact]
     public async Task WhenDisposedWaitUntilReadyAsyncReturnsExpectedResult()
     {
         await using var sut = await CreateDisposedSystemUnderTest();
-        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await sut.WaitUntilReadyAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await sut.WaitUntilReadyAsync());
     }
     
     [Fact]
     public async Task WhenDisposedCloseAsyncReturnsExpectedResult()
     {
         await using var sut = await CreateDisposedSystemUnderTest();
-        await sut.CloseAsync().ConfigureAwait(false);
+        await sut.CloseAsync();
     }
     
     [Fact]

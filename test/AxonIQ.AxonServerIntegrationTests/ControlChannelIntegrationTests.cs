@@ -12,6 +12,7 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "ControlChannel")]
 public class ControlChannelIntegrationTests
 {
     private readonly IAxonServer _container;

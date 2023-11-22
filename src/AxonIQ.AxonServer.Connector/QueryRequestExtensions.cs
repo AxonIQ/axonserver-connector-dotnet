@@ -5,7 +5,7 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal static class QueryRequestExtensions
 {
-    private static bool SuppportsServerStreaming(this QueryRequest request)
+    private static bool SupportsServerStreaming(this QueryRequest request)
     {
         return request
             .ProcessingInstructions
@@ -13,7 +13,7 @@ internal static class QueryRequestExtensions
             ?.Value.BooleanValue ?? false;
     }
     
-    private static bool SuppportsClientStreaming(this QueryRequest request)
+    private static bool SupportsClientStreaming(this QueryRequest request)
     {
         return request
             .ProcessingInstructions
@@ -21,8 +21,8 @@ internal static class QueryRequestExtensions
             ?.Value.BooleanValue ?? false;
     }
     
-    public static bool SuppportsStreaming(this QueryRequest request)
+    public static bool SupportsStreaming(this QueryRequest request)
     {
-        return request.SuppportsClientStreaming() && request.SuppportsServerStreaming();
+        return request.SupportsClientStreaming() && request.SupportsServerStreaming();
     }
 }

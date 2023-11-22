@@ -73,7 +73,7 @@ internal class AxonActor<TMessage, TState> : IAxonActor<TMessage>, IAsyncDisposa
             if (_logger.IsEnabled(LogLevel.Debug))
             {
                 _logger.LogDebug(exception,
-                    $"Actor protocol loop is exciting gracefully because an operation was cancelled");    
+                    "Actor protocol loop is exciting gracefully because an operation was cancelled");    
             }
         }
         catch (Exception exception)

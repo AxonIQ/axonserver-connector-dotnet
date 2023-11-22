@@ -15,6 +15,7 @@ namespace AxonIQ.AxonServerIntegrationTests;
 
 public class AxonServerGrpcChannelFactoryTests
 {
+    [Trait("Surface", "Connection")]
     public class WhenServerIsNotReachable
     {
         private readonly Fixture _fixture;
@@ -56,6 +57,7 @@ public class AxonServerGrpcChannelFactoryTests
     }
 
     [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+    [Trait("Surface", "Connection")]
     public class WhenServerHasAccessControlDisabled
     {
         private readonly IAxonServer _server;
@@ -114,6 +116,7 @@ public class AxonServerGrpcChannelFactoryTests
     }
 
     [Collection(nameof(AxonServerWithAccessControlEnabledCollection))]
+    [Trait("Surface", "Connection")]
     public class WhenServerHasAccessControlEnabled
     {
         private readonly IAxonServer _server;

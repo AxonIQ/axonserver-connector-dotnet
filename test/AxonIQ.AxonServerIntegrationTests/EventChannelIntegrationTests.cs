@@ -15,6 +15,7 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "EventChannel")]
 public class EventChannelIntegrationTests : IAsyncLifetime
 {
     private readonly IAxonServer _container;
@@ -228,7 +229,7 @@ public class EventChannelIntegrationTests : IAsyncLifetime
                 Assert.NotEqual(199, @event.AggregateSequenceNumber);
             }
         }
-        catch (ObjectDisposedException exception) when (exception.ObjectName == "GrpcCall")
+        catch (ObjectDisposedException exception) when (exception.ObjectName.StartsWith("Grpc.Net.Client.Internal.GrpcCall"))
         {
             // Expected
         }

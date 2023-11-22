@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using AxonIQ.AxonServer.Connector;
 using Ductus.FluentDocker.Builders;
 using Ductus.FluentDocker.Extensions;
 using Ductus.FluentDocker.Model.Builders;
@@ -10,6 +11,7 @@ using Ductus.FluentDocker.Services.Extensions;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using shortid.Configuration;
+using YamlDotNet.RepresentationModel;
 
 namespace AxonIQ.AxonServer.Embedded;
 
@@ -22,14 +24,16 @@ public class EmbeddedAxonServer : IAxonServer
     private IContainerService? _container;
     private DirectoryInfo? _serverFiles;
 
-    public EmbeddedAxonServer(SystemProperties properties, ILogger<EmbeddedAxonServer> logger)
+    public EmbeddedAxonServer(SystemProperties properties, ClusterTemplate template, ILogger<EmbeddedAxonServer> logger)
     {
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
+        Template = template;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public SystemProperties Properties { get; }
-    
+    public ClusterTemplate Template { get; }
+
     public bool EmitServerLogsOnDispose { get; set; }
 
     public async Task InitializeAsync()
@@ -46,16 +50,23 @@ public class EmbeddedAxonServer : IAxonServer
             Path.Combine(Path.GetTempPath(), shortid.ShortId.Generate(new GenerationOptions(useSpecialCharacters: false))));
         _serverFiles.Create();
         
+        var stream = new YamlStream(Template.Serialize());
+        using (var writer = new StringWriter())
+        {
+            stream.Save(writer, false);
+            await File.WriteAllTextAsync(Path.Combine(_serverFiles.FullName, "cluster-template.yml"), writer.ToString());
+        }
+        
         await File.WriteAllTextAsync(Path.Combine(_serverFiles.FullName, "axonserver.properties"), string.Join(Environment.NewLine, Properties.Serialize()));
 
         var builder = new Builder()
             .UseContainer()
             .ReuseIfExists()
-            .UseImage("axoniq/axonserver:latest")
+            .UseImage("axoniq/axonserver:2023.2.1")
             .RemoveVolumesOnDispose()
             .ExposePort(8024)
             .ExposePort(8124)
-            .Mount(_serverFiles.FullName, "/config", MountType.ReadOnly)
+            .Mount(_serverFiles.FullName, "/axonserver/config", MountType.ReadOnly)
             .WaitForPort("8024/tcp", TimeSpan.FromSeconds(10.0));
         if (!string.IsNullOrEmpty(Properties.NodeSetup.Name))
         {
@@ -90,6 +101,16 @@ public class EmbeddedAxonServer : IAxonServer
             Port = endpoint.Port,
             Path = "actuator/health"
         }.Uri;
+        
+        //Only test the raft status of contexts this node is hosting a replication group for 
+        var contexts =
+            Template
+                .ReplicationGroups?
+                .Where(replicationGroup =>
+                    replicationGroup.Roles?.Any(role => role.Node == Properties.NodeSetup.Name) ?? false)
+                .SelectMany(replicationGroup => replicationGroup.Contexts?.Where(context => context.Name != null)
+                    .Select(context => new Context(context.Name!)) ?? Array.Empty<Context>())
+                .ToArray() ?? Array.Empty<Context>();
 
         var watch = Stopwatch.StartNew();
         while (!available && watch.Elapsed < (maximumWaitTime ?? DefaultMaximumWaitTime))
@@ -102,8 +123,13 @@ public class EmbeddedAxonServer : IAxonServer
                 var response = (await client.GetAsync(requestUri)).EnsureSuccessStatusCode();
                 var json = await response.Content.ReadAsStringAsync();
                 var document = JsonDocument.Parse(json);
-                var property = document.RootElement.GetProperty("status");
-                if (property.GetString() == "UP")
+                if (document.RootElement.GetProperty("status").GetString() == "UP" &&
+                    document.RootElement.GetProperty("components").GetProperty("raft").GetProperty("status").GetString() == "UP" &&
+                    contexts.All(context => 
+                        document.RootElement
+                            .GetProperty("components").GetProperty("raft").GetProperty("details")
+                            .GetProperty($"{context.ToString()}.leader").GetString() != null 
+                    ))
                 {
                     available = true;
                 }
@@ -225,8 +251,19 @@ public class EmbeddedAxonServer : IAxonServer
             NodeSetup =
             {
                 Name = $"axonserver-{suffix}",
+                InternalHostname = $"axonserver-{suffix}",
                 Hostname = "localhost",
-                DevModeEnabled = true
+                DevModeEnabled = true,
+                Standalone = false
+            },
+            ClusterSetup =
+            {
+                AutoclusterFirst = $"axonserver-{suffix}",
+                AutoclusterContexts = new []
+                {
+                    $"{Context.Admin.ToString()}",
+                    $"{Context.Default.ToString()}"
+                }
             },
             AccessControl =
             {
@@ -244,7 +281,73 @@ public class EmbeddedAxonServer : IAxonServer
                 }
             }
         };
-        return new EmbeddedAxonServer(properties, logger)
+        var template = new ClusterTemplate
+        {
+            First = properties.NodeSetup.Name,
+            Applications = new ClusterTemplateApplication[]
+            {
+                new()
+                {
+                    Name = "axonserver-dotnet-connector-tests",
+                    Roles = new ClusterTemplateApplicationRole[]
+                    {
+                        new()
+                        {
+                            Context = Context.Default.ToString(),
+                            Roles = new[] { "USE_CONTEXT" }
+                        },
+                        new()
+                        {
+                            Context = Context.Admin.ToString(),
+                            Roles = new[] { "USE_CONTEXT" }
+                        }
+                    },
+                    Token = Guid.NewGuid().ToString("N")
+                }
+            },
+            ReplicationGroups = new ClusterTemplateReplicationGroup[]
+            {
+                new()
+                {
+                    Name = Context.Default.ToString(),
+                    Contexts = new ClusterTemplateReplicationGroupContext[]
+                    {
+                        new()
+                        {
+                            Name = Context.Default.ToString()
+                        }
+                    },
+                    Roles = new ClusterTemplateReplicationGroupRole[]
+                    {
+                        new()
+                        {
+                            Node = properties.NodeSetup.Name,
+                            Role = "PRIMARY"
+                        }
+                    }
+                },
+                new()
+                {
+                    Name = Context.Admin.ToString(),
+                    Contexts = new ClusterTemplateReplicationGroupContext[]
+                    {
+                        new()
+                        {
+                            Name = Context.Admin.ToString()
+                        }
+                    },
+                    Roles = new ClusterTemplateReplicationGroupRole[]
+                    {
+                        new()
+                        {
+                            Node = properties.NodeSetup.Name,
+                            Role = "PRIMARY"
+                        }
+                    }
+                }
+            }
+        };
+        return new EmbeddedAxonServer(properties, template, logger)
         {
             EmitServerLogsOnDispose = emitServerLogs
         };
@@ -258,6 +361,7 @@ public class EmbeddedAxonServer : IAxonServer
             NodeSetup =
             {
                 Name = $"axonserver-{suffix}",
+                InternalHostname = $"axonserver-{suffix}",
                 Hostname = "localhost",
                 DevModeEnabled = true
             },
@@ -272,7 +376,73 @@ public class EmbeddedAxonServer : IAxonServer
                 HeartbeatEnabled = true
             }
         };
-        return new EmbeddedAxonServer(properties, logger)
+        var template = new ClusterTemplate
+        {
+            First = properties.NodeSetup.Name,
+            Applications = new ClusterTemplateApplication[]
+            {
+                new()
+                {
+                    Name = "axonserver-dotnet-connector-tests",
+                    Roles = new ClusterTemplateApplicationRole[]
+                    {
+                        new()
+                        {
+                            Context = Context.Default.ToString(),
+                            Roles = new[] { "USE_CONTEXT" }
+                        },
+                        new()
+                        {
+                            Context = Context.Admin.ToString(),
+                            Roles = new[] { "USE_CONTEXT" }
+                        }
+                    },
+                    Token = Guid.NewGuid().ToString("N")
+                }
+            },
+            ReplicationGroups = new ClusterTemplateReplicationGroup[]
+            {
+                new()
+                {
+                    Name = Context.Default.ToString(),
+                    Contexts = new ClusterTemplateReplicationGroupContext[]
+                    {
+                        new()
+                        {
+                            Name = Context.Default.ToString()
+                        }
+                    },
+                    Roles = new ClusterTemplateReplicationGroupRole[]
+                    {
+                        new()
+                        {
+                            Node = properties.NodeSetup.Name,
+                            Role = "PRIMARY"
+                        }
+                    }
+                },
+                new()
+                {
+                    Name = Context.Admin.ToString(),
+                    Contexts = new ClusterTemplateReplicationGroupContext[]
+                    {
+                        new()
+                        {
+                            Name = Context.Admin.ToString()
+                        }
+                    },
+                    Roles = new ClusterTemplateReplicationGroupRole[]
+                    {
+                        new()
+                        {
+                            Node = properties.NodeSetup.Name,
+                            Role = "PRIMARY"
+                        }
+                    }
+                }
+            }
+        };
+        return new EmbeddedAxonServer(properties, template, logger)
         {
             EmitServerLogsOnDispose = emitServerLogs
         };

@@ -181,7 +181,7 @@ public class EmbeddedAxonClusterNode : IAxonClusterNode
         _container = builder.Build().Start();
     }
 
-    internal async Task WaitUntilAvailableAsync(int cluster, TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default)
+    internal async Task WaitUntilAvailableAsync(string cluster, TimeSpan? maximumWaitTime = default, TimeSpan? delayBetweenAttempts = default)
     {
         if (_container == null)
             throw new InvalidOperationException("The cluster node has not been initialized");

@@ -51,6 +51,11 @@ public class SystemNodeSetup
     /// Development mode which allows deleting all events from event store (Axon SE only). Default value is false.
     /// </summary>
     public bool? DevModeEnabled { get; set; }
+    
+    /// <summary>
+    /// Standalone indicates whether to run as a single node vs a cluster node. Default value is false.
+    /// </summary>
+    public bool? Standalone { get; set; }
 
     /// <summary>
     /// Set WebSocket CORS Allowed Origins. Default value is false.
@@ -99,6 +104,10 @@ public class SystemNodeSetup
         if (DevModeEnabled.HasValue)
         {
             properties.Add($"axoniq.axonserver.devmode.enabled={DevModeEnabled.Value.ToString().ToLowerInvariant()}");
+        }
+        if (Standalone.HasValue)
+        {
+            properties.Add($"axoniq.axonserver.standalone={Standalone.Value.ToString().ToLowerInvariant()}");
         }
         if (SetWebSocketAllowedOrigins.HasValue)
         {

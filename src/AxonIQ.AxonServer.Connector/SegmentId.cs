@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace AxonIQ.AxonServer.Connector;
 
-public readonly struct SegmentId
+public readonly struct SegmentId : IEquatable<SegmentId>
 {
     private readonly int _value;
 
@@ -16,4 +16,6 @@ public readonly struct SegmentId
     public override int GetHashCode() => HashCode.Combine(_value);
     public override string ToString() => _value.ToString(CultureInfo.InvariantCulture);
     public int ToInt32() => _value;
+    public static bool operator ==(SegmentId left, SegmentId right) => left.Equals(right);
+    public static bool operator !=(SegmentId left, SegmentId right) => !left.Equals(right);
 }

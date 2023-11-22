@@ -14,6 +14,7 @@ using Xunit.Abstractions;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(ToxicAxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "CommandChannel")]
 public class CommandChannelConnectivityIntegrationTests
 {
     private readonly IToxicAxonServer _container;
@@ -54,7 +55,7 @@ public class CommandChannelConnectivityIntegrationTests
                         AxonServerConnectorDefaults.DefaultReconnectOptions.ConnectionTimeout, 
                         TimeSpan.FromMilliseconds(100),
                         false)))
-            .ConfigureAwait(false);
+;
         await connection.WaitUntilReadyAsync();
         
         var responseId = InstructionId.New().ToString();

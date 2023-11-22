@@ -3,7 +3,7 @@ using Xunit;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
-public class AxonServerConnectionFactoryDefaultsTests
+public class AxonServerConnectorDefaultsTests
 {
     [Fact]
     public void PortReturnsExpectedResult()
@@ -81,5 +81,21 @@ public class AxonServerConnectionFactoryDefaultsTests
             TimeSpan.FromMilliseconds(10000),
             TimeSpan.FromMilliseconds(2000),
             true), result);
+    }
+    
+    [Fact]
+    public void DefaultChannelInstructionTimeout()
+    {
+        var result = AxonServerConnectorDefaults.DefaultChannelInstructionTimeout;
+        
+        Assert.Equal(TimeSpan.FromSeconds(15), result);
+    }
+    
+    [Fact]
+    public void DefaultChannelInstructionPurgeFrequency()
+    {
+        var result = AxonServerConnectorDefaults.DefaultChannelInstructionPurgeFrequency;
+        
+        Assert.Equal(TimeSpan.FromSeconds(5), result);
     }
 }

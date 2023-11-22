@@ -5,7 +5,12 @@ ci:
 	dotnet restore
 	dotnet build --configuration Release --no-restore
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServer.Connector.Tests --logger "trx;logfilename=connector_tests.trx"
-	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --logger "trx;logfilename=server_integration_tests.trx"
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=AdminChannel" --logger "trx;logfilename=server_integration_tests_admin_channel.trx" 
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=ControlChannel" --logger "trx;logfilename=server_integration_tests_control_channel.trx"
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=CommandChannel" --logger "trx;logfilename=server_integration_tests_command_channel.trx"
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=EventChannel" --logger "trx;logfilename=server_integration_tests_event_channel.trx"
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=QueryChannel" --logger "trx;logfilename=server_integration_tests_query_channel.trx"
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=HearbeatChannel" --logger "trx;logfilename=server_integration_tests_heartbeat_channel.trx"
 
 cd:
 	dotnet tool restore
@@ -18,3 +23,6 @@ cd:
     	
 install-license:
 	dotnet user-secrets set "axoniq.license" "${LICENSE}" -p test/AxonIQ.AxonClusterIntegrationTests/AxonIQ.AxonClusterIntegrationTests.csproj
+	
+remove-dangling-containers:
+	docker rm -f $(docker ps -a --filter "name=axonserver-" -q)

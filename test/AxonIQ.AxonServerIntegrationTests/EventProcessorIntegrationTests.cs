@@ -14,6 +14,7 @@ using AsyncEnumerable = System.Linq.AsyncEnumerable;
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "ControlChannel")]
 public class EventProcessorIntegrationTests
 {
     private readonly IAxonServer _container;
@@ -113,7 +114,7 @@ public class EventProcessorIntegrationTests
         await registration.WaitUntilCompletedAsync();
 
         //Allow the poll to happen
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -124,7 +125,7 @@ public class EventProcessorIntegrationTests
         await sut.WaitUntilReadyAsync();
         
         var control = sut.ControlChannel;
-        //var admin = sut.AdminChannel;
+        
         var name = _fixture.Create<EventProcessorName>();
         var callCount = 0;
         var completion = new TaskCompletionSource();
@@ -151,7 +152,7 @@ public class EventProcessorIntegrationTests
         await registration.WaitUntilCompletedAsync();
 
         //Allow the poll to happen
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -193,7 +194,7 @@ public class EventProcessorIntegrationTests
         await registration.WaitUntilCompletedAsync();
 
         //Allow the poll to happen
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
     
     [Fact]
@@ -236,7 +237,7 @@ public class EventProcessorIntegrationTests
         await registration.WaitUntilCompletedAsync();
 
         //Allow the poll to happen
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
     
     [Fact]
@@ -270,7 +271,7 @@ public class EventProcessorIntegrationTests
         var result = await admin.StartEventProcessorAsync(name, TokenStoreIdentifier.Empty);
         Assert.Equal( Result.Success, result);
         
-        await processor.StartCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await processor.StartCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
     
     [Fact]
@@ -305,7 +306,7 @@ public class EventProcessorIntegrationTests
         var result = await admin.PauseEventProcessorAsync(name, TokenStoreIdentifier.Empty);
         Assert.Equal( Result.Success, result);
         
-        await processor.PauseCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await processor.PauseCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -381,7 +382,7 @@ public class EventProcessorIntegrationTests
         var result = await admin.MoveEventProcessorSegmentAsync(name, id, new SegmentId(0), toClient.ClientIdentity.ClientInstanceId);
         Assert.Equal( Result.Success, result);
         
-        await processor1.ReleaseSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await processor1.ReleaseSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
     
     [Fact]
@@ -436,7 +437,7 @@ public class EventProcessorIntegrationTests
         var result = await admin.SplitEventProcessorAsync(name, id);
         Assert.Equal( Result.Success, result);
         
-        await processor.SplitSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await processor.SplitSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
     
     [Fact]
@@ -491,7 +492,7 @@ public class EventProcessorIntegrationTests
         var result = await admin.MergeEventProcessorAsync(name, id);
         Assert.Equal( Result.Success, result);
         
-        await processor.MergeSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        await processor.MergeSegmentCompletion.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
     
     private class EmptyEventProcessor : IEventProcessorInstructionHandler

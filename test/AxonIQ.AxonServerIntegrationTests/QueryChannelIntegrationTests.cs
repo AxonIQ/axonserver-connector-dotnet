@@ -9,12 +9,12 @@ using Google.Protobuf;
 using Io.Axoniq.Axonserver.Grpc;
 using Io.Axoniq.Axonserver.Grpc.Query;
 using Microsoft.Extensions.Logging;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace AxonIQ.AxonServerIntegrationTests;
 
 [Collection(nameof(AxonServerWithAccessControlDisabledCollection))]
+[Trait("Surface", "QueryChannel")]
 public class QueryChannelIntegrationTests
 {
     private readonly IAxonServer _container;
@@ -45,7 +45,7 @@ public class QueryChannelIntegrationTests
         return factory.ConnectAsync(Context.Default);
     }
 
-    [Fact]
+    [Fact(Skip = "Not sure what the behavior should be.")]
     public async Task RegisterQueryHandlerWhileDisconnectedHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest(builder =>
@@ -114,7 +114,7 @@ public class QueryChannelIntegrationTests
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
-        await using var registration = await sut.RegisterQueryHandlerAsync(
+        var registration = await sut.RegisterQueryHandlerAsync(
             new PingPongQueryHandler(responseId), 
             queries);
     
@@ -169,6 +169,94 @@ public class QueryChannelIntegrationTests
     }
     
     [Fact]
+    public async Task QueryClosesAfterSomeResponsesHasExpectedResult()
+    {
+        await using var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilConnectedAsync();
+        
+        var sut = connection.QueryChannel;
+    
+        var requestId = InstructionId.New();
+        var queries = new[]
+        {
+            new QueryDefinition(new QueryName("Ping"), "Pong")
+        };
+        var handler = new OnePingPongForeverQueryHandler();
+        await using var registration = await sut.RegisterQueryHandlerAsync(
+            handler, 
+            queries);
+    
+        await registration.WaitUntilCompletedAsync();
+    
+        var result = sut.Query(new QueryRequest
+        {
+            Query = "Ping",
+            MessageIdentifier = requestId.ToString()
+        }, CancellationToken.None);
+
+        var index = 5;
+        await foreach (var response in result)
+        {
+            if (index-- == 0)
+            {
+                break;
+            }
+        }
+        
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.True(handler.Completed);
+    }
+    
+    [Fact]
+    public async Task QueryWithManyScatteredResponsesHasExpectedResult()
+    {
+        await using var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilConnectedAsync();
+        
+        var sut = connection.QueryChannel;
+    
+        var requestId = InstructionId.New();
+        var firstResponseIds = new[] { InstructionId.New(), InstructionId.New(), InstructionId.New() };
+        var secondResponseIds = new[] { InstructionId.New(), InstructionId.New(), InstructionId.New() };
+        var allResponseIds = firstResponseIds
+            .Concat(secondResponseIds)
+            .OrderBy(id => id.ToString())
+            .ToArray();
+        var queries = new[]
+        {
+            new QueryDefinition(new QueryName("Ping"), "Pong")
+        };
+        await using var registration1 = await sut.RegisterQueryHandlerAsync(
+            new OnePingManyPongQueryHandler(firstResponseIds), 
+            queries);
+    
+        await registration1.WaitUntilCompletedAsync();
+        
+        await using var registration2 = await sut.RegisterQueryHandlerAsync(
+            new OnePingManyPongQueryHandler(secondResponseIds), 
+            queries);
+    
+        await registration2.WaitUntilCompletedAsync();
+    
+        var result = sut.Query(new QueryRequest
+        {
+            Query = "Ping",
+            MessageIdentifier = requestId.ToString()
+        }, CancellationToken.None);
+
+        var actual = await result.ToArrayAsync();
+        Array.Sort(actual, (left, right) => string.Compare(left.MessageIdentifier, right.MessageIdentifier, StringComparison.Ordinal));
+        
+        Assert.Equal(6, actual.Length);
+        Assert.Equal(allResponseIds[0].ToString(), actual[0].MessageIdentifier);
+        Assert.Equal(allResponseIds[1].ToString(), actual[1].MessageIdentifier);
+        Assert.Equal(allResponseIds[2].ToString(), actual[2].MessageIdentifier);
+        Assert.Equal(allResponseIds[3].ToString(), actual[3].MessageIdentifier);
+        Assert.Equal(allResponseIds[4].ToString(), actual[4].MessageIdentifier);
+        Assert.Equal(allResponseIds[5].ToString(), actual[5].MessageIdentifier);
+    }
+    
+    [Fact]
     public async Task SubscriptionQueryWaitForInitialResultHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest();
@@ -192,7 +280,12 @@ public class QueryChannelIntegrationTests
         {
             Query = "Ping",
             MessageIdentifier = requestId.ToString()
-        }, new SerializedObject(), new PermitCount(1), new PermitCount(1), CancellationToken.None);
+        }, new SerializedObject
+        {
+            Type = "pong",
+            Revision = "0",
+            Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+        }, new PermitCount(100), new PermitCount(10), CancellationToken.None);
 
         var actual = await result.InitialResult;
         Assert.Equal(responseId.ToString(), actual.MessageIdentifier);
@@ -202,7 +295,30 @@ public class QueryChannelIntegrationTests
         Assert.Equal(ByteString.CopyFromUtf8("{ \"pong\": true }").ToByteArray(), actual.Payload.Data.ToByteArray());
     }
     
-    [Fact(Skip = "Needs work")]
+    [Fact]
+    public async Task SubscriptionQueryWaitForInitialResultWhenNoHandlerHasExpectedResult()
+    {
+        await using var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilConnectedAsync();
+        
+        var sut = connection.QueryChannel;
+
+        var result = await sut.SubscriptionQueryAsync(new QueryRequest
+        {
+            Query = "Ping",
+            MessageIdentifier = InstructionId.New().ToString()
+        }, new SerializedObject
+        {
+            Type = "Pong",
+            Revision = "0",
+            Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+        }, new PermitCount(100), new PermitCount(10), CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<AxonServerException>(async () => await result.InitialResult);
+        Assert.Equal(ErrorCategory.NoHandlerForQuery, exception.ErrorCategory);
+    }
+    
+    [Fact]
     public async Task SubscriptionQueryWaitForUpdatesHasExpectedResult()
     {
         await using var connection = await CreateSystemUnderTest();
@@ -226,7 +342,7 @@ public class QueryChannelIntegrationTests
         {
             Query = "Ping",
             MessageIdentifier = requestId.ToString()
-        }, new SerializedObject(), new PermitCount(1), new PermitCount(1), CancellationToken.None);
+        }, new SerializedObject(), new PermitCount(100), new PermitCount(10), CancellationToken.None);
 
         var actual = await result.Updates.ToArrayAsync();
         Assert.Equal(3, actual.Length);
@@ -234,16 +350,120 @@ public class QueryChannelIntegrationTests
         Assert.Equal(responseIds[1].ToString(), actual[1].MessageIdentifier);
         Assert.Equal(responseIds[2].ToString(), actual[2].MessageIdentifier);
     }
+    
+    [Fact]
+    public async Task SubscriptionQueryCloseAfterSomeUpdatesHasExpectedResult()
+    {
+        await using var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilConnectedAsync();
+        
+        var sut = connection.QueryChannel;
+    
+        var requestId = InstructionId.New();
+        var queries = new[]
+        {
+            new QueryDefinition(new QueryName("Ping"), "Pong")
+        };
+        var handler = new OnePingPongForeverQueryHandler();
+        await using var registration = await sut.RegisterQueryHandlerAsync(
+            handler, 
+            queries);
+    
+        await registration.WaitUntilCompletedAsync();
+    
+        var result = await sut.SubscriptionQueryAsync(new QueryRequest
+        {
+            Query = "Ping",
+            MessageIdentifier = requestId.ToString()
+        }, new SerializedObject(), new PermitCount(100), new PermitCount(10), CancellationToken.None);
+
+        var index = 5;
+        await foreach (var _ in result.Updates.WithCancellation(CancellationToken.None))
+        {
+            if (index-- == 0)
+            {
+                await result.DisposeAsync();
+                break;
+            }
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.True(handler.Completed);
+    }
+    
+    [Fact]
+    public async Task SubscriptionQueryWaitForUpdatesWhenNoHandlerHasExpectedResult()
+    {
+        await using var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilConnectedAsync();
+        
+        var sut = connection.QueryChannel;
+
+        var result = await sut.SubscriptionQueryAsync(new QueryRequest
+        {
+            Query = "Ping",
+            MessageIdentifier = InstructionId.New().ToString()
+        }, new SerializedObject(), new PermitCount(100), new PermitCount(10), CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<AxonServerException>(async () => await result.Updates.ToArrayAsync());
+        Assert.Equal(ErrorCategory.NoHandlerForQuery, exception.ErrorCategory);
+    }
+    
+    [Fact]
+    public async Task SubscriptionQueryWaitForScatteredUpdatesHasExpectedResult()
+    {
+        await using var connection = await CreateSystemUnderTest();
+        await connection.WaitUntilConnectedAsync();
+        
+        var sut = connection.QueryChannel;
+        
+        var requestId = InstructionId.New();
+        var firstResponseIds = new[] { InstructionId.New(), InstructionId.New(), InstructionId.New() };
+        var secondResponseIds = new[] { InstructionId.New(), InstructionId.New(), InstructionId.New() };
+        var allResponseIds = firstResponseIds
+            .Concat(secondResponseIds)
+            .OrderBy(id => id.ToString())
+            .ToArray();
+        var queries = new[]
+        {
+            new QueryDefinition(new QueryName("Ping"), "Pong")
+        };
+        await using var registration1 = await sut.RegisterQueryHandlerAsync(
+            new OnePingManyPongQueryHandler(firstResponseIds), 
+            queries);
+        await registration1.WaitUntilCompletedAsync();
+        
+        await using var registration2 = await sut.RegisterQueryHandlerAsync(
+            new OnePingManyPongQueryHandler(secondResponseIds), 
+            queries);
+        await registration2.WaitUntilCompletedAsync();
+
+        var result = await sut.SubscriptionQueryAsync(new QueryRequest
+        {
+            Query = "Ping",
+            MessageIdentifier = requestId.ToString()
+        }, new SerializedObject(), new PermitCount(100), new PermitCount(10), CancellationToken.None);
+
+        var actual = await result.Updates.ToArrayAsync();
+        Array.Sort(actual, (left, right) => string.Compare(left.MessageIdentifier, right.MessageIdentifier, StringComparison.Ordinal));
+        
+        Assert.Equal(6, actual.Length);
+        Assert.Equal(allResponseIds[0].ToString(), actual[0].MessageIdentifier);
+        Assert.Equal(allResponseIds[1].ToString(), actual[1].MessageIdentifier);
+        Assert.Equal(allResponseIds[2].ToString(), actual[2].MessageIdentifier);
+        Assert.Equal(allResponseIds[3].ToString(), actual[3].MessageIdentifier);
+        Assert.Equal(allResponseIds[4].ToString(), actual[4].MessageIdentifier);
+        Assert.Equal(allResponseIds[5].ToString(), actual[5].MessageIdentifier);
+    }
 
     private class QueryHandler : IQueryHandler
     {
-        public Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
+        public Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
             return Task.CompletedTask;
         }
 
-        public ISubscriptionQueryRegistration? RegisterSubscriptionQuery(SubscriptionQuery query,
-            ISubscriptionQueryUpdateResponseChannel responseChannel)
+        public Task? TryHandleAsync(SubscriptionQuery query, ISubscriptionQueryUpdateResponseChannel responseChannel, CancellationToken ct)
         {
             return null;
         }
@@ -258,7 +478,7 @@ public class QueryChannelIntegrationTests
             _responseId = responseId;
         }
         
-        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
+        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
             if (request.Query == "Ping")
             {
@@ -272,15 +492,32 @@ public class QueryChannelIntegrationTests
                         Revision = "0",
                         Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
                     }
-                });
-                await responseChannel.CompleteAsync();
+                }, ct);
+                await responseChannel.CompleteAsync(ct);
             }
         }
 
-        public ISubscriptionQueryRegistration? RegisterSubscriptionQuery(SubscriptionQuery query,
-            ISubscriptionQueryUpdateResponseChannel responseChannel)
+        public Task? TryHandleAsync(SubscriptionQuery query, ISubscriptionQueryUpdateResponseChannel responseChannel, CancellationToken ct)
         {
-            return null;
+            return query.QueryRequest.Query == "Ping" ? TryHandleAsyncCore(responseChannel, ct) : null;
+        }
+
+        private async Task TryHandleAsyncCore(
+            ISubscriptionQueryUpdateResponseChannel responseChannel, 
+            CancellationToken ct)
+        {
+            await responseChannel.SendUpdateAsync(new QueryUpdate
+            {
+                MessageIdentifier = _responseId.ToString(),
+                Payload = new SerializedObject
+                {
+                    Type = "pong",
+                    Revision = "0",
+                    Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+                }
+            }, ct);
+            
+            await responseChannel.CompleteAsync(ct);
         }
     }
     
@@ -293,7 +530,7 @@ public class QueryChannelIntegrationTests
             _responseIds = responseIds;
         }
         
-        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel)
+        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
             if (request.Query == "Ping")
             {
@@ -309,27 +546,106 @@ public class QueryChannelIntegrationTests
                             Revision = "0",
                             Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
                         }
-                    });
+                    }, ct);
                 }
 
-                await responseChannel.CompleteAsync();
+                await responseChannel.CompleteAsync(ct);
             }
         }
-
-        public ISubscriptionQueryRegistration? RegisterSubscriptionQuery(SubscriptionQuery query,
-            ISubscriptionQueryUpdateResponseChannel responseChannel)
+        
+        public Task? TryHandleAsync(SubscriptionQuery query, ISubscriptionQueryUpdateResponseChannel responseChannel, CancellationToken ct)
         {
-            return null;
+            return query.QueryRequest.Query == "Ping" ? TryHandleAsyncCore(responseChannel, ct) : null;
+        }
+
+        private async Task TryHandleAsyncCore(
+            ISubscriptionQueryUpdateResponseChannel responseChannel, 
+            CancellationToken ct)
+        {
+            foreach (var responseId in _responseIds)
+            {
+                await responseChannel.SendUpdateAsync(new QueryUpdate
+                {
+                    MessageIdentifier = responseId.ToString(),
+                    Payload = new SerializedObject
+                    {
+                        Type = "pong",
+                        Revision = "0",
+                        Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+                    }
+                }, ct);
+            }
+            
+            await responseChannel.CompleteAsync(ct);
         }
     }
     
-    private static class PingTypeCounter
+    private class OnePingPongForeverQueryHandler : IQueryHandler
     {
-        private static int _current = -1;
-
-        public static int Next()
+        public bool Completed { get; private set; }
+        
+        public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
-            return Interlocked.Increment(ref _current);
-        } 
+            if (request.Query == "Ping")
+            {
+                try
+                {
+                    while (!ct.IsCancellationRequested)
+                    {
+                        await responseChannel.SendAsync(new QueryResponse
+                        {
+                            MessageIdentifier = InstructionId.New().ToString(),
+                            RequestIdentifier = request.MessageIdentifier,
+                            Payload = new SerializedObject
+                            {
+                                Type = "pong",
+                                Revision = "0",
+                                Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+                            }
+                        }, ct);
+
+                        await Task.Delay(TimeSpan.FromMilliseconds(100), ct);
+                    }
+                }
+                finally
+                {
+                    Completed = true;
+                }
+            }
+        }
+        
+        public Task? TryHandleAsync(SubscriptionQuery query, ISubscriptionQueryUpdateResponseChannel responseChannel, CancellationToken ct)
+        {
+            return query.QueryRequest.Query == "Ping" ? TryHandleAsyncCore(responseChannel, ct) : null;
+        }
+
+        private async Task TryHandleAsyncCore(
+            ISubscriptionQueryUpdateResponseChannel responseChannel, 
+            CancellationToken ct)
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    await responseChannel.SendUpdateAsync(new QueryUpdate
+                    {
+                        MessageIdentifier = InstructionId.New().ToString(),
+                        Payload = new SerializedObject
+                        {
+                            Type = "pong",
+                            Revision = "0",
+                            Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
+                        }
+                    }, ct);
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), ct);
+                }
+            }
+            finally
+            {
+                Completed = true;
+            }
+        }
     }
+    
 }

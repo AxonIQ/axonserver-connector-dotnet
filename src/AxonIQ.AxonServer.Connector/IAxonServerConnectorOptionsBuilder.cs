@@ -119,6 +119,30 @@ public interface IAxonServerConnectorOptionsBuilder
     /// <returns>An instance of the builder to continue configuring options with.</returns>
     IAxonServerConnectorOptionsBuilder WithEventProcessorUpdateFrequency(TimeSpan frequency);
     /// <summary>
+    /// Specifies the frequency with which the command channel scans for and purges unacknowledged instructions.  
+    /// </summary>
+    /// <param name="frequency">The frequency with which to scan and purge</param>
+    /// <returns>An instance of the builder to continue configuring options with.</returns>
+    IAxonServerConnectorOptionsBuilder WithCommandChannelInstructionPurgeFrequency(TimeSpan frequency);
+    /// <summary>
+    /// Specifies the time after which an unacknowledged command channel instruction is considered to have timed out.
+    /// </summary>
+    /// <param name="timeout">The time to wait for the condition to be considered true</param>
+    /// <returns>An instance of the builder to continue configuring options with.</returns>
+    IAxonServerConnectorOptionsBuilder WithCommandChannelInstructionTimeout(TimeSpan timeout);
+    /// <summary>
+    /// Specifies the frequency with which the query channel scans for and purges unacknowledged instructions.  
+    /// </summary>
+    /// <param name="frequency">The frequency with which to scan and purge</param>
+    /// <returns>An instance of the builder to continue configuring options with.</returns>
+    IAxonServerConnectorOptionsBuilder WithQueryChannelInstructionPurgeFrequency(TimeSpan frequency);
+    /// <summary>
+    /// Specifies the time after which an unacknowledged query channel instruction is considered to have timed out.
+    /// </summary>
+    /// <param name="timeout">The time to wait for the condition to be considered true</param>
+    /// <returns>An instance of the builder to continue configuring options with.</returns>
+    IAxonServerConnectorOptionsBuilder WithQueryChannelInstructionTimeout(TimeSpan timeout);
+    /// <summary>
     /// Builds the configured options and falls back to defaults for those options that have not been specified.
     /// </summary>
     /// <returns>An instance of the configured options.</returns>

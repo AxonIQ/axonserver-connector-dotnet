@@ -13,4 +13,6 @@ public readonly struct ScheduledEventCancellationToken : IEquatable<ScheduledEve
     public override bool Equals(object? obj) => obj is ScheduledEventCancellationToken other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(_value);
     public override string ToString() => _value;
+    public static bool operator ==(ScheduledEventCancellationToken left, ScheduledEventCancellationToken right) => left.Equals(right);
+    public static bool operator !=(ScheduledEventCancellationToken left, ScheduledEventCancellationToken right) => !left.Equals(right);
 }
