@@ -5,7 +5,7 @@ ci:
 	dotnet restore
 	dotnet build --configuration Release --no-restore
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServer.Connector.Tests --logger "trx;logfilename=connector_tests.trx"
-	# dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=AdminChannel" --logger "trx;logfilename=server_integration_tests_admin_channel.trx" 
+	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=AdminChannel" --logger "trx;logfilename=server_integration_tests_admin_channel.trx" 
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=ControlChannel" --logger "trx;logfilename=server_integration_tests_control_channel.trx"
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=CommandChannel" --logger "trx;logfilename=server_integration_tests_command_channel.trx"
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=EventChannel" --logger "trx;logfilename=server_integration_tests_event_channel.trx"
