@@ -409,7 +409,7 @@ public class AxonServerConnectorOptionsTests
         var component = _fixture.Create<ComponentName>();
         var source = new MemoryConfigurationSource
         {
-            InitialData = new KeyValuePair<string, string>[]
+            InitialData = new KeyValuePair<string, string?>[]
             {
                 new(AxonServerConnectorConfiguration.ComponentName, component.ToString())
             }
@@ -440,7 +440,7 @@ public class AxonServerConnectorOptionsTests
         var clientInstance = _fixture.Create<ClientInstanceId>();
         var source = new MemoryConfigurationSource
         {
-            InitialData = new KeyValuePair<string, string>[]
+            InitialData = new KeyValuePair<string, string?>[]
             {
                 new(AxonServerConnectorConfiguration.ComponentName, component.ToString()),
                 new(AxonServerConnectorConfiguration.ClientInstanceId, clientInstance.ToString())
