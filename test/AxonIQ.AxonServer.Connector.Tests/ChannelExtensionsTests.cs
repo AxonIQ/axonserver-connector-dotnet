@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AxonIQ.AxonServer.Connector.Tests;
 
@@ -16,7 +17,7 @@ public class ChannelExtensionsTests
             source.Writer.TryWrite(item);
         }
         source.Writer.Complete();
-        await source.PipeTo(destination);
+        await source.PipeTo(destination, NullLogger.Instance);
         var actual = await destination.Reader.ReadAllAsync().Take(count).ToArrayAsync();
         Assert.Equal(items, actual);
     }
@@ -34,7 +35,7 @@ public class ChannelExtensionsTests
             source.Writer.TryWrite(item);
         }
         source.Writer.Complete();
-        await source.PipeTo(destination);
+        await source.PipeTo(destination, NullLogger.Instance);
         var actual = await destination.Reader.ReadAllAsync().Take(count).ToArrayAsync();
         Assert.Empty(actual);
     }
@@ -45,7 +46,7 @@ public class ChannelExtensionsTests
         var source = Channel.CreateUnbounded<int>();
         var destination = Channel.CreateUnbounded<int>();
         
-        var pipe = source.PipeTo(destination);
+        var pipe = source.PipeTo(destination, NullLogger.Instance);
         
         var count = Random.Shared.Next(100,200);
         var items = Enumerable.Range(0, count).ToArray();
@@ -82,7 +83,7 @@ public class ChannelExtensionsTests
         var count = Random.Shared.Next(100,200);
         var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.Cancel();
-        var pipe = source.PipeTo(destination, cancellationTokenSource.Token);
+        var pipe = source.PipeTo(destination, NullLogger.Instance, cancellationTokenSource.Token);
         var items = Enumerable.Range(0, count).ToHashSet();
         foreach (var item in items)
         {
@@ -102,7 +103,7 @@ public class ChannelExtensionsTests
         var destination = Channel.CreateUnbounded<int>();
         var count = Random.Shared.Next(100,200);
         var cancellationTokenSource = new CancellationTokenSource();
-        var pipe = source.PipeTo(destination, cancellationTokenSource.Token);
+        var pipe = source.PipeTo(destination, NullLogger.Instance, cancellationTokenSource.Token);
         var items = Enumerable.Range(0, count).ToHashSet();
         var pointOfCancellation = Random.Shared.Next(50,100);
         var index = 0;

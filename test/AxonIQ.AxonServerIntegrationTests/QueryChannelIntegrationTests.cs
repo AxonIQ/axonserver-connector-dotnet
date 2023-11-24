@@ -222,18 +222,21 @@ public class QueryChannelIntegrationTests
             .Concat(secondResponseIds)
             .OrderBy(id => id.ToString())
             .ToArray();
+        
         var queries = new[]
         {
             new QueryDefinition(new QueryName("Ping"), "Pong")
         };
+        var handler1 = new OnePingManyPongQueryHandler(firstResponseIds);
         await using var registration1 = await sut.RegisterQueryHandlerAsync(
-            new OnePingManyPongQueryHandler(firstResponseIds), 
+            handler1, 
             queries);
     
         await registration1.WaitUntilCompletedAsync();
-        
+
+        var handler2 = new OnePingManyPongQueryHandler(secondResponseIds);
         await using var registration2 = await sut.RegisterQueryHandlerAsync(
-            new OnePingManyPongQueryHandler(secondResponseIds), 
+            handler2, 
             queries);
     
         await registration2.WaitUntilCompletedAsync();
@@ -247,6 +250,8 @@ public class QueryChannelIntegrationTests
         var actual = await result.ToArrayAsync();
         Array.Sort(actual, (left, right) => string.Compare(left.MessageIdentifier, right.MessageIdentifier, StringComparison.Ordinal));
         
+        Assert.Equal(3, handler1.ResponsesSent);
+        Assert.Equal(3, handler2.ResponsesSent);
         Assert.Equal(6, actual.Length);
         Assert.Equal(allResponseIds[0].ToString(), actual[0].MessageIdentifier);
         Assert.Equal(allResponseIds[1].ToString(), actual[1].MessageIdentifier);
@@ -529,7 +534,9 @@ public class QueryChannelIntegrationTests
         {
             _responseIds = responseIds;
         }
-        
+
+        public int ResponsesSent { get; private set; }
+
         public async Task HandleAsync(QueryRequest request, IQueryResponseChannel responseChannel, CancellationToken ct)
         {
             if (request.Query == "Ping")
@@ -547,6 +554,7 @@ public class QueryChannelIntegrationTests
                             Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
                         }
                     }, ct);
+                    ResponsesSent++;
                 }
 
                 await responseChannel.CompleteAsync(ct);
@@ -574,6 +582,7 @@ public class QueryChannelIntegrationTests
                         Data = ByteString.CopyFromUtf8("{ \"pong\": true }")
                     }
                 }, ct);
+                ResponsesSent++;
             }
             
             await responseChannel.CompleteAsync(ct);

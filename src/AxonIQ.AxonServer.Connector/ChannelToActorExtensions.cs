@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using Io.Axoniq.Axonserver.Grpc;
+using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
@@ -9,19 +10,21 @@ internal static class ChannelToActorExtensions
         this Channel<QueryReply> source, 
         IAxonPriorityActor<TOutput> destination, 
         Func<QueryReply, IReadOnlyCollection<TOutput>> translator, 
+        ILogger logger,
         CancellationToken cancellationToken = default)
     {
         if (source == null) throw new ArgumentNullException(nameof(source));
         if (destination == null) throw new ArgumentNullException(nameof(destination));
         if (translator == null) throw new ArgumentNullException(nameof(translator));
         
-        return TellQueryRepliesToAsyncCore(source.Reader, destination, translator, cancellationToken);
+        return TellQueryRepliesToAsyncCore(source.Reader, destination, translator, logger, cancellationToken);
     }
 
     private static async Task TellQueryRepliesToAsyncCore<TOutput>(
-        ChannelReader<QueryReply> source, 
+        ChannelReader<QueryReply> source,
         IAxonPriorityActor<TOutput> destination,
-        Func<QueryReply, IReadOnlyCollection<TOutput>> translator, 
+        Func<QueryReply, IReadOnlyCollection<TOutput>> translator,
+        ILogger logger,
         CancellationToken cancellationToken)
     {
         var completedAtLeastOnceWithoutErrors = false;
@@ -52,17 +55,20 @@ internal static class ChannelToActorExtensions
                 }
             }
         }
-        catch (ObjectDisposedException)
+        catch (ObjectDisposedException exception)
         {
             // ignore
+            logger.LogDebug("Object named {ObjectName} was disposed while telling query replies to query channel", exception.ObjectName);
         }
         catch (ChannelClosedException)
         {
             // ignore
+            logger.LogDebug("Channel was closed while telling query replies to query channel");
         }
         catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
         {
             // ignore
+            logger.LogDebug("Operation was cancelled while telling query replies to query channel");
         }
         if(!completedAtLeastOnceWithoutErrors && errors.Count != 0)
         {

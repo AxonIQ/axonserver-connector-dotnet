@@ -182,6 +182,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                 var query = ok.Value.Query;
                                 var name = new QueryName(query.Query);
                                 var handlers = connected.QueryHandlers.ResolveQueryHandlers(name);
+                                _logger.LogDebug("Query {Query} will be handled by {HandlerCount} handlers", name.ToString(), handlers.Count);
                                 switch (handlers.Count)
                                 {
                                     case 0:
@@ -210,7 +211,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                         foreach (var handler in handlers)
                                         {
                                             var buffer = Channels.CreateBounded<QueryReply>(32);
-                                            var responseChannel = new BufferedQueryResponseChannel(buffer);
+                                            var responseChannel = new BufferedQueryResponseChannel(buffer, _logger);
                                             Task.Run(
                                                     () => handler.HandleAsync(query, responseChannel,
                                                         cancellationTokenSource.Token), ct)
@@ -222,7 +223,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                         }
 
                                         flowControlledChannel
-                                            .PipeFromAll(buffers, ct)
+                                            .PipeFromAll(buffers, _logger, ct)
                                             .TellToAsync(
                                                 _actor,
                                                 result => new Message.QueryReplyForwardingCompleted(requestId, result),
@@ -233,6 +234,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                                 _actor,
                                                 reply => translator(reply).Select(instruction =>
                                                     new Message.SendQueryProviderOutbound(instruction)),
+                                                _logger,
                                                 ct);
                                         
                                         if (!query.SupportsStreaming())
@@ -335,7 +337,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                                 foreach (var handler in handlers)
                                                 {
                                                     var buffer = Channels.CreateBounded<QueryReply>(32);
-                                                    var responseChannel = new BufferedQueryResponseChannel(buffer);
+                                                    var responseChannel = new BufferedQueryResponseChannel(buffer, _logger);
                                                     Task.Run(
                                                             () => handler.HandleAsync(query, responseChannel,
                                                                 cancellationTokenSource.Token), ct)
@@ -348,7 +350,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                                 }
 
                                                 flowControlledChannel
-                                                    .PipeFromAll(buffers, ct)
+                                                    .PipeFromAll(buffers, _logger, ct)
                                                     .TellToAsync(
                                                         _actor,
                                                         result => new Message.QueryReplyForwardingCompleted(requestId,
@@ -360,6 +362,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                                         _actor,
                                                         reply => translator(reply).Select(instruction =>
                                                             new Message.SendQueryProviderOutbound(instruction)),
+                                                        _logger,
                                                         ct);
 
                                                 if (!query.SupportsStreaming())

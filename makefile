@@ -25,4 +25,4 @@ install-license:
 	dotnet user-secrets set "axoniq.license" "${LICENSE}" -p test/AxonIQ.AxonClusterIntegrationTests/AxonIQ.AxonClusterIntegrationTests.csproj
 	
 remove-dangling-containers:
-	docker rm -f $(docker ps -a --filter "name=axonserver-" -q)
+	docker rm -f $$(docker ps -a --filter "name=axonserver-" -q)
