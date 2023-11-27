@@ -8,7 +8,7 @@ ifneq ("$(SONAR_TOKEN)","")
 endif
 	dotnet build --configuration Release --no-restore
 ifneq ("$(SONAR_TOKEN)","")
-	dotnet sonarscanner end -d:sonar.token="$(SONAR_TOKEN)" -d:sonar.host.url="$(SONAR_HOST_URL)"
+	dotnet sonarscanner end -d:sonar.token="$(SONAR_TOKEN)"
 endif
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServer.Connector.Tests --logger "trx;logfilename=connector_tests.trx"
 	dotnet test --configuration Release --no-build --no-restore test/AxonIQ.AxonServerIntegrationTests --filter "Surface=AdminChannel" --logger "trx;logfilename=server_integration_tests_admin_channel.trx" 
@@ -26,7 +26,7 @@ ifneq ("$(SONAR_TOKEN)","")
 endif
 	dotnet build --configuration Release --no-restore
 ifneq ("$(SONAR_TOKEN)","")
-	dotnet sonarscanner end -d:sonar.token="$(SONAR_TOKEN)" -d:sonar.host.url="$(SONAR_HOST_URL)"
+	dotnet sonarscanner end -d:sonar.token="$(SONAR_TOKEN)"
 endif
 	dotnet pack --configuration Release --no-build --no-restore --include-symbols --include-source src/AxonIQ.AxonServer.Connector/AxonIQ.AxonServer.Connector.csproj -o .artifacts/
 	dotnet pack --configuration Release --no-build --no-restore --include-symbols --include-source src/AxonIQ.AxonServer.Embedded/AxonIQ.AxonServer.Embedded.csproj -o .artifacts/
