@@ -30,6 +30,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
+          SONAR_PROJECT_KEY: AxonIQ_axonserver-connector-dotnet
+          SONAR_ORGANIZATION: axoniq
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - name: publish test results
         uses: EnricoMi/publish-unit-test-result-action/composite@v2
         if: always()
