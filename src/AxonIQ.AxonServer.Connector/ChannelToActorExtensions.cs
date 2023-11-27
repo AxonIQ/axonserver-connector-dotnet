@@ -70,6 +70,10 @@ internal static class ChannelToActorExtensions
             // ignore
             logger.LogDebug("Operation was cancelled while telling query replies to query channel");
         }
+        catch (Exception exception)
+        {
+            logger.LogCritical(exception, "Unexpected exception while telling query replies to query channel");
+        }
         if(!completedAtLeastOnceWithoutErrors && errors.Count != 0)
         {
             foreach (var message in translator(new QueryReply.CompleteWithError(errors[0])))
