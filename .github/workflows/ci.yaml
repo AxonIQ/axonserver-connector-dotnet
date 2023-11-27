@@ -23,6 +23,9 @@ jobs:
         run: make ci
         env:
           AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
+          SONAR_PROJECT_KEY: AxonIQ_axonserver-connector-dotnet
+          SONAR_ORGANIZATION: axoniq
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       # run the CD build (on master only)
       - name: make cd
         if: github.ref == 'refs/heads/master'
