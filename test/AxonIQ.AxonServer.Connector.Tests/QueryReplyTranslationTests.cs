@@ -6,11 +6,13 @@ namespace AxonIQ.AxonServer.Connector.Tests;
 public class QueryReplyTranslationTests
 {
     private readonly InstructionId _instructionId;
+    private readonly ChannelId _channelId;
     private readonly QueryReplyTranslator _sut;
 
     public QueryReplyTranslationTests()
     {
         _instructionId = InstructionId.New();
+        _channelId = ChannelId.New();
         _sut = QueryReplyTranslation.ForQuery(new QueryRequest
             {
                 MessageIdentifier = _instructionId.ToString()
@@ -22,7 +24,7 @@ public class QueryReplyTranslationTests
     public void TranslationOfSendHasExpectedResultWhenMessageIdentifierNotProvided()
     {
         var payload = new SerializedObject();
-        var actual = _sut(new QueryReply.Send(new QueryResponse
+        var actual = _sut(new QueryReply.Send(_channelId, new QueryResponse
         {
             Payload = payload
         }));
@@ -38,7 +40,7 @@ public class QueryReplyTranslationTests
     {
         var instructionId = InstructionId.New();
         var payload = new SerializedObject();
-        var actual = _sut(new QueryReply.Send(new QueryResponse
+        var actual = _sut(new QueryReply.Send(_channelId, new QueryResponse
         {
             MessageIdentifier = instructionId.ToString(),
             Payload = payload
@@ -63,7 +65,7 @@ public class QueryReplyTranslationTests
     [Fact]
     public void TranslationOfCompleteHasExpectedResult()
     {
-        var actual = _sut(new QueryReply.Complete());
+        var actual = _sut(new QueryReply.Complete(_channelId));
 
         var message = Assert.Single(actual);
         Assert.Equal(_instructionId.ToString(), message.QueryComplete.RequestId);
@@ -75,7 +77,7 @@ public class QueryReplyTranslationTests
     {
         var error = new ErrorMessage();
         
-        var actual = _sut(new QueryReply.CompleteWithError(error)).ToList();
+        var actual = _sut(new QueryReply.CompleteWithError(_channelId, error)).ToList();
         
         Assert.Equal(2, actual.Count);
         var response = actual[0];

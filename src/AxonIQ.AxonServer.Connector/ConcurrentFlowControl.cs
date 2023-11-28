@@ -1,22 +1,39 @@
-using System.Collections.Concurrent;
-using PooledAwait;
+using Microsoft.VisualStudio.Threading;
 
 namespace AxonIQ.AxonServer.Connector;
 
 internal class ConcurrentFlowControl : IFlowControl
 {
-    private readonly ConcurrentBag<PooledValueTaskSource<bool>> _waiters = new();
-    private long _requested = 0L;
+    private readonly AsyncManualResetEvent _event = new(false);
+    private long _requested;
     private long _cancelled = Cancelled.No;
 
-    public void Request(long count)
+    public Task<bool> WaitToTakeAsync(CancellationToken cancellationToken = default)
     {
-        if (Interlocked.Read(ref _cancelled) == Cancelled.No && Interlocked.Add(ref _requested, count) > 0)
+        if (Interlocked.Read(ref _cancelled) == Cancelled.Yes)
         {
-            SignalWaiters(true);
+            return Task.FromResult(false);
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<bool>(cancellationToken);
+        }
+        
+        if (Interlocked.Read(ref _requested) > 0)
+        {
+            return Task.FromResult(true);
+        }
+
+        return WaitToTakeCoreAsync(cancellationToken);
+
+        async Task<bool> WaitToTakeCoreAsync(CancellationToken ct)
+        {
+            await _event.WaitAsync(ct);
+            return Interlocked.Read(ref _cancelled) == Cancelled.No;
         }
     }
-
+    
     public bool TryTake()
     {
         if (Interlocked.Read(ref _cancelled) == Cancelled.Yes)
@@ -24,69 +41,44 @@ internal class ConcurrentFlowControl : IFlowControl
             return false;
         }
         
-        // Try take a permit and return true if we succeeded
-        if (Interlocked.Decrement(ref _requested) >= 0)
+        // Try take an available permit
+        var decremented = Interlocked.Decrement(ref _requested);
+        if (decremented >= 0)
         {
+            if (decremented == 0)
+            {
+                _event.Reset();
+            }
             return true;
         }
 
-        // Return the permit because there was none to be taken (we're not allowed to have negative permits)
-        // If we ended up with a positive number of permits again, we signal any waiters it's okay to try take one
-        if (Interlocked.Increment(ref _requested) > 0)
+        // Return the unavailable permit (if the result is negative it means there are no permits available)
+        if (Interlocked.Increment(ref _requested) > 0 && Interlocked.Read(ref _cancelled) == Cancelled.No)
         {
-            SignalWaiters(true);
+            // If we ended up with a positive number of permits after returning the one we tried to take,
+            // we signal any waiters it's okay to try take one
+            _event.Set();
         }
         return false;
     }
-
-    public ValueTask<bool> WaitToTakeAsync(CancellationToken cancellationToken = default)
-    {
-        if (Interlocked.Read(ref _cancelled) == Cancelled.Yes)
-        {
-            return ValueTask.FromResult(false);
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return ValueTask.FromCanceled<bool>(cancellationToken);
-        }
-        
-        if (Interlocked.Read(ref _requested) > 0)
-        {
-            return ValueTask.FromResult(true);
-        }
-
-        var waiter = PooledValueTaskSource<bool>.Create();
-        _waiters.Add(waiter);
-        
-        // REMARK: We may have been racing with .Cancel()
-        // We need to signal at least this waiter when that happens.
-        // Because we've already added the waiter we know it will be signalled.
-        if (Interlocked.Read(ref _cancelled) == Cancelled.Yes)
-        {
-            SignalWaiters(false);
-        }
-        
-        return waiter.Task;
-    }
     
+    public void Request(long count)
+    {
+        if (count > 0 && 
+            Interlocked.Add(ref _requested, count) > 0 && 
+            Interlocked.Read(ref _cancelled) == Cancelled.No)
+        {
+            // Signal any waiters that they should try to take a permit
+            _event.Set();
+        }
+    }
+
     public void Cancel()
     {
         if (Interlocked.CompareExchange(ref _cancelled, Cancelled.Yes, Cancelled.No) == Cancelled.No)
         {
-            SignalWaiters(false);
-        }
-    }
-
-    private void SignalWaiters(bool result)
-    {
-        // We're only removing as many waiters as we know of at a given point in time.
-        // Otherwise this method never finishes
-        var count = _waiters.Count;
-        while (count > 0 && _waiters.TryTake(out var waiter))
-        {
-            waiter.TrySetResult(result);
-            count--;
+            // Signal any waiters that they should stop waiting and not try to take a permit (cancelled)
+            _event.Set();
         }
     }
 }

@@ -8,7 +8,8 @@ internal static class ChannelToActorExtensions
 {
     public static Task TellQueryRepliesToAsync<TOutput>(
         this Channel<QueryReply> source, 
-        IAxonPriorityActor<TOutput> destination, 
+        IAxonPriorityActor<TOutput> destination,
+        int expectedCompletionCount,
         Func<QueryReply, IReadOnlyCollection<TOutput>> translator, 
         ILogger logger,
         CancellationToken cancellationToken = default)
@@ -17,39 +18,44 @@ internal static class ChannelToActorExtensions
         if (destination == null) throw new ArgumentNullException(nameof(destination));
         if (translator == null) throw new ArgumentNullException(nameof(translator));
         
-        return TellQueryRepliesToAsyncCore(source.Reader, destination, translator, logger, cancellationToken);
+        return TellQueryRepliesToAsyncCore(source.Reader, destination, expectedCompletionCount, translator, logger, cancellationToken);
     }
 
     private static async Task TellQueryRepliesToAsyncCore<TOutput>(
         ChannelReader<QueryReply> source,
         IAxonPriorityActor<TOutput> destination,
+        int expectedCompletionCount,
         Func<QueryReply, IReadOnlyCollection<TOutput>> translator,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var completedAtLeastOnceWithoutErrors = false;
-        var errors = new List<ErrorMessage>();
+        var completed = new List<ChannelId>();
+        var completedWithError = new List<(ChannelId, ErrorMessage)>();
         try
         {
-            while (await source.WaitToReadAsync(cancellationToken))
+            while (completed.Count + completedWithError.Count < expectedCompletionCount && 
+                   await source.WaitToReadAsync(cancellationToken))
             {
                 while (source.TryRead(out var item))
                 {
                     switch (item)
                     {
                         case QueryReply.Send send:
+                            logger.LogDebug("Sending query reply from channel {ChannelId}: {Response}", send.Id.ToString(), send.Response);
                             foreach (var message in translator(send))
                             {
                                 await destination.TellAsync(MessagePriority.Secondary, message, cancellationToken);
                             }
                             break;
                         case QueryReply.CompleteWithError completion:
+                            logger.LogDebug("Received query completion with error from channel {ChannelId}: {Error}", completion.Id.ToString(), completion.Error);
                             // aggregated because we only send it once at the end
-                            errors.Add(completion.Error);
+                            completedWithError.Add((completion.Id, completion.Error));
                             break;
-                        case QueryReply.Complete: 
+                        case QueryReply.Complete completion:
+                            logger.LogDebug("Received query completion from channel {ChannelId}", completion.Id.ToString());
                             // ignored because we only send it once at the end
-                            completedAtLeastOnceWithoutErrors = true;
+                            completed.Add(completion.Id);
                             break;
                     }
                 }
@@ -74,16 +80,18 @@ internal static class ChannelToActorExtensions
         {
             logger.LogCritical(exception, "Unexpected exception while telling query replies to query channel");
         }
-        if(!completedAtLeastOnceWithoutErrors && errors.Count != 0)
+        if(completed.Count == 0 && completedWithError.Count != 0)
         {
-            foreach (var message in translator(new QueryReply.CompleteWithError(errors[0])))
+            var (id, error) = completedWithError[0];
+            foreach (var message in translator(new QueryReply.CompleteWithError(id, error)))
             {
                 await destination.TellAsync(MessagePriority.Secondary, message, cancellationToken);    
             }
         }
         else
         {
-            foreach (var message in translator(new QueryReply.Complete()))
+            var id = completed[0];
+            foreach (var message in translator(new QueryReply.Complete(id)))
             {
                 await destination.TellAsync(MessagePriority.Secondary, message, cancellationToken);    
             }

@@ -7,12 +7,14 @@ public class SubscriptionQueryReplyTranslationTests
 {
     private readonly SubscriptionId _subscriptionId;
     private readonly InstructionId _instructionId;
+    private readonly ChannelId _channelId;
     private readonly QueryReplyTranslator _sut;
 
     public SubscriptionQueryReplyTranslationTests()
     {
         _subscriptionId = SubscriptionId.New();
         _instructionId = InstructionId.New();
+        _channelId = ChannelId.New();
         _sut = QueryReplyTranslation.ForSubscriptionQuery(new SubscriptionQuery
             {
                 SubscriptionIdentifier = _subscriptionId.ToString(),
@@ -25,7 +27,7 @@ public class SubscriptionQueryReplyTranslationTests
     public void TranslationOfSendHasExpectedResultWhenMessageIdentifierNotProvided()
     {
         var payload = new SerializedObject();
-        var actual = _sut(new QueryReply.Send(new QueryResponse
+        var actual = _sut(new QueryReply.Send(_channelId, new QueryResponse
         {
             Payload = payload
         }));
@@ -46,7 +48,7 @@ public class SubscriptionQueryReplyTranslationTests
             MessageIdentifier = instructionId.ToString(),
             Payload = payload
         };
-        var actual = _sut(new QueryReply.Send(queryResponse));
+        var actual = _sut(new QueryReply.Send(_channelId, queryResponse));
 
         Assert.Equal(new []
         {
@@ -67,7 +69,7 @@ public class SubscriptionQueryReplyTranslationTests
     [Fact]
     public void TranslationOfCompleteHasExpectedResult()
     {
-        var actual = _sut(new QueryReply.Complete());
+        var actual = _sut(new QueryReply.Complete(_channelId));
 
         var message = Assert.Single(actual);
         Assert.Equal(_instructionId.ToString(), message.QueryComplete.RequestId);
@@ -79,7 +81,7 @@ public class SubscriptionQueryReplyTranslationTests
     {
         var error = new ErrorMessage();
         
-        var actual = _sut(new QueryReply.CompleteWithError(error)).ToList();
+        var actual = _sut(new QueryReply.CompleteWithError(_channelId, error)).ToList();
         
         Assert.Equal(2, actual.Count);
         var response = actual[0];

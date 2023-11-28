@@ -5,34 +5,35 @@ using Microsoft.Extensions.Logging;
 
 namespace AxonIQ.AxonServer.Connector;
 
-internal class BufferedQueryResponseChannel : IQueryResponseChannel
+internal class BufferedQueryResponseChannel(ChannelId id, Channel<QueryReply> channel, ILogger logger) : IQueryResponseChannel
 {
-    private readonly Channel<QueryReply> _channel;
-    private readonly ILogger _logger;
+    private long _completed = Completed.No;
 
-    public BufferedQueryResponseChannel(Channel<QueryReply> channel, ILogger logger)
-    {
-        _channel = channel ?? throw new ArgumentNullException(nameof(channel));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
     public ValueTask SendAsync(QueryResponse response, CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Sending query response: {Response}", response);
-        return _channel.Writer.WriteAsync(new QueryReply.Send(response), cancellationToken);
+        logger.LogDebug("Sending query response: {Response}", response);
+        return channel.Writer.WriteAsync(new QueryReply.Send(id, response), cancellationToken);
     }
 
-    public async ValueTask CompleteAsync(CancellationToken cancellationToken)
+    public ValueTask CompleteAsync(CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Completing query");
-        await _channel.Writer.WriteAsync(new QueryReply.Complete(), cancellationToken);
-        _channel.Writer.Complete();
+        if(Interlocked.CompareExchange(ref _completed, Completed.Yes, Completed.No) == Completed.No)
+        {
+            logger.LogDebug("Completing query");
+            return channel.Writer.WriteAsync(new QueryReply.Complete(id), cancellationToken);
+        }
+        logger.LogDebug("Query already completed");
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask CompleteWithErrorAsync(ErrorMessage error, CancellationToken cancellationToken)
+    public ValueTask CompleteWithErrorAsync(ErrorMessage error, CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Completing query with {Error}", error);
-        await _channel.Writer.WriteAsync(new QueryReply.CompleteWithError(error), cancellationToken);
-        _channel.Writer.Complete();
+        if (Interlocked.CompareExchange(ref _completed, Completed.Yes, Completed.No) == Completed.No)
+        {
+            logger.LogDebug("Completing query with {Error}", error);
+            return channel.Writer.WriteAsync(new QueryReply.CompleteWithError(id, error), cancellationToken);
+        }
+        logger.LogDebug("Query already completed");
+        return ValueTask.CompletedTask;
     }
 }
