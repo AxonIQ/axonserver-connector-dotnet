@@ -29,6 +29,8 @@ internal static class ChannelToActorExtensions
         ILogger logger,
         CancellationToken cancellationToken)
     {
+        // This code works on the assumption that the source channel reports completion only once per ChannelId
+        // Hence, it knows we're done when all channels have reported completion (with or without error)
         var completed = new List<ChannelId>();
         var completedWithError = new List<(ChannelId, ErrorMessage)>();
         try
@@ -41,19 +43,19 @@ internal static class ChannelToActorExtensions
                     switch (item)
                     {
                         case QueryReply.Send send:
-                            logger.LogDebug("Sending query reply from channel {ChannelId}: {Response}", send.Id.ToString(), send.Response);
+                            logger.LogDebug("Translating query reply from channel {ChannelId} and sending as outbound messages: {Response}", send.Id.ToString(), send.Response);
                             foreach (var message in translator(send))
                             {
                                 await destination.TellAsync(MessagePriority.Secondary, message, cancellationToken);
                             }
                             break;
                         case QueryReply.CompleteWithError completion:
-                            logger.LogDebug("Received query completion with error from channel {ChannelId}: {Error}", completion.Id.ToString(), completion.Error);
+                            logger.LogDebug("Tracking query completion from channel {ChannelId} with error: {Error}", completion.Id.ToString(), completion.Error);
                             // aggregated because we only send it once at the end
                             completedWithError.Add((completion.Id, completion.Error));
                             break;
                         case QueryReply.Complete completion:
-                            logger.LogDebug("Received query completion from channel {ChannelId}", completion.Id.ToString());
+                            logger.LogDebug("Tracking query completion from channel {ChannelId}", completion.Id.ToString());
                             // ignored because we only send it once at the end
                             completed.Add(completion.Id);
                             break;
@@ -82,6 +84,8 @@ internal static class ChannelToActorExtensions
         }
         if(completed.Count == 0 && completedWithError.Count != 0)
         {
+            logger.LogDebug("Sending query completion with error outbound messages");
+            // We report the first error only
             var (id, error) = completedWithError[0];
             foreach (var message in translator(new QueryReply.CompleteWithError(id, error)))
             {
@@ -90,6 +94,8 @@ internal static class ChannelToActorExtensions
         }
         else
         {
+            // We report successful completion even if there were errors
+            logger.LogDebug("Sending query completion outbound messages");
             var id = completed[0];
             foreach (var message in translator(new QueryReply.Complete(id)))
             {

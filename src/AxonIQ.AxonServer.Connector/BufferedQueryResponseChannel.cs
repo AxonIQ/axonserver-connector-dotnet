@@ -11,7 +11,7 @@ internal class BufferedQueryResponseChannel(ChannelId id, Channel<QueryReply> ch
 
     public ValueTask SendAsync(QueryResponse response, CancellationToken cancellationToken)
     {
-        logger.LogDebug("Sending query response: {Response}", response);
+        logger.LogDebug("Sending query response on channel {ChannelId}: {Response}", id.ToString(), response);
         return channel.Writer.WriteAsync(new QueryReply.Send(id, response), cancellationToken);
     }
 
@@ -19,10 +19,10 @@ internal class BufferedQueryResponseChannel(ChannelId id, Channel<QueryReply> ch
     {
         if(Interlocked.CompareExchange(ref _completed, Completed.Yes, Completed.No) == Completed.No)
         {
-            logger.LogDebug("Completing query");
+            logger.LogDebug("Completing query response channel {ChannelId}", id.ToString());
             return channel.Writer.WriteAsync(new QueryReply.Complete(id), cancellationToken);
         }
-        logger.LogDebug("Query already completed");
+        logger.LogDebug("Query response channel {ChannelId} already completed", id.ToString());
         return ValueTask.CompletedTask;
     }
 
@@ -30,10 +30,10 @@ internal class BufferedQueryResponseChannel(ChannelId id, Channel<QueryReply> ch
     {
         if (Interlocked.CompareExchange(ref _completed, Completed.Yes, Completed.No) == Completed.No)
         {
-            logger.LogDebug("Completing query with {Error}", error);
+            logger.LogDebug("Completing query response channel {ChannelId} with {Error}", id.ToString(), error);
             return channel.Writer.WriteAsync(new QueryReply.CompleteWithError(id, error), cancellationToken);
         }
-        logger.LogDebug("Query already completed");
+        logger.LogDebug("Query response channel {ChannelId} already completed", id.ToString());
         return ValueTask.CompletedTask;
     }
 }
