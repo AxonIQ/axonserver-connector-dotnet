@@ -182,6 +182,7 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                 var query = ok.Value.Query;
                                 var name = new QueryName(query.Query);
                                 var handlers = connected.QueryHandlers.ResolveQueryHandlers(name);
+                                _logger.LogDebug("Query {Query} will be handled by {HandlerCount} handlers", name.ToString(), handlers.Count);
                                 switch (handlers.Count)
                                 {
                                     case 0:
@@ -203,36 +204,29 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                         var translator = QueryReplyTranslation.ForQuery(query);
                                         var requestId = InstructionId.Parse(query.MessageIdentifier);
                                         var flowControl = new ConcurrentFlowControl();
-                                        var flowControlledChannel = new FlowControlledChannel<QueryReply>(flowControl);
+                                        var buffer = Channels.CreateBounded<QueryReply>(handlers.Count * 32);
+                                        var flowControlledChannel = new FlowControlledChannel<QueryReply>(flowControl, buffer);
                                         var cancellationTokenSource =
                                             CancellationTokenSource.CreateLinkedTokenSource(ct);
-                                        var buffers = new List<Channel<QueryReply>>(handlers.Count);
                                         foreach (var handler in handlers)
                                         {
-                                            var buffer = Channels.CreateBounded<QueryReply>(32);
-                                            var responseChannel = new BufferedQueryResponseChannel(buffer);
                                             Task.Run(
-                                                    () => handler.HandleAsync(query, responseChannel,
+                                                    () => handler.HandleAsync(query, 
+                                                        new BufferedQueryResponseChannel(ChannelId.New(), buffer, _logger),
                                                         cancellationTokenSource.Token), ct)
                                                 .TellToAsync(
                                                     _actor,
                                                     result => new Message.QueryHandlerCompleted(requestId, result),
                                                     ct);
-                                            buffers.Add(buffer);
                                         }
-
-                                        flowControlledChannel
-                                            .PipeFromAll(buffers, ct)
-                                            .TellToAsync(
-                                                _actor,
-                                                result => new Message.QueryReplyForwardingCompleted(requestId, result),
-                                                ct);
 
                                         flowControlledChannel
                                             .TellQueryRepliesToAsync(
                                                 _actor,
+                                                handlers.Count,
                                                 reply => translator(reply).Select(instruction =>
                                                     new Message.SendQueryProviderOutbound(instruction)),
+                                                _logger,
                                                 ct);
                                         
                                         if (!query.SupportsStreaming())
@@ -327,39 +321,30 @@ internal class QueryChannel : IQueryChannel, IAsyncDisposable
                                                 var translator = QueryReplyTranslation.ForSubscriptionQuery(getInitialResult);
                                                 var requestId = InstructionId.Parse(query.MessageIdentifier);
                                                 var flowControl = new ConcurrentFlowControl();
+                                                var buffer = Channels.CreateBounded<QueryReply>(handlers.Count * 32);
                                                 var flowControlledChannel =
-                                                    new FlowControlledChannel<QueryReply>(flowControl);
+                                                    new FlowControlledChannel<QueryReply>(flowControl, buffer);
                                                 var cancellationTokenSource =
                                                     CancellationTokenSource.CreateLinkedTokenSource(ct);
-                                                var buffers = new List<Channel<QueryReply>>(handlers.Count);
                                                 foreach (var handler in handlers)
                                                 {
-                                                    var buffer = Channels.CreateBounded<QueryReply>(32);
-                                                    var responseChannel = new BufferedQueryResponseChannel(buffer);
                                                     Task.Run(
-                                                            () => handler.HandleAsync(query, responseChannel,
+                                                            () => handler.HandleAsync(query, new BufferedQueryResponseChannel(ChannelId.New(), buffer, _logger),
                                                                 cancellationTokenSource.Token), ct)
                                                         .TellToAsync(
                                                             _actor,
                                                             result => new Message.QueryHandlerCompleted(requestId,
                                                                 result),
                                                             ct);
-                                                    buffers.Add(buffer);
                                                 }
-
-                                                flowControlledChannel
-                                                    .PipeFromAll(buffers, ct)
-                                                    .TellToAsync(
-                                                        _actor,
-                                                        result => new Message.QueryReplyForwardingCompleted(requestId,
-                                                            result),
-                                                        ct);
 
                                                 flowControlledChannel
                                                     .TellQueryRepliesToAsync(
                                                         _actor,
+                                                        handlers.Count,
                                                         reply => translator(reply).Select(instruction =>
                                                             new Message.SendQueryProviderOutbound(instruction)),
+                                                        _logger,
                                                         ct);
 
                                                 if (!query.SupportsStreaming())

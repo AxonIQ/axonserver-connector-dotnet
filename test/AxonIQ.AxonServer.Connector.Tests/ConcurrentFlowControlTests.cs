@@ -42,23 +42,23 @@ public class ConcurrentFlowControlTests
     [Fact]
     public Task WaitToTakeAsyncHasExpectedResultWhenNoneRequested()
     {
-        return Assert.ThrowsAsync<TimeoutException>(async () => await _sut.WaitToTakeAsync().AsTask().WaitAsync(TimeSpan.FromMilliseconds(5)));
+        return Assert.ThrowsAsync<TimeoutException>(async () => await _sut.WaitToTakeAsync().WaitAsync(TimeSpan.FromMilliseconds(5)));
     }
     
     [Fact]
     public Task WaitToTakeAsyncHasExpectedResultWhenZeroRequested()
     {
         _sut.Request(0);
-        return Assert.ThrowsAsync<TimeoutException>(async () => await _sut.WaitToTakeAsync().AsTask().WaitAsync(TimeSpan.FromMilliseconds(5)));
+        return Assert.ThrowsAsync<TimeoutException>(async () => await _sut.WaitToTakeAsync().WaitAsync(TimeSpan.FromMilliseconds(5)));
     }
     
     [Fact]
     public async Task WaitToTakeAsyncHasExpectedResultWhenOneRequested()
     {
         _sut.Request(1);
-        Assert.True(await _sut.WaitToTakeAsync().AsTask().WaitAsync(TimeSpan.FromMilliseconds(5)));
+        Assert.True(await _sut.WaitToTakeAsync().WaitAsync(TimeSpan.FromMilliseconds(5)));
         Assert.True(_sut.TryTake());
-        await Assert.ThrowsAsync<TimeoutException>(async () => await _sut.WaitToTakeAsync().AsTask().WaitAsync(TimeSpan.FromMilliseconds(5)));
+        await Assert.ThrowsAsync<TimeoutException>(async () => await _sut.WaitToTakeAsync().WaitAsync(TimeSpan.FromMilliseconds(5)));
     }
     
     [Fact]
@@ -66,13 +66,13 @@ public class ConcurrentFlowControlTests
     {
         _sut.Request(1);
         _sut.Cancel();
-        Assert.False(await _sut.WaitToTakeAsync().AsTask().WaitAsync(TimeSpan.FromMilliseconds(5)));
+        Assert.False(await _sut.WaitToTakeAsync().WaitAsync(TimeSpan.FromMilliseconds(5)));
     }
     
     [Fact]
     public async Task WaitToTakeAsyncHasExpectedResultWhenOneRequestedAfterWait()
     {
-        var wait= _sut.WaitToTakeAsync().AsTask();
+        var wait= _sut.WaitToTakeAsync();
         Assert.False(wait.IsCompleted);
         _sut.Request(1);
         Assert.True(await wait.WaitAsync(TimeSpan.FromMilliseconds(5)));
@@ -81,7 +81,7 @@ public class ConcurrentFlowControlTests
     [Fact]
     public async Task WaitToTakeAsyncHasExpectedResultWhenCancelledAfterWait()
     {
-        var wait= _sut.WaitToTakeAsync().AsTask();
+        var wait= _sut.WaitToTakeAsync();
         Assert.False(wait.IsCompleted);
         _sut.Cancel();
         Assert.False(await wait.WaitAsync(TimeSpan.FromMilliseconds(5)));

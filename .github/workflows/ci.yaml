@@ -23,6 +23,10 @@ jobs:
         run: make ci
         env:
           AXONIQ_LICENSE: ${{ secrets.AXONIQ_LICENSE }}
+          SONAR_PROJECT_KEY: AxonIQ_axonserver-connector-dotnet
+          SONAR_ORGANIZATION: axoniq
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
       # run the CD build (on master only)
       - name: make cd
         if: github.ref == 'refs/heads/master'
@@ -30,6 +34,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUGET_APIKEY: ${{ secrets.NUGET_APIKEY }}
+          SONAR_PROJECT_KEY: AxonIQ_axonserver-connector-dotnet
+          SONAR_ORGANIZATION: axoniq
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
       - name: publish test results
         uses: EnricoMi/publish-unit-test-result-action/composite@v2
         if: always()

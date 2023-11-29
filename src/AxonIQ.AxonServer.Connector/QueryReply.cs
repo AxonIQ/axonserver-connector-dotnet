@@ -5,9 +5,9 @@ namespace AxonIQ.AxonServer.Connector;
 
 internal abstract record QueryReply
 {
-    public record Send(QueryResponse Response) : QueryReply;
+    public record Send(ChannelId Id, QueryResponse Response) : QueryReply;
 
-    public record Complete : QueryReply;
+    public record Complete(ChannelId Id) : QueryReply;
 
-    public record CompleteWithError(ErrorMessage Error) : QueryReply;
+    public record CompleteWithError(ChannelId Id, ErrorMessage Error) : QueryReply;
 }

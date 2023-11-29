@@ -281,7 +281,7 @@ public class ServiceCollectionExtensionsTests
     {
         var source = new MemoryConfigurationSource
         {
-            InitialData = new KeyValuePair<string, string>[]
+            InitialData = new KeyValuePair<string, string?>[]
             {
                 new(
                     AxonServerConnectorConfiguration.DefaultSection + ":" +

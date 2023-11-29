@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <UserSecretsId>633c5eac-a5c9-478c-ae4b-c9fdb8da37ea</UserSecretsId>
@@ -15,18 +15,18 @@
 
     <ItemGroup>
       <PackageReference Include="AutoFixture" Version="4.18.0" />
-      <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />  
-      <PackageReference Include="Xunit" Version="2.5.3" />
-      <PackageReference Include="Xunit.Runner.Console" Version="2.5.3">
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />  
+      <PackageReference Include="Xunit" Version="2.6.2" />
+      <PackageReference Include="Xunit.Runner.Console" Version="2.6.2">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
-      <PackageReference Include="Xunit.Runner.VisualStudio" Version="2.5.3">
+      <PackageReference Include="Xunit.Runner.VisualStudio" Version="2.5.4">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.7.2" />
+      <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 
 namespace AxonIQ.AxonServer.Connector;
@@ -6,75 +7,53 @@ internal class FlowControlledChannel<T> : Channel<T>
 {
     private readonly ConcurrentFlowControl _flowControl;
     private readonly Channel<T> _channel;
-    
-    public FlowControlledChannel(ConcurrentFlowControl flowControl)
+
+    public FlowControlledChannel(ConcurrentFlowControl flowControl, Channel<T> channel)
     {
         _flowControl = flowControl ?? throw new ArgumentNullException(nameof(flowControl));
-        _channel = Channel.CreateUnbounded<T>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            AllowSynchronousContinuations = false
-        });
-        Reader = new FlowControlledChannelReader(this); //_channel.Reader; 
+        _channel = channel ?? throw new ArgumentNullException(nameof(channel));
+        
+        Reader = new FlowControlledChannelReader(this);
         Writer = new FlowControlledChannelWriter(this);
     }
-    
-    private sealed class FlowControlledChannelReader : ChannelReader<T>
+
+    private sealed class FlowControlledChannelReader(FlowControlledChannel<T> parent) : ChannelReader<T>
     {
-        private readonly FlowControlledChannel<T> _parent;
+        public override Task Completion => parent.Reader.Completion;
+        public override int Count => parent.Reader.Count;
+        public override bool CanCount => parent.Reader.CanCount;
+        public override bool CanPeek => parent.Reader.CanPeek;
+        public override bool TryPeek([MaybeNullWhen(false)] out T item) => parent.Reader.TryPeek(out item);
 
-        public FlowControlledChannelReader(FlowControlledChannel<T> parent)
+        public override bool TryRead([MaybeNullWhen(false)] out T item)
         {
-            _parent = parent;
+            if(parent._flowControl.TryTake())
+            {
+                if(parent._channel.Reader.TryRead(out item)) return true;
+                parent._flowControl.Request(1);
+            }
+
+            item = default;
+            return false;
         }
 
-        public override Task Completion => _parent._channel.Reader.Completion;
-        public override int Count => _parent._channel.Reader.Count;
-        public override bool CanCount => _parent._channel.Reader.CanCount;
-        public override bool CanPeek => _parent._channel.Reader.CanPeek;
-
-        public override bool TryRead(out T item)
+        public override async ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default)
         {
-            return _parent._channel.Reader.TryRead(out item!);
-        }
-
-        public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default)
-        {
-            return _parent._channel.Reader.WaitToReadAsync(cancellationToken);
+            if (await parent._flowControl.WaitToTakeAsync(cancellationToken))
+            {
+                return await parent._channel.Reader.WaitToReadAsync(cancellationToken);
+            }
+            return false;
         }
     }
     
-    private sealed class FlowControlledChannelWriter : ChannelWriter<T>
+    private sealed class FlowControlledChannelWriter(FlowControlledChannel<T> parent) : ChannelWriter<T>
     {
-        private readonly FlowControlledChannel<T> _parent;
-
-        public FlowControlledChannelWriter(FlowControlledChannel<T> parent)
-        {
-            _parent = parent;
-        }
-
-        public override bool TryComplete(Exception? error = null) => _parent._channel.Writer.TryComplete(error);
-
-        public override bool TryWrite(T item)
-        {
-            if (_parent._flowControl.TryTake())
-            {
-                if (_parent._channel.Writer.TryWrite(item)) return true;
-                // NOTE: return the one we've taken but were not able to write
-                _parent._flowControl.Request(1);
-            }
-            return false;
-        }
-
-        public override async ValueTask<bool> WaitToWriteAsync(CancellationToken cancellationToken = default)
-        {
-            if (await _parent._flowControl.WaitToTakeAsync(cancellationToken))
-            {
-                return await _parent._channel.Writer.WaitToWriteAsync(cancellationToken);
-            }
-
-            return false;
-        }
+        public override bool TryComplete(Exception? error = null) => parent.Writer.TryComplete(error);
+        public override bool TryWrite(T item) => parent.Writer.TryWrite(item);
+        public override ValueTask<bool> WaitToWriteAsync(CancellationToken cancellationToken = default) =>
+            parent.Writer.WaitToWriteAsync(cancellationToken);
+        public override ValueTask WriteAsync(T item, CancellationToken cancellationToken = default) =>
+            parent.Writer.WriteAsync(item, cancellationToken);
     }
 }

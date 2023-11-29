@@ -2,7 +2,7 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("AxonIQ.AxonClusterIntegrationTests")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("AxonIQ.AxonServer.Connector.Tests")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("AxonIQ.AxonServerIntegrationTests")]
-[assembly: System.Runtime.Versioning.TargetFramework(".NETCoreApp,Version=v6.0", FrameworkDisplayName="")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETCoreApp,Version=v8.0", FrameworkDisplayName=".NET 8.0")]
 namespace AxonIQ.AxonServer.Connector
 {
     public readonly struct AggregateId : System.IEquatable<AxonIQ.AxonServer.Connector.AggregateId>
