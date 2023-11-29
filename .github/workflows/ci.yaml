@@ -45,6 +45,19 @@ jobs:
           files: |
             test/AxonIQ.AxonServer.Connector.Tests/TestResults/*.trx
             test/AxonIQ.AxonServerIntegrationTests/TestResults/*.trx
+      - uses: actions/upload-artifact@v3
+        with:
+          name: sequences
+          path: |
+            test/AxonIQ.AxonServer.Connector.Tests/TestResults/**/*.xml
+            test/AxonIQ.AxonServerIntegrationTests/TestResults/**/*.xml
+      - uses: actions/upload-artifact@v3
+        with:
+          name: diagnostics
+          path: |
+            test/AxonIQ.AxonServer.Connector.Tests/TestResults/*_diagnostics.txt
+            test/AxonIQ.AxonServerIntegrationTests/TestResults/*_diagnostics.datacollector.*.txt
+            test/AxonIQ.AxonServerIntegrationTests/TestResults/*_diagnostics.host.*.txt
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:
