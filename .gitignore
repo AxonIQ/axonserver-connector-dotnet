@@ -12,5 +12,5 @@ axoniq.license
 axonserver.properties
 cluster-template.yml
 src/Benchmarks/java/target
-test/AxonIQ.AxonServer.Connector.Tests/TestResults/*.trx
-test/AxonIQ.AxonServerIntegrationTests/TestResults/*.trx
+test/AxonIQ.AxonServer.Connector.Tests/TestResults/*
+test/AxonIQ.AxonServerIntegrationTests/TestResults/*
