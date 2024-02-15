@@ -37,7 +37,7 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="OpenTelemetry" Version="1.6.0" />
-        <PackageReference Include="OpenTelemetry.Api" Version="1.6.0" />
+        <PackageReference Include="OpenTelemetry.Api" Version="1.7.0" />
     </ItemGroup>
     
     <ItemGroup>
