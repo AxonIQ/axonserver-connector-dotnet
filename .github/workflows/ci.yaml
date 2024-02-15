@@ -45,13 +45,13 @@ jobs:
           files: |
             test/AxonIQ.AxonServer.Connector.Tests/TestResults/*.trx
             test/AxonIQ.AxonServerIntegrationTests/TestResults/*.trx
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: sequences
           path: |
             test/AxonIQ.AxonServer.Connector.Tests/TestResults/**/*.xml
             test/AxonIQ.AxonServerIntegrationTests/TestResults/**/*.xml
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: diagnostics
           path: |
