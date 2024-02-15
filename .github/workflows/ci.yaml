@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       # setup dotnet based on global.json
-      - uses: actions/setup-dotnet@v3.0.2
+      - uses: actions/setup-dotnet@v4.0.0
       # run the CI build
       - name: make ci
         run: make ci
